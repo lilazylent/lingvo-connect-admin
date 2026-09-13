@@ -128,6 +128,12 @@ test("orders controls, Kanban colors and persistent themes",async({page},info)=>
   const [timelineBox,markerBox] = await Promise.all([timeline.boundingBox(),marker.boundingBox()]);
   expect(markerBox!.x).toBeGreaterThanOrEqual(timelineBox!.x);
   await expect(marker).toHaveCSS("background-color","rgb(24, 24, 29)");
+  await page.getByRole("button",{name:"Новый заказ +"}).click();
+  await expect(page.locator(".crm-wizard__head")).toHaveCSS("background-color","rgb(32, 32, 39)");
+  await expect(page.locator(".crm-wizard__head h2")).toHaveCSS("color","rgb(245, 243, 244)");
+  await expect(page.locator(".wizard-draft-note")).toHaveCSS("background-color","rgb(32, 32, 39)");
+  await expect(page.locator(".wizard-draft-note")).toHaveCSS("color","rgb(203, 199, 202)");
+  await page.screenshot({path:info.outputPath("dark-order-wizard.png"),fullPage:true});
 
   await page.goto("/admin/applications/visual-application");
   await expect(page.locator(".detail-sections")).toHaveCSS("background-color","rgb(17, 17, 20)");

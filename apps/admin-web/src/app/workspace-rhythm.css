@@ -337,6 +337,21 @@ html[data-crm-theme="dark"] :is(.page-head p,.detail-head p,.settings-head-copy,
 html[data-crm-theme="dark"] :is(.overline,.table-caption,.table-caption span,.pagination,.filter-disclosure,.workflow-help,.order-card-head p,.crm-section-head p) { color: var(--crm-text-secondary); }
 html[data-crm-theme="dark"] :is(.card,.detail-panel,.form-section,.application-toolbar,.crm-editor,.table-surface,.settings-surface,.directory-summary,.placeholder-surface,.crm-wizard,.crm-order-card,.order-side-card,.order-context-strip>div,.finance-strip>div,.order-work-table article,.file-metric-row,.theme-option,.status-directory__row,.work-inline-editor,.work-draft,.price-row,.executor-row,.operational-form,.directory-summary__metrics>div,.directory-summary__orders a,.order-file-row,.order-records__section,.crm-history__group,.dashboard-finance,.metric-strip,.page-head__meta,.context-note,.crm-work,.crm-work-editor,.import-file-picker) { color: var(--crm-text); border-color: var(--crm-border); background: var(--crm-surface); }
 html[data-crm-theme="dark"] :is(.crm-commandbar,.order-card-layout>aside,.order-core-editor,.order-context-strip,.finance-strip,.table-caption,.kanban-column,.wizard-steps,.wizard-footer,.review-hero,.detail-sections) { color: var(--crm-text); border-color: var(--crm-border); background: var(--crm-shell); }
+html[data-crm-theme="dark"] .crm-wizard__head {
+  color: var(--crm-text);
+  border-color: var(--crm-border);
+  background: var(--crm-surface-raised);
+}
+html[data-crm-theme="dark"] .crm-wizard__head :is(h2,p) { color: var(--crm-text); }
+html[data-crm-theme="dark"] .wizard-steps button { color: var(--crm-text-secondary); border-color: var(--crm-border); }
+html[data-crm-theme="dark"] .wizard-steps button:hover { color: var(--crm-text); background: var(--crm-surface-hover); }
+html[data-crm-theme="dark"] .wizard-steps button.is-active { color: var(--crm-text); background: var(--crm-surface-raised); }
+html[data-crm-theme="dark"] .wizard-draft-note {
+  color: var(--crm-text-secondary);
+  border-color: var(--crm-border-strong);
+  border-left-color: var(--crm-accent-hover);
+  background: var(--crm-surface-raised);
+}
 html[data-crm-theme="dark"] :is(.input,.select-trigger,.crm-combobox__input,.view-switch,.settings-tabs,.settings-subtabs,.archive-toggle,.file-drop,.calculated-value,.manual-switch--feature,.compact-upload,.file-picker__surface,.order-side-link) { color: var(--crm-text); border-color: var(--crm-border-strong); background: var(--crm-surface-raised); }
 html[data-crm-theme="dark"] :is(.input,.select-trigger,.crm-combobox__input):hover { border-color: #777781; background: var(--crm-surface-hover); }
 html[data-crm-theme="dark"] :is(.input,.select-trigger,.crm-combobox__input):focus { border-color: var(--crm-accent); background: var(--crm-surface-raised); }
