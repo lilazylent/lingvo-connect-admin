@@ -1,0 +1,46 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Node / Next.js
+node_modules/
+.next/
+.next-qa/
+.qa-stage2-storage/
+out/
+coverage/
+npm-debug.log*
+
+# Python
+.venv/
+.venv*/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.db
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Local data and private files
+uploads/
+storage/
+backups/
+dumps/
+*.sql
+*.dump
+*.sqlite
+*.sqlite3
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini

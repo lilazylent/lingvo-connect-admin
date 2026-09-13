@@ -1,0 +1,130 @@
+"""Operational records. A request remains independent of the accepted order."""
+
+from datetime import date, datetime
+from decimal import Decimal
+
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.db import Base
+from app.models import new_uuid, utcnow
+
+
+class RecordMixin:
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    archived: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Executor(RecordMixin, Base):
+    __tablename__ = "executors"
+    name: Mapped[str] = mapped_column(String(200), index=True)
+    email: Mapped[str] = mapped_column(String(320), default="", index=True)
+    phone: Mapped[str] = mapped_column(String(40), default="")
+    telegram: Mapped[str] = mapped_column(String(160), default="")
+    notes: Mapped[str] = mapped_column(Text, default="")
+
+
+class ExecutorDirection(Base):
+    __tablename__ = "executor_directions"
+    executor_id: Mapped[str] = mapped_column(
+        ForeignKey("executors.id", ondelete="CASCADE"), primary_key=True
+    )
+    source_language: Mapped[str] = mapped_column(String(80), primary_key=True)
+    target_language: Mapped[str] = mapped_column(String(80), primary_key=True)
+    work_type: Mapped[str] = mapped_column(String(64), primary_key=True)
+
+
+class Order(RecordMixin, Base):
+    __tablename__ = "orders"
+    number: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    title: Mapped[str] = mapped_column(String(200), index=True)
+    client_id: Mapped[str | None] = mapped_column(
+        ForeignKey("companies.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
+    contact_id: Mapped[str | None] = mapped_column(
+        ForeignKey("representatives.id", ondelete="RESTRICT"), nullable=True
+    )
+    manager_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    application_id: Mapped[str | None] = mapped_column(
+        ForeignKey("applications.id", ondelete="RESTRICT"), nullable=True, unique=True
+    )
+    deadline: Mapped[date | None] = mapped_column(Date, nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="NEW", index=True)
+    notes: Mapped[str] = mapped_column(Text, default="")
+
+
+class OrderWork(RecordMixin, Base):
+    __tablename__ = "order_works"
+    order_id: Mapped[str] = mapped_column(ForeignKey("orders.id", ondelete="RESTRICT"), index=True)
+    work_type: Mapped[str] = mapped_column(String(64))
+    service_code: Mapped[str] = mapped_column(String(64), default="written_translation", index=True)
+    source_language: Mapped[str] = mapped_column(String(80), default="")
+    target_language: Mapped[str] = mapped_column(String(80), default="")
+    topic: Mapped[str] = mapped_column(String(160), default="")
+    urgent: Mapped[bool] = mapped_column(Boolean, default=False)
+    native_speaker: Mapped[bool] = mapped_column(Boolean, default=False)
+    tariff_ids: Mapped[str] = mapped_column(Text, default="")
+    character_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    page_count: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    word_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    billing_unit: Mapped[str] = mapped_column(String(32), default="CUSTOM")
+    client_rate: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"))
+    auto_price: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"))
+    price: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"))
+    price_overridden: Mapped[bool] = mapped_column(Boolean, default=False)
+    price_override_reason: Mapped[str] = mapped_column(String(500), default="")
+    executor_id: Mapped[str | None] = mapped_column(
+        ForeignKey("executors.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
+    executor_rate: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"))
+    executor_billing_unit: Mapped[str] = mapped_column(String(32), default="CUSTOM")
+    executor_auto_cost: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"))
+    executor_cost: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"))
+    executor_cost_overridden: Mapped[bool] = mapped_column(Boolean, default=False)
+    deadline: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+    deadline_time: Mapped[str] = mapped_column(String(5), default="")
+    executor_deadline: Mapped[date | None] = mapped_column(Date, nullable=True)
+    executor_deadline_time: Mapped[str] = mapped_column(String(5), default="")
+    status: Mapped[str] = mapped_column(String(32), default="NEW", index=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=100)
+    notes: Mapped[str] = mapped_column(Text, default="")
+
+
+class OrderCounter(Base):
+    """Single locked counter, independent of existing request sequence."""
+
+    __tablename__ = "order_counters"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    value: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class ApplicationClient(Base):
+    __tablename__ = "application_clients"
+    application_id: Mapped[str] = mapped_column(
+        ForeignKey("applications.id", ondelete="RESTRICT"), primary_key=True
+    )
+    client_id: Mapped[str | None] = mapped_column(
+        ForeignKey("companies.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
+
+
+class OperationalActivity(Base):
+    __tablename__ = "operational_activity"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    order_id: Mapped[str | None] = mapped_column(
+        ForeignKey("orders.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
+    executor_id: Mapped[str | None] = mapped_column(
+        ForeignKey("executors.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
+    work_id: Mapped[str | None] = mapped_column(
+        ForeignKey("order_works.id", ondelete="RESTRICT"), nullable=True
+    )
+    actor_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    action: Mapped[str] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
