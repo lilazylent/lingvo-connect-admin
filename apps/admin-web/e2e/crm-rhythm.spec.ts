@@ -3,6 +3,7 @@ import { test, expect } from "@playwright/test";
 // Isolated UI fixtures: never authenticate against or change the user's database.
 const user = { id: "visual-user", display_name: "Мария Иванова", email: "visual@example.invalid", role: "ADMIN", is_active: true, two_factor_enabled: true };
 const order = { id: "visual-order", number: "LC-O-000042", title: "Перевод технической документации", status: "IN_PROGRESS", deadline: "2026-10-02", client_id: null, contact_id: null, manager_id: null, application_id: null, notes: "", version: 1, archived: false, created_at: "2026-09-13T09:00:00Z", client_name: "Международная производственная компания", contact_name: "Анна Смирнова", manager_name: "Мария Иванова", files: [], payment: null, financial: {revenue:12000,executor_cost:7000,profit:5000,margin_percent:41.67,client_paid:0,client_debt:12000}, works: [{id:"visual-work", service_code:"written_translation", source_language:"Русский",target_language:"Английский", character_count:18000, page_count:10, price:12000, executor_cost:7000,executor_id:null,status:"IN_PROGRESS",deadline:"2026-10-02",version:1}] };
+const application = { id:"visual-application", number:"LC-A-000042", name:"Анна Смирнова", contact_method:"email", contact:"anna@example.invalid", email:"anna@example.invalid", phone:null, company:"Международная производственная компания", requested_service:"written_translation", source_language:"Русский", target_language:"Английский", message:"Нужно перевести техническое руководство и сохранить структуру документа.", desired_date:"2026-10-02", status_code:"IN_PROGRESS", responsible_manager:user, internal_summary:"Согласовать итоговый формат.", source:"website", source_identifier:null, submitted_at:"2026-09-13T09:00:00Z", created_at:"2026-09-13T09:00:00Z", updated_at:"2026-09-13T09:00:00Z", version:1, comments:[], files:[], activity:[] };
 const pageData = (items: unknown[] = []) => ({items,total:items.length,page:1,pages:1,page_size:20});
 const statuses = [
   {code:"NEW",name:"Новый",color:"blue",active:true,sort_order:10},
@@ -33,6 +34,8 @@ test.beforeEach(async ({page}) => {
     else if (path.endsWith("/crm/dashboard")) json = {new_leads:6,active_orders:1,due_today:0,overdue:0,unassigned:1,awaiting_payment:1,revenue:12000,executor_cost:7000,profit:5000,recent_orders:[order]};
     else if (path.endsWith("/crm/orders/visual-order")) json = order;
     else if (path.endsWith("/crm/orders")) json = pageData([order]);
+    else if (path.endsWith("/applications/visual-application")) json = application;
+    else if (path.endsWith("/applications/managers")) json = [user];
     else if (path.endsWith("/crm/services")) json = [{id:"service",code:"written_translation",name:"Письменный перевод",billing_mode:"CONDITIONAL_PAGE",active:true,sort_order:1,notes:""}];
     else if (path.endsWith("/crm/order-statuses")) json = statuses;
     else if (path.includes("/crm/order-statuses/")) json = statuses[0];
@@ -102,6 +105,29 @@ test("orders controls, Kanban colors and persistent themes",async({page},info)=>
   const firstHeader = page.locator("thead th").first();
   await expect(firstHeader).toHaveCSS("color","rgb(245, 243, 244)");
   await expect(firstHeader).toHaveCSS("background-color","rgb(32, 32, 39)");
+
+  for (const [route,name] of [["/admin","dashboard"],["/admin/orders?open=visual-order","order"],["/admin/applications/visual-application","application-detail"],["/admin/files","files"],["/admin/users","users"]] as const) {
+    await page.goto(route);
+    await expect(page.locator("html")).toHaveAttribute("data-crm-theme","dark");
+    await expect(page.getByRole("heading",{level:1})).toBeVisible();
+    await page.screenshot({path:info.outputPath(`dark-${name}.png`),fullPage:true});
+  }
+
+  await page.goto("/admin");
+  await expect(page.locator(".page-head__meta")).toHaveCSS("background-color","rgb(24, 24, 29)");
+  await expect(page.locator(".metric-strip a").first()).toHaveCSS("background-color","rgb(32, 32, 39)");
+  await expect(page.locator(".dashboard-finance strong").first()).toHaveCSS("color","rgb(245, 243, 244)");
+
+  await page.goto("/admin/orders?open=visual-order");
+  await expect(page.locator(".order-core-editor")).toHaveCSS("background-color","rgb(17, 17, 20)");
+  await expect(page.locator(".order-work-table article > div > strong").first()).toHaveCSS("color","rgb(245, 243, 244)");
+  await expect(page.locator(".payment-summary strong").first()).toHaveCSS("color","rgb(245, 243, 244)");
+
+  await page.goto("/admin/applications/visual-application");
+  await expect(page.locator(".detail-sections")).toHaveCSS("background-color","rgb(17, 17, 20)");
+  await expect(page.locator(".detail-sections a span").first()).toHaveCSS("color","rgb(203, 199, 202)");
+  await page.locator(".operational-group").first().hover();
+  await expect(page.locator(".operational-group").first()).toHaveCSS("background-color","rgb(40, 40, 47)");
 
   for (const [route,name] of [["/admin/applications","applications"],["/admin/clients","clients"],["/admin/translators","translators"]] as const) {
     await page.goto(route);
