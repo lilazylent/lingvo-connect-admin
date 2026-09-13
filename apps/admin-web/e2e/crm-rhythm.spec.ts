@@ -32,6 +32,7 @@ test.beforeEach(async ({page}) => {
     }
     else if (path.endsWith("/managers") || path.endsWith("/users")) json = [user];
     else if (path.endsWith("/crm/dashboard")) json = {new_leads:6,active_orders:1,due_today:0,overdue:0,unassigned:1,awaiting_payment:1,revenue:12000,executor_cost:7000,profit:5000,recent_orders:[order]};
+    else if (path.endsWith("/orders/visual-order/activity")) json = pageData([{id:"event-1",action:"ORDER_STATUS_CHANGED",created_at:"2026-09-13T09:30:00Z"}]);
     else if (path.endsWith("/crm/orders/visual-order")) json = order;
     else if (path.endsWith("/crm/orders")) json = pageData([order]);
     else if (path.endsWith("/applications/visual-application")) json = application;
@@ -122,6 +123,11 @@ test("orders controls, Kanban colors and persistent themes",async({page},info)=>
   await expect(page.locator(".order-core-editor")).toHaveCSS("background-color","rgb(17, 17, 20)");
   await expect(page.locator(".order-work-table article > div > strong").first()).toHaveCSS("color","rgb(245, 243, 244)");
   await expect(page.locator(".payment-summary strong").first()).toHaveCSS("color","rgb(245, 243, 244)");
+  const timeline = page.locator(".order-history .activity-list");
+  const marker = timeline.locator("li > span").first();
+  const [timelineBox,markerBox] = await Promise.all([timeline.boundingBox(),marker.boundingBox()]);
+  expect(markerBox!.x).toBeGreaterThanOrEqual(timelineBox!.x);
+  await expect(marker).toHaveCSS("background-color","rgb(24, 24, 29)");
 
   await page.goto("/admin/applications/visual-application");
   await expect(page.locator(".detail-sections")).toHaveCSS("background-color","rgb(17, 17, 20)");
@@ -135,4 +141,14 @@ test("orders controls, Kanban colors and persistent themes",async({page},info)=>
     await expect(page.getByRole("heading",{level:1})).toBeVisible();
     await page.screenshot({path:info.outputPath(`dark-${name}.png`),fullPage:true});
   }
+});
+
+test("dark login keeps both panels readable",async({page},info)=>{
+  await page.route("**/api/admin/auth/session",route=>route.fulfill({status:200,json:{stage:"ANONYMOUS",user:null}}));
+  await page.addInitScript(()=>localStorage.setItem("lc-crm-theme","dark"));
+  await page.goto("/login");
+  await expect(page.locator("html")).toHaveAttribute("data-crm-theme","dark");
+  await expect(page.locator(".auth-brand")).toHaveCSS("background-color","rgb(32, 32, 39)");
+  await expect(page.locator(".auth-brand__copy p")).toHaveCSS("color","rgb(245, 243, 244)");
+  await page.screenshot({path:info.outputPath("dark-login.png"),fullPage:true});
 });

@@ -308,7 +308,25 @@ html[data-crm-theme="dark"] {
   --lc-amber-soft: var(--crm-warning-soft);
   --focus-ring: var(--crm-accent);
 }
+html[data-crm-theme="dark"] { color-scheme: dark; }
 html[data-crm-theme="dark"], html[data-crm-theme="dark"] body { background: var(--crm-bg); color: var(--crm-text); }
+html[data-crm-theme="dark"] .auth-page { background: var(--crm-bg); }
+html[data-crm-theme="dark"] .auth-brand {
+  color: var(--crm-text);
+  background: var(--crm-surface-raised);
+}
+html[data-crm-theme="dark"] .auth-brand::before,
+html[data-crm-theme="dark"] .auth-brand::after { border-color: var(--crm-border-strong); }
+html[data-crm-theme="dark"] .auth-brand .brand strong,
+html[data-crm-theme="dark"] .auth-brand__copy p { color: var(--crm-text); }
+html[data-crm-theme="dark"] .auth-brand .brand small,
+html[data-crm-theme="dark"] .auth-brand__index { color: var(--crm-text-secondary); }
+html[data-crm-theme="dark"] .auth-panel {
+  color: var(--crm-text);
+  background-color: var(--crm-shell);
+  background-image: linear-gradient(to right,rgb(255 255 255 / 4%) 1px,transparent 1px);
+}
+html[data-crm-theme="dark"] .auth-footer { border-color: var(--crm-border); color: var(--crm-text-secondary); }
 html[data-crm-theme="dark"] .workspace { background: var(--crm-bg); }
 html[data-crm-theme="dark"] .content { background: var(--crm-bg); }
 html[data-crm-theme="dark"] .sidebar { border-color: var(--crm-border); background: var(--crm-shell); }
@@ -333,9 +351,17 @@ html[data-crm-theme="dark"] :is(td,th,.payment-summary>div,.order-side-card__hea
 html[data-crm-theme="dark"] .metric-strip a { color: var(--crm-text); border-color: var(--crm-border) !important; background: var(--crm-surface-raised); box-shadow: 0 9px 28px rgb(0 0 0 / 16%); }
 html[data-crm-theme="dark"] .metric-strip a:hover { color: #fff; border-color: var(--crm-border-strong) !important; background: var(--crm-surface-hover); }
 html[data-crm-theme="dark"] .metric-strip strong { color: var(--crm-text); }
-html[data-crm-theme="dark"] :is(.dashboard-finance strong,.order-work-table article>div>strong,.order-work-table article>div:first-of-type strong,.order-side-card>div strong,.payment-summary strong,.file-metric-row__copy strong,.file-metric-row__metric strong,.file-picker__copy strong,.order-records__heading h3) { color: var(--crm-text); }
-html[data-crm-theme="dark"] :is(.dashboard-finance span,.order-work-table article>div>span,.order-work-table article small,.order-side-card>div span,.payment-summary span,.file-metric-row__copy small,.file-metric-row__metric span,.order-records__empty) { color: var(--crm-text-secondary); }
+html[data-crm-theme="dark"] :is(.dashboard-finance strong,.order-work-table article>div>strong,.order-work-table article>div:first-of-type strong,.order-side-card>div strong,.payment-summary strong,.file-metric-row__copy strong,.file-metric-row__metric strong,.file-picker__copy strong,.order-file-row__copy strong,.order-records__heading h3) { color: var(--crm-text); }
+html[data-crm-theme="dark"] :is(.dashboard-finance span,.order-work-table article>div>span,.order-work-table article small,.order-side-card>div span,.payment-summary span,.file-metric-row__copy small,.file-metric-row__metric span,.file-picker__copy small,.order-file-row__copy small,.order-records__empty) { color: var(--crm-text-secondary); }
 html[data-crm-theme="dark"] .order-records__count { color: var(--crm-text-secondary); background: var(--crm-surface-hover); }
+html[data-crm-theme="dark"] .order-file-row__mark { color: var(--crm-accent-hover); border-color: var(--crm-border-strong); background: var(--crm-accent-soft); }
+html[data-crm-theme="dark"] .order-file-row__download { color: var(--crm-accent-hover); }
+html[data-crm-theme="dark"] .activity-list li > span {
+  border: 2px solid var(--crm-accent-hover);
+  background: var(--crm-surface);
+  box-shadow: 0 0 0 3px var(--crm-surface);
+}
+html[data-crm-theme="dark"] .activity-list li::before { background: var(--crm-border-strong); }
 html[data-crm-theme="dark"] :is(.detail-sections a,.detail-sections a span,.directory-summary__metrics span,.directory-summary__orders a span,.directory-summary__orders a small,.activity-list small) { color: var(--crm-text-secondary); }
 html[data-crm-theme="dark"] :is(.directory-summary header h3,.directory-summary__metrics strong,.directory-summary__orders a strong,.activity-list strong,.activity-list--order strong) { color: var(--crm-text); }
 html[data-crm-theme="dark"] thead th { color: var(--crm-text); background: var(--crm-surface-raised); }

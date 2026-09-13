@@ -2391,7 +2391,14 @@ td > small { font-size: 12px; }
 }
 .order-file-row__download:hover { background: var(--lc-burgundy-soft); transform: translateY(-1px); }
 .order-records__empty { margin: 8px 0 0; color: #87939d; font-size: 12px; }
-.order-history .activity-list { max-height: 360px; margin-top: 8px; padding-right: 5px; overflow-y: auto; overscroll-behavior: contain; }
+.order-history .activity-list {
+  max-height: 360px;
+  margin-top: 8px;
+  padding: 3px 7px 2px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
 .activity-list--order li { padding-bottom: 14px; }
 .activity-list--order strong { color: #2e4659; font-size: 12.5px; }
 .activity-list--order small { font-size: 10.5px; }
