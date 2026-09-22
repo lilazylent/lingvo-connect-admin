@@ -4,8 +4,9 @@ from datetime import UTC, datetime, timedelta
 import pyotp
 
 from app.config import get_settings
+from app.client_models import Company
 from app.db import SessionLocal
-from app.models import Role, SecurityAuditEvent, User, UserSession
+from app.models import RecoveryCode, Role, SecurityAuditEvent, User, UserInvitation, UserSession
 from app.security import decrypt_totp_secret
 from tests.conftest import csrf_headers
 
@@ -216,3 +217,279 @@ def test_csrf_is_enforced(client, create_user):
         json={"email": "manager@example.com", "display_name": "Менеджер", "role": "MANAGER"},
     )
     assert response.status_code == 403
+
+
+def test_admin_can_delete_unused_user_but_not_self_or_last_admin(client, create_user):
+    complete_first_login(client, create_user)
+    manager = create_user("remove-me@example.com", role=Role.MANAGER, must_change_password=False)
+
+    removed = client.delete(
+        f"/api/admin/users/{manager.id}",
+        headers=csrf_headers(client),
+    )
+    assert removed.status_code == 200
+    with SessionLocal() as db:
+        assert db.get(User, manager.id) is None
+
+    with SessionLocal() as db:
+        owner = db.query(User).filter(User.email == "owner@example.com").one()
+        owner_id = owner.id
+
+    self_delete = client.delete(
+        f"/api/admin/users/{owner_id}",
+        headers=csrf_headers(client),
+    )
+    assert self_delete.status_code == 400
+
+    demote_last_admin = client.patch(
+        f"/api/admin/users/{owner_id}",
+        json={"role": "MANAGER"},
+        headers=csrf_headers(client),
+    )
+    assert demote_last_admin.status_code == 400
+
+    deactivate_last_admin = client.patch(
+        f"/api/admin/users/{owner_id}",
+        json={"is_active": False},
+        headers=csrf_headers(client),
+    )
+    assert deactivate_last_admin.status_code == 400
+
+
+def test_manager_cannot_mutate_user_administration(client, create_user):
+    complete_first_login(client, create_user, email="manager@example.com", role=Role.MANAGER)
+    target = create_user("target@example.com", role=Role.MANAGER, must_change_password=False)
+
+    assert client.post(
+        "/api/admin/users",
+        json={"email": "other@example.com", "display_name": "Другой", "role": "MANAGER"},
+        headers=csrf_headers(client),
+    ).status_code == 403
+    assert client.get("/api/admin/users/invitations").status_code == 403
+    assert client.post(
+        "/api/admin/users/invitations",
+        json={"email": "invited@example.com", "role": "MANAGER"},
+        headers=csrf_headers(client),
+    ).status_code == 403
+    assert client.patch(
+        f"/api/admin/users/{target.id}",
+        json={"role": "ADMIN"},
+        headers=csrf_headers(client),
+    ).status_code == 403
+    assert client.post(
+        f"/api/admin/users/{target.id}/reset-password",
+        headers=csrf_headers(client),
+    ).status_code == 403
+    assert client.post(
+        f"/api/admin/users/{target.id}/reset-2fa",
+        headers=csrf_headers(client),
+    ).status_code == 403
+    assert client.delete(
+        f"/api/admin/users/{target.id}",
+        headers=csrf_headers(client),
+    ).status_code == 403
+
+
+def test_admin_user_security_actions_are_persisted(client, create_user):
+    complete_first_login(client, create_user)
+    target = create_user(
+        "security-target@example.com",
+        role=Role.MANAGER,
+        must_change_password=False,
+        two_factor_enabled=True,
+    )
+    with SessionLocal() as db:
+        stored = db.get(User, target.id)
+        stored.two_factor_secret_encrypted = "encrypted-placeholder"
+        db.add(RecoveryCode(user_id=target.id, code_hash="c" * 64))
+        db.add(
+            UserSession(
+                user_id=target.id,
+                token_hash="d" * 64,
+                csrf_hash="e" * 64,
+                auth_stage="AUTHENTICATED",
+                expires_at=datetime.now(UTC) + timedelta(hours=1),
+                idle_expires_at=datetime.now(UTC) + timedelta(hours=1),
+            )
+        )
+        db.commit()
+
+    reset_2fa = client.post(
+        f"/api/admin/users/{target.id}/reset-2fa",
+        headers=csrf_headers(client),
+    )
+    assert reset_2fa.status_code == 200
+    with SessionLocal() as db:
+        stored = db.get(User, target.id)
+        assert stored.two_factor_enabled is False
+        assert stored.two_factor_secret_encrypted is None
+        assert db.query(RecoveryCode).filter(RecoveryCode.user_id == target.id).count() == 0
+        assert all(session.revoked_at is not None for session in db.query(UserSession).filter(UserSession.user_id == target.id).all())
+
+    with SessionLocal() as db:
+        db.add(
+            UserSession(
+                user_id=target.id,
+                token_hash="f" * 64,
+                csrf_hash="1" * 64,
+                auth_stage="AUTHENTICATED",
+                expires_at=datetime.now(UTC) + timedelta(hours=1),
+                idle_expires_at=datetime.now(UTC) + timedelta(hours=1),
+            )
+        )
+        db.commit()
+
+    reset_password = client.post(
+        f"/api/admin/users/{target.id}/reset-password",
+        headers=csrf_headers(client),
+    )
+    assert reset_password.status_code == 200
+    assert reset_password.json()["temporary_password"]
+    with SessionLocal() as db:
+        stored = db.get(User, target.id)
+        assert stored.must_change_password is True
+        assert all(session.revoked_at is not None for session in db.query(UserSession).filter(UserSession.user_id == target.id).all())
+
+
+def test_used_user_cannot_be_hard_deleted(client, create_user):
+    complete_first_login(client, create_user)
+    manager = create_user("linked-manager@example.com", role=Role.MANAGER, must_change_password=False)
+    with SessionLocal() as db:
+        db.add(Company(name="Клиент менеджера", manager_id=manager.id))
+        db.commit()
+
+    response = client.delete(
+        f"/api/admin/users/{manager.id}",
+        headers=csrf_headers(client),
+    )
+    assert response.status_code == 409
+    with SessionLocal() as db:
+        assert db.get(User, manager.id) is not None
+
+
+def test_admin_invites_user_and_invited_user_registers_with_own_password(client, create_user):
+    complete_first_login(client, create_user)
+    created = client.post(
+        "/api/admin/users/invitations",
+        json={"email": "new-manager@example.com", "role": "MANAGER"},
+        headers=csrf_headers(client),
+    )
+    assert created.status_code == 201
+    payload = created.json()
+    invitation_id = payload["invitation"]["id"]
+    token = payload["registration_url"].rsplit("/", 1)[1]
+    assert payload["registration_url"].startswith("http://testserver/register/")
+    assert payload["invitation"]["status"] == "PENDING"
+
+    with SessionLocal() as db:
+        assert db.query(User).filter(User.email == "new-manager@example.com").count() == 0
+        invitation = db.get(UserInvitation, invitation_id)
+        assert invitation is not None
+        assert invitation.token_hash != token
+
+    public = client.get(f"/api/admin/auth/invitations/{token}")
+    assert public.status_code == 200
+    assert public.json()["email"] == "new-manager@example.com"
+    assert public.json()["role"] == "MANAGER"
+
+    accepted = client.post(
+        f"/api/admin/auth/invitations/{token}/accept",
+        json={"password": "OwnPermanentPass789!"},
+    )
+    assert accepted.status_code == 200
+    assert accepted.json()["stage"] == "TWO_FACTOR_SETUP"
+    assert accepted.json()["user"]["role"] == "MANAGER"
+    assert accepted.json()["user"]["must_change_password"] is False
+    assert client.get("/api/admin/auth/2fa/setup").status_code == 200
+
+    with SessionLocal() as db:
+        user = db.query(User).filter(User.email == "new-manager@example.com").one()
+        invitation = db.get(UserInvitation, invitation_id)
+        assert user.display_name == "new-manager"
+        assert invitation.accepted_user_id == user.id
+        assert invitation.accepted_at is not None
+
+    assert client.get(f"/api/admin/auth/invitations/{token}").status_code == 410
+
+
+def test_invitation_can_be_renewed_and_cancelled(client, create_user):
+    complete_first_login(client, create_user)
+    created = client.post(
+        "/api/admin/users/invitations",
+        json={"email": "pending@example.com", "role": "MANAGER"},
+        headers=csrf_headers(client),
+    )
+    invitation_id = created.json()["invitation"]["id"]
+    old_token = created.json()["registration_url"].rsplit("/", 1)[1]
+
+    renewed = client.post(
+        f"/api/admin/users/invitations/{invitation_id}/new-link",
+        headers=csrf_headers(client),
+    )
+    assert renewed.status_code == 200
+    new_token = renewed.json()["registration_url"].rsplit("/", 1)[1]
+    assert new_token != old_token
+    assert client.get(f"/api/admin/auth/invitations/{old_token}").status_code == 404
+    assert client.get(f"/api/admin/auth/invitations/{new_token}").status_code == 200
+
+    cancelled = client.delete(
+        f"/api/admin/users/invitations/{invitation_id}",
+        headers=csrf_headers(client),
+    )
+    assert cancelled.status_code == 200
+    assert client.get(f"/api/admin/auth/invitations/{new_token}").status_code == 410
+    assert client.get("/api/admin/users/invitations").json() == []
+
+
+def test_expired_invitation_is_rejected_but_admin_can_issue_new_link(client, create_user):
+    complete_first_login(client, create_user)
+    created = client.post(
+        "/api/admin/users/invitations",
+        json={"email": "expired@example.com", "role": "ADMIN"},
+        headers=csrf_headers(client),
+    )
+    invitation_id = created.json()["invitation"]["id"]
+    old_token = created.json()["registration_url"].rsplit("/", 1)[1]
+    with SessionLocal() as db:
+        invitation = db.get(UserInvitation, invitation_id)
+        invitation.expires_at = datetime.now(UTC) - timedelta(minutes=1)
+        db.commit()
+
+    expired = client.get(f"/api/admin/auth/invitations/{old_token}")
+    assert expired.status_code == 410
+    assert "истёк" in expired.json()["detail"]
+    listing = client.get("/api/admin/users/invitations")
+    assert listing.status_code == 200
+    assert listing.json()[0]["status"] == "EXPIRED"
+
+    renewed = client.post(
+        f"/api/admin/users/invitations/{invitation_id}/new-link",
+        headers=csrf_headers(client),
+    )
+    assert renewed.status_code == 200
+    new_token = renewed.json()["registration_url"].rsplit("/", 1)[1]
+    assert client.get(f"/api/admin/auth/invitations/{new_token}").status_code == 200
+
+
+def test_invitation_creation_guards_existing_accounts_and_duplicate_pending_invites(client, create_user):
+    complete_first_login(client, create_user)
+    create_user("existing@example.com", role=Role.MANAGER, must_change_password=False)
+    existing = client.post(
+        "/api/admin/users/invitations",
+        json={"email": "existing@example.com", "role": "MANAGER"},
+        headers=csrf_headers(client),
+    )
+    assert existing.status_code == 409
+
+    first = client.post(
+        "/api/admin/users/invitations",
+        json={"email": "duplicate@example.com", "role": "MANAGER"},
+        headers=csrf_headers(client),
+    )
+    assert first.status_code == 201
+    duplicate = client.post(
+        "/api/admin/users/invitations",
+        json={"email": "duplicate@example.com", "role": "ADMIN"},
+        headers=csrf_headers(client),
+    )
+    assert duplicate.status_code == 409

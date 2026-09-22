@@ -1,0 +1,1579 @@
+MASTER EXECUTION PROMPT
+LINGVO CONNECT CRM
+PHASE 07 — DARK THEME SYSTEM AUDIT + CROSS-PROJECT VISUAL CONSOLIDATION
+CANONICAL ENGLISH VERSION
+
+======================================================================
+MISSION
+======================================================================
+
+You are acting simultaneously as:
+
+- Senior Frontend Architect
+- Senior Product Designer
+- Design System Engineer
+- React / TypeScript Engineer
+- CSS Architecture Engineer
+- Accessibility Engineer
+- QA Engineer
+- Regression Analyst
+
+You are NOT working on a single page.
+
+You are working on one cohesive CRM product:
+Lingvo Connect CRM.
+
+The purpose of Phase 07 is not to "make the interface darker".
+
+The purpose is to eliminate visual fragmentation across the entire CRM
+and make Dark Theme a first-class, production-quality system.
+
+A local fix is NOT considered complete if the same semantic UI pattern
+exists elsewhere in the project.
+
+The following outcome is unacceptable:
+
+"Fixed on one page, still broken somewhere else."
+
+The following outcome is required:
+
+"One semantic pattern = one consistent implementation across the CRM."
+
+
+======================================================================
+NON-NEGOTIABLE EXECUTION PRINCIPLE
+======================================================================
+
+EVERY shared visual change MUST trigger a cross-project regression audit.
+
+Examples:
+
+If you fix:
+
+- typography
+- text color
+- grid alignment
+- card spacing
+- button geometry
+- badges
+- inputs
+- tabs
+- separators
+- status indicators
+- hover states
+- scrollbars
+- Dark Theme colors
+- focus states
+- table rows
+
+in ONE place,
+
+you MUST immediately search the entire codebase for every equivalent
+semantic pattern and verify that the same rule is applied everywhere.
+
+Never consider a fix complete only because the current screenshot looks good.
+
+The codebase, not the screenshot, is the scope of the fix.
+
+
+======================================================================
+0. SOURCE OF TRUTH
+======================================================================
+
+Before making ANY code change, re-read the latest project state.
+
+Mandatory sources of truth:
+
+1. Latest approved Phase 06 ZIP.
+2. AGENTS.md.
+3. CLAUDE.md if present.
+4. Project-specific instructions.
+5. docs/CRM_MVP_MASTER_SPEC.md.
+6. The original 26-point Final MVP Frontend Polish specification.
+7. Phase 00–06 specifications.
+8. Phase 00–06 implementation reports.
+9. All owner-review requirement documents.
+10. All uploaded review transcripts.
+11. All visual screenshots/contact sheets derived from owner videos.
+12. MASTER_FRONTEND_REFERENCE.
+13. Current backend API and schema.
+14. Current source code.
+
+The CURRENT PROJECT CODE is always authoritative over memory.
+
+Do not rely on assumptions from previous versions.
+
+Do not silently restore behavior from an older ZIP.
+
+
+======================================================================
+1. PHASE 07 PRIMARY OBJECTIVE
+======================================================================
+
+Phase 07 consists of four combined responsibilities:
+
+DARK THEME SYSTEM AUDIT
++
+VISUAL CONSOLIDATION
++
+CROSS-PROJECT REGRESSION FIXING
++
+DESIGN SYSTEM ENFORCEMENT
+
+The final Dark Theme must feel intentionally designed for Lingvo Connect.
+
+Target visual language:
+
+- deep graphite / neutral navy canvas
+- slightly elevated dark surfaces
+- clean neutral primary typography
+- readable secondary typography
+- controlled burgundy / wine accent
+- restrained borders
+- quiet visual hierarchy
+- compact operational density
+- no decorative visual noise
+
+The CRM must NOT look like:
+
+"Light Theme with dark backgrounds added later."
+
+
+======================================================================
+2. IMMUTABLE OWNER DESIGN INTENT
+======================================================================
+
+The owner has explicitly approved the overall direction.
+
+Do NOT redesign the entire CRM from scratch.
+
+Preserve what already works:
+
+- current overall shell concept
+- compact operational layout
+- Dashboard structural direction
+- list + detail workspace pattern
+- real backend-driven data
+- restrained Lingvo Connect burgundy accent
+- increased global working typography
+- hidden Preliminary Calculation utility pattern
+- Table / Kanban concept
+- existing business workflows
+
+Phase 07 is refinement, consolidation and correction.
+
+Not reinvention.
+
+
+======================================================================
+3. GLOBAL CROSS-PROJECT CONSISTENCY RULE
+======================================================================
+
+This rule applies to EVERY implementation step.
+
+If a repeated UI pattern is changed locally:
+
+STEP 1
+Identify its semantic category.
+
+Examples:
+
+"text-secondary"
+"form-label"
+"status-badge"
+"section-divider"
+"table-header"
+"button-secondary"
+"detail-panel"
+"numeric metric"
+"pipeline step"
+
+STEP 2
+Search the entire repository.
+
+Search for:
+
+- component names
+- class names
+- tokens
+- selectors
+- repeated JSX structures
+- literal colors
+- duplicated styles
+- semantic labels
+- equivalent controls
+
+STEP 3
+Build a usage map.
+
+STEP 4
+Inspect every usage.
+
+STEP 5
+Determine whether the pattern should become:
+
+- one shared component
+- one semantic token
+- one shared CSS primitive
+- one layout contract
+
+STEP 6
+Fix the SYSTEM instead of only the current screen.
+
+STEP 7
+Regression-check all previously approved Phase 0–6 screens.
+
+STEP 8
+Update or add regression coverage.
+
+A local visual patch is forbidden when the same semantic pattern exists
+elsewhere.
+
+
+======================================================================
+4. DO NOT PATCH SYMPTOMS
+======================================================================
+
+Do NOT solve visual defects with arbitrary page-specific overrides.
+
+Avoid:
+
+- unnecessary !important
+- random margin-left / top values
+- page-specific colors where semantic tokens should exist
+- extra stylesheets layered over unresolved legacy CSS
+- hiding overflow to conceal broken layout
+- duplicate buttons implemented differently across pages
+- hard-coded white text to fix one Dark screen
+- deleting valid information just to satisfy Playwright
+- changing tests to accept broken UI
+
+For every defect, identify its source category first:
+
+A. Design token problem
+B. Shared primitive problem
+C. Shared component problem
+D. Layout contract problem
+E. Page composition problem
+F. CSS cascade / legacy override problem
+G. Data semantics problem
+H. Browser/native-control problem
+
+Fix the root cause.
+
+
+======================================================================
+5. REQUIRED PRE-FLIGHT AUDIT
+======================================================================
+
+Before implementation, audit the project.
+
+Create a working map of:
+
+- CSS import order
+- global stylesheets
+- theme styles
+- legacy stylesheets
+- page-specific overrides
+- shared primitives
+- duplicated controls
+- typography tokens
+- semantic color tokens
+- spacing tokens
+- radius tokens
+- layout tokens
+
+Search globally for:
+
+- literal hex colors
+- rgb / rgba literals
+- white backgrounds
+- white borders
+- blue / cyan legacy colors
+- !important
+- duplicated selectors
+- Dark-specific overrides
+- native form controls
+- inline styles
+- duplicated component markup
+
+Do not start visual implementation before this audit.
+
+
+======================================================================
+6. GLOBAL TYPOGRAPHY CONTRACT
+======================================================================
+
+The owner has already approved the enlarged text direction.
+
+Do NOT revert it.
+
+Global rule:
+
+All operational / small UI text must remain approximately 1.5x larger
+than the original old CRM implementation.
+
+Large page/display headings do NOT need the same scaling.
+
+Define and enforce semantic typography roles:
+
+Display / Page Title
+Section Heading
+Body
+Control Text
+Table Text
+Secondary Text
+Helper / Meta
+Caption
+Numeric / Financial Metric
+Pipeline Number
+
+Equivalent semantic text MUST use equivalent scale.
+
+Forbidden example:
+
+same helper text role:
+11px in Orders
+15px in Files
+13px in Settings
+
+If discovered, consolidate globally.
+
+
+======================================================================
+7. SEMANTIC COLOR CONTRACT
+======================================================================
+
+Audit and enforce a canonical semantic palette.
+
+Minimum semantic roles:
+
+canvas
+surface
+surface-elevated
+surface-interactive
+surface-selected
+
+text-primary
+text-secondary
+text-muted
+text-disabled
+text-on-accent
+
+border
+border-strong
+divider
+
+accent
+accent-hover
+accent-subtle
+
+success
+warning
+danger
+info
+
+Do not use literal page-specific colors to imitate these roles.
+
+If one semantic text category is fixed on one screen,
+find every equivalent instance across the CRM.
+
+
+======================================================================
+8. WHITE ISLAND HUNT
+======================================================================
+
+Perform a dedicated repository-wide audit for accidental light surfaces.
+
+Search for:
+
+#fff
+#ffffff
+rgb(255...)
+white
+background-color: white
+white borders
+native light inputs
+native light selects
+native light date controls
+light browser autofill states
+default white buttons
+
+For every match, decide:
+
+INTENTIONAL
+or
+LEGACY DEFECT
+
+There must be no accidental white island in Dark Theme.
+
+
+======================================================================
+9. LEGACY BLUE / LOW-CONTRAST COLOR HUNT
+======================================================================
+
+Search the entire project for legacy blue/cyan/dark-blue text.
+
+Owner-reported problem areas include:
+
+- Applications
+- Orders
+- Order creation
+- Calculation
+- Work cards
+- Files
+- helper text
+- metadata
+- financial summaries
+
+Blue is allowed only if it has a deliberate semantic `info` purpose
+and sufficient contrast.
+
+Otherwise replace it with the appropriate semantic text token.
+
+
+======================================================================
+10. BORDER / DIVIDER AUDIT
+======================================================================
+
+Audit:
+
+- horizontal rules
+- card borders
+- section separators
+- table row separators
+- input borders
+- pipeline borders
+- file row dividers
+
+On graphite backgrounds, bright white separators are forbidden unless
+there is an explicit high-contrast reason.
+
+Use restrained semantic borders.
+
+
+======================================================================
+11. SCROLLBAR AUDIT
+======================================================================
+
+Review:
+
+- document/body
+- side panels
+- detail cards
+- tables
+- order detail
+- applications detail
+- clients detail
+- settings
+- modals
+- drawers
+
+Important:
+
+Scrollable content MUST remain scrollable.
+
+But a permanently visible ugly scrollbar is not automatically part of
+the intended design.
+
+Never fix this with `overflow: hidden` if it breaks mouse-wheel,
+keyboard or touch scrolling.
+
+
+======================================================================
+12. ORDER FINANCE REDESIGN — HIGH PRIORITY
+======================================================================
+
+THIS IS AN UNFINISHED PHASE 05 DEBT.
+
+It MUST be fixed at the beginning of Phase 07.
+
+Current problems:
+
+- cards are too wide
+- cards are too tall
+- large dead space
+- weak hierarchy
+- financial metrics are scattered
+- terminology is ambiguous
+- visual density is poor
+
+The current Finance layout is NOT approved.
+
+
+======================================================================
+13. ORDER FINANCE — REQUIRED TERMINOLOGY
+======================================================================
+
+Russian UI strings are owner-controlled.
+
+Do NOT silently translate them.
+
+Replace ambiguous labels.
+
+Current:
+
+"ИТОГО ЗАКАЗА"
+
+Preferred canonical wording:
+
+"Итоговая стоимость заказа"
+
+or, where context requires:
+
+"Стоимость заказа"
+
+Current:
+
+"ОСТАЛОСЬ ОПЛАТИТЬ"
+
+Preferred:
+
+"Остаток к оплате"
+
+Current:
+
+"ИСПОЛНИТЕЛЯМ"
+
+Required:
+
+"Выплаты исполнителям"
+
+Current:
+
+"МАРЖА"
+
+Preferred:
+
+"Маржинальность"
+
+Keep:
+
+"Прибыль"
+
+In order creation / Review:
+
+Do NOT use a standalone label:
+
+"Клиенту"
+
+Use a semantically clear label:
+
+"Стоимость для клиента"
+
+or:
+
+"Итоговая стоимость заказа"
+
+depending on context.
+
+
+======================================================================
+14. ORDER FINANCE — SEMANTIC MEANING
+======================================================================
+
+Verify that numbers actually represent their labels.
+
+Expected conceptual relationship:
+
+Итоговая стоимость заказа
+-
+Уже оплачено
+=
+Остаток к оплате
+
+"Выплаты исполнителям"
+must represent real executor assignment costs.
+
+"Прибыль"
+must represent the existing business formula.
+
+"Маржинальность"
+must correspond to the existing margin logic.
+
+Do NOT change backend financial formulas without evidence of a real
+business logic bug.
+
+This task is primarily UI semantics + layout unless a calculation defect
+is proven.
+
+
+======================================================================
+15. ORDER FINANCE — LAYOUT TARGET
+======================================================================
+
+Do NOT render five large identical rectangles.
+
+Create hierarchy.
+
+Primary:
+
+"Итоговая стоимость заказа"
+
+Secondary operational:
+
+"Остаток к оплате"
+
+Economic metrics:
+
+"Прибыль"
+"Выплаты исполнителям"
+"Маржинальность"
+
+Reduce dead space.
+
+Reduce tile height.
+
+Reduce unnecessary horizontal expansion.
+
+The Finance section must no longer consume half of a desktop viewport
+without informational justification.
+
+Test at:
+
+1920
+1440
+1280
+1024
+768
+430
+390
+375
+360
+320
+
+
+======================================================================
+16. ORDER PIPELINE 01–09 — STATIC REDESIGN
+======================================================================
+
+Current pipeline is visually unfinished.
+
+Owner-reported problems:
+
+- numbers are too bold
+- number size is too visually heavy
+- active step is too dominant
+- active ring is too thick
+- 07 / 08 / 09 are poorly visible in Dark
+- some numbers become visually white blobs
+- current-state geometry feels coarse
+
+Phase 07 MUST redesign static pipeline presentation.
+
+
+======================================================================
+17. PIPELINE VISUAL CONTRACT
+======================================================================
+
+Requirements:
+
+- smaller numeric footprint
+- lighter font weight
+- cleaner numeric typography
+- thinner indicator ring
+- clear current state
+- restrained completed state
+- readable future state
+- correct Dark contrast
+- consistent spacing
+- no oversized heavy circle
+
+The user explicitly dislikes the current thick active circle.
+
+
+======================================================================
+18. PIPELINE PHASE 08 PREPARATION
+======================================================================
+
+Do NOT implement full decorative motion in Phase 07.
+
+BUT:
+
+Prepare DOM/CSS architecture so Phase 08 can animate the active ring
+clockwise.
+
+Owner motion concept:
+
+start at 12 o'clock
+→ fill clockwise
+→ complete 360°
+→ thin progress ring
+
+When stage changes:
+
+the ring should visually fill rather than simply appear.
+
+Phase 07 prepares the component.
+
+Phase 08 adds the actual animation.
+
+
+======================================================================
+19. ORDER CREATION — STEP 02 "РАБОТЫ"
+======================================================================
+
+Owner screenshot problems:
+
+"РАБОТА 01" is too white / visually harsh.
+
+"Новая работа" and related meta content may still use low-contrast blue.
+
+Some labels have not inherited the enlarged typography.
+
+Separators are too bright.
+
+Audit and correct:
+
+"РАБОТА 01"
+"Новая работа"
+"Услуга"
+"Тематика"
+"Язык с"
+"Язык на"
+"Знаков"
+"Страниц"
+"Срок"
+"Время"
+"Статус работы"
+"Срочный перевод"
+"Скидка вручную"
+"Перевод носителем"
+"Комментарий"
+
+After fixing these patterns,
+search globally for equivalent:
+
+badge labels
+section labels
+helper text
+legacy blue text
+bright separators
+
+
+======================================================================
+20. ORDER CREATION — STEP 04 "РАСЧЁТ"
+======================================================================
+
+This screen requires a focused grid audit.
+
+Owner-reported issue:
+
+"Ставка вручную, ₽"
+
+currently breaks alignment.
+
+The currency symbol must NOT create a separate misaligned visual row.
+
+The following controls must share one consistent grid/baseline:
+
+"Тариф"
+"Единица тарифа"
+"Ставка вручную"
+"Ручной итог"
+"Авторасчёт"
+
+Review:
+
+- label height
+- baseline
+- control height
+- wrapping
+- line-height
+- overflow
+- long labels
+- 125–250% zoom
+- Dark Theme
+- tablet
+- mobile
+
+Remove low-contrast blue text.
+
+Replace harsh white lines with semantic dividers.
+
+
+======================================================================
+21. ORDER CREATION — STEP 06 "ПРОВЕРКА"
+======================================================================
+
+The existing labels are not semantically clear enough.
+
+Do NOT present:
+
+"КЛИЕНТУ"
+"ИСПОЛНИТЕЛЯМ"
+
+without explanation.
+
+Preferred summary:
+
+"Стоимость для клиента"
+"Выплаты исполнителям"
+"Прибыль"
+"Маржинальность"
+
+The summary must be immediately understandable to a manager seeing the
+screen for the first time.
+
+Fix:
+
+- typography
+- contrast
+- label meaning
+- alignment
+- grid
+
+
+======================================================================
+22. ORDER DETAIL — "РАБОТЫ"
+======================================================================
+
+Owner has repeatedly reported this as unfinished.
+
+Problems:
+
+- "01" is misaligned
+- "Письменный перевод" does not align cleanly with the index
+- action text remains too small
+- metadata hierarchy is inconsistent
+
+Actions include:
+
+"Изменить"
+"Дублировать"
+"В архив"
+
+These must inherit the approved working typography.
+
+Create one clean identity row:
+
+index
++
+service
++
+language pair / metadata
++
+status
++
+actions
+
+No arbitrary vertical offsets.
+
+
+======================================================================
+23. ORDER DETAIL — FILES
+======================================================================
+
+Current file display is generally accepted.
+
+Missing behavior:
+
+The user must be able to:
+
+- open / preview
+- download
+
+directly from the order file section.
+
+Use real existing backend file operations.
+
+Do NOT add fake buttons.
+
+
+======================================================================
+24. ORDER DETAIL — HISTORY
+======================================================================
+
+Current concept is accepted.
+
+Do not redesign unnecessarily.
+
+Only verify:
+
+- global enlarged typography
+- semantic text hierarchy
+- Dark contrast
+- divider consistency
+
+
+======================================================================
+25. APPLICATIONS — DETAIL PANEL
+======================================================================
+
+Re-audit the selected application panel.
+
+Requirements:
+
+- no visually unnecessary permanent scrollbar
+- scrolling must remain functional
+- tabs must remain interactive
+- metadata must remain readable
+- no legacy blue text
+- no white islands
+
+
+======================================================================
+26. APPLICATIONS — FULL APPLICATION HEADER
+======================================================================
+
+Current owner-reported issue:
+
+The page header can feel visually chaotic.
+
+Examples:
+
+"Заявка"
+"Письменный перевод"
+"Текущий статус"
+"Статус заявки"
+"В работе"
+CTA actions
+
+are visually disconnected.
+
+There is too much empty space.
+
+Create one coherent layout hierarchy:
+
+identity
+→ metadata
+→ current status
+→ status control
+→ actions
+
+Do not leave unrelated blocks floating across the page.
+
+
+======================================================================
+27. DECORATIVE BURGUNDY LINE PRIMITIVE
+======================================================================
+
+The owner has repeatedly reported the same issue:
+
+the burgundy/red decorative line protrudes beyond card geometry.
+
+Previous local fixes were insufficient.
+
+This must become a shared primitive.
+
+The line must:
+
+- remain inside the component radius
+- not visibly protrude beyond edges
+- optionally fade through a controlled gradient
+- behave identically wherever the same visual motif appears
+
+After fixing one instance,
+search ALL instances across the project.
+
+
+======================================================================
+28. CLIENTS
+======================================================================
+
+Phase 04 baseline must remain stable.
+
+Regression-check:
+
+- list/detail split
+- selected row
+- status badge
+- tabs
+- contacts
+- orders
+- history
+- scroll behavior
+- editor
+- helper text
+- Dark colors
+
+The owner generally accepted the Clients direction.
+
+Do not redesign unnecessarily.
+
+
+======================================================================
+29. EXECUTORS
+======================================================================
+
+Preserve the approved Phase 04/06 direction.
+
+Regression-check:
+
+- directions
+- service
+- rate
+- assignments
+- tabs
+- list/detail behavior
+- autocomplete
+- forms
+- status
+- Dark colors
+
+Do not implement Phase 10 matching here.
+
+
+======================================================================
+30. FILES
+======================================================================
+
+Files require a complete Dark audit.
+
+Inspect:
+
+- file rows
+- selected file panel
+- "Скачать"
+- "Открыть"
+- preview
+- upload
+- source navigation
+- icons
+- metadata
+- dividers
+- export actions
+- empty state
+- loading state
+- error state
+
+Owner explicitly rejected white Download buttons in Dark.
+
+No white download controls.
+
+No blue low-contrast metadata.
+
+No harsh white separators.
+
+
+======================================================================
+31. USERS
+======================================================================
+
+Verify:
+
+- role badges
+- status
+- 2FA
+- access information
+- selected user
+- editor
+- destructive actions
+- menu
+- outside-click
+- Escape
+- viewport placement
+
+Keep the viewport-aware menu behavior introduced earlier.
+
+Do not regress the overflow bug.
+
+
+======================================================================
+32. SETTINGS
+======================================================================
+
+Audit every Phase 06 settings module:
+
+"Справочники"
+"Тарифы"
+"Скидки и коэффициенты"
+"Оформление"
+"Услуги и единицы"
+"Статусы заказов"
+
+These modules must feel like one application.
+
+Review:
+
+- toolbar
+- tables
+- forms
+- dialogs
+- drawers
+- selects
+- dates
+- checkboxes
+- native controls
+- hover/focus
+- Dark Theme
+
+No browser-default white input surfaces.
+
+
+======================================================================
+33. AUTH / 2FA
+======================================================================
+
+Re-test Login and 2FA.
+
+A previous owner-reported bug placed the "Продолжить" button too close
+to / overlapping the password field.
+
+That bug must never return.
+
+Audit:
+
+- vertical rhythm
+- labels
+- fields
+- password
+- CTA
+- error
+- autofill
+- focus
+- disabled
+- Dark Theme
+
+
+======================================================================
+34. SHARED COMPONENT CONSOLIDATION
+======================================================================
+
+Search for semantic duplicates.
+
+Candidate primitives include:
+
+PageShell
+PageHeader
+ReferenceBanner
+MetricCard
+SummaryStrip
+CommandBar
+SearchField
+FilterField
+DataTable
+StatusBadge
+Pagination
+SplitWorkspace
+DetailPanel
+Card
+Section
+Tabs
+Button
+Input
+Select
+Textarea
+Modal
+Drawer
+Popover
+Toast
+Menu
+FileControl
+FinancialMetric
+PipelineStep
+
+If two components mean the same thing but are implemented differently,
+evaluate consolidation.
+
+Do NOT force abstraction where semantics differ.
+
+But do not tolerate accidental duplication.
+
+
+======================================================================
+35. DARK THEME INTERACTION STATES
+======================================================================
+
+Every shared interactive primitive must be checked in:
+
+default
+hover
+focus-visible
+active
+selected
+disabled
+loading
+error
+
+Dark Theme must not create situations such as:
+
+good default button
+→ white hover button
+
+or:
+
+readable input
+→ unreadable focused input
+
+
+======================================================================
+36. RESPONSIVE CONTRACT
+======================================================================
+
+Mandatory viewport widths:
+
+1920
+1440
+1280
+1024
+768
+430
+390
+375
+360
+320
+
+Mandatory browser zoom:
+
+100%
+125%
+150%
+175%
+200%
+250%
+
+Particular attention:
+
+- Order Finance
+- Order pipeline
+- Order calculation
+- Applications detail
+- Clients detail
+- Files
+- Settings
+- tables
+- forms
+- modals
+- split workspaces
+
+
+======================================================================
+37. DENSITY CONTRACT
+======================================================================
+
+The CRM is an operational system.
+
+The owner explicitly prefers:
+
+compact
+intuitive
+minimal
+informative
+readable
+
+Do NOT create empty space for decorative purposes.
+
+But also do NOT reduce readability just to maximize density.
+
+Correct hierarchy:
+
+compact ≠ cramped
+air ≠ dead space
+
+Every section must justify the space it occupies.
+
+
+======================================================================
+38. PHASE 10 BOUNDARY
+======================================================================
+
+DO NOT implement automatic executor matching in Phase 07.
+
+Do NOT implement:
+
+- executor availability calendar
+- holiday / vacation matching
+- automatic candidate ranking
+- JP → RU → EN routing
+- automatic route generation
+- "Исполнитель не найден" workflow
+- direct-vs-pivot matching logic
+
+Phase 06 only prepares normalized foundations.
+
+The matching workflow remains POST-MVP, after Phase 09.
+
+
+======================================================================
+39. PHASE 08 BOUNDARY
+======================================================================
+
+Phase 07 may prepare:
+
+- motion-compatible markup
+- CSS variables
+- transition-safe states
+- progress-ring DOM structure
+
+Phase 07 is NOT the final motion phase.
+
+Phase 08 owns:
+
+- clockwise pipeline ring animation
+- page entrance
+- hover polish
+- modal/drawer motion
+- dropdown transitions
+- row transitions
+- toast animation
+- skeleton shimmer
+- micro-feedback
+
+
+======================================================================
+40. REGRESSION ALGORITHM AFTER EVERY SHARED CHANGE
+======================================================================
+
+After EVERY shared UI change:
+
+1. Identify semantic category.
+2. Search entire src tree.
+3. Find every equivalent usage.
+4. Inspect every usage.
+5. Identify duplicates.
+6. Decide shared primitive/token/style strategy.
+7. Apply canonical fix.
+8. Re-open approved Phase 0–6 pages.
+9. Verify Light.
+10. Verify Dark.
+11. Verify responsive behavior.
+12. Verify zoom.
+13. Update regression test coverage.
+
+Do not postpone this audit until the end of the phase.
+
+Perform it continuously.
+
+
+======================================================================
+41. AUTOMATED TESTING
+======================================================================
+
+Run all actually available quality gates.
+
+Frontend:
+
+npm audit / foundation audit
+lint
+typecheck
+production build
+
+Backend tests only if backend code is affected.
+
+Playwright:
+
+Phase 1
+Phase 2
+Phase 3
+Phase 4
+Phase 5
+Phase 6
+new Phase 7 suite
+
+Add targeted Phase 07 coverage for:
+
+- no accidental Dark white islands
+- readable semantic secondary text
+- finance terminology
+- finance compact geometry
+- pipeline 01–09 visibility
+- pipeline current/future/completed contrast
+- calculation grid alignment
+- Files Dark controls
+- Settings Dark native controls
+- application/client scroll behavior
+- order work-card typography
+
+
+======================================================================
+42. TEST INTEGRITY RULE
+======================================================================
+
+Never make a failing test pass by weakening a valid acceptance criterion.
+
+When a test fails, classify:
+
+PRODUCT BUG
+or
+OUTDATED TEST CONTRACT
+or
+RACE CONDITION
+or
+INVALID LOCATOR
+or
+ENVIRONMENT PROBLEM
+
+Fix the correct layer.
+
+Never delete real product behavior to satisfy strict mode.
+
+
+======================================================================
+43. MANUAL VISUAL QA
+======================================================================
+
+Automated tests are NOT sufficient.
+
+Manually inspect:
+
+Dashboard
+Applications
+Application Detail
+Clients
+Orders
+Order Creation
+Order Detail
+Executors
+Files
+Users
+Settings
+Login
+2FA
+
+In both Light and Dark.
+
+Compare:
+
+- grid
+- density
+- typography
+- alignment
+- semantic color
+- border hierarchy
+- card geometry
+- empty space
+- clipping
+- wrapping
+- labels
+- statuses
+- controls
+
+
+======================================================================
+44. GLOBAL SEARCH BEFORE COMPLETION
+======================================================================
+
+Before declaring Phase 07 complete, search the repository again for:
+
+literal white colors
+literal blue colors
+legacy theme selectors
+!important
+duplicate shared selectors
+page-specific button colors
+page-specific helper-text colors
+page-specific input colors
+page-specific Dark overrides
+
+Every result must be either:
+
+justified
+or
+fixed.
+
+
+======================================================================
+45. FINAL SELF-REVIEW QUESTIONS
+======================================================================
+
+Before packaging, ask:
+
+"Did I fix anything only locally?"
+
+If yes:
+continue working.
+
+"Does this pattern exist elsewhere?"
+
+If yes:
+audit it.
+
+"Is this literal color actually a semantic token?"
+
+If yes:
+replace it unless there is a valid exception.
+
+"Does the same control look different on another page?"
+
+If yes:
+resolve the inconsistency.
+
+"Did any shared change break an approved Phase 0–6 screen?"
+
+If unknown:
+you have not finished QA.
+
+"Can I open any random CRM page and immediately recognize the same
+design system?"
+
+If no:
+Phase 07 is not complete.
+
+
+======================================================================
+46. PHASE 07 ACCEPTANCE GATE
+======================================================================
+
+Phase 07 is NOT complete until all known items below are resolved:
+
+- no accidental white islands
+- no known low-contrast blue operational text
+- no harsh unintended white separators
+- Finance section no longer contains excessive dead space
+- financial terminology is understandable
+- "Выплаты исполнителям" is used where appropriate
+- order review no longer uses ambiguous standalone "Клиенту"
+- pipeline 01–09 is readable in Dark
+- active pipeline state is visually lighter and cleaner
+- "Работа 01" is readable
+- work-card actions use approved typography
+- "Ставка вручную" aligns correctly
+- Step 06 financial summary is understandable
+- Files Dark controls are consistent
+- Users menus remain viewport-safe
+- Settings look like one system
+- Applications / Clients scroll behavior remains usable
+- Auth remains correct
+- Phase 0–6 regression is green
+
+
+======================================================================
+47. DELIVERY PROTOCOL
+======================================================================
+
+After implementation and QA:
+
+1. Update Phase 07 specification.
+2. Create Phase 07 implementation report.
+3. Create changed-files manifest.
+4. Record tests that ACTUALLY ran.
+5. Never claim a test passed if it did not run.
+6. Package clean ZIP.
+7. Exclude node_modules.
+8. Exclude temporary build artifacts where unnecessary.
+9. Validate ZIP integrity.
+10. Provide exact PowerShell commands for THIS version.
+11. Explicitly state whether backend rebuild is required.
+12. Explicitly state whether Alembic migration is required.
+13. Explicitly state what remains for Phase 08.
+14. Do not start Phase 08 before Phase 07 baseline is accepted.
+
+
+======================================================================
+FINAL EXECUTION MINDSET
+======================================================================
+
+Do not work like a developer fixing screenshots.
+
+Work like the owner of the design system.
+
+Every local defect is a potential system defect.
+
+Every repeated inconsistency is evidence of missing abstraction.
+
+Every visual fix must survive:
+
+another page
+another theme
+another viewport
+another zoom level
+another data state
+
+The target is not:
+
+"This screen looks correct."
+
+The target is:
+
+"The CRM behaves as one coherent visual system."

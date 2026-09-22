@@ -1,0 +1,5 @@
+apps/admin-web/e2e/phase3-dashboard-applications.spec.ts
+docs/phases/PHASE_06_FILES_USERS_SETTINGS.md
+docs/post-mvp/PHASE_10_EXECUTOR_MATCHING_ROUTING.md
+PHASE_05_E2E_LAST_FAILURE_FIX_REPORT.md
+apps/admin-web/AGENTS.md

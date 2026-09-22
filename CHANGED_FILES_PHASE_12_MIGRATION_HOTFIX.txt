@@ -1,0 +1,11 @@
+Build ID: phase13-internal-works-20260919-r1
+
+Changed runtime file:
+- apps/api/alembic/versions/0021_order_number_v2.py
+  - replaced oversized temporary `MIG-<uuid>` order numbers with deterministic `MIG-########` values that fit VARCHAR(32)
+
+Build provenance updated from r3 to r4 in existing audit/build-id references.
+
+Added documentation:
+- PHASE_12_MIGRATION_HOTFIX_REPORT.md
+- CHANGED_FILES_PHASE_12_MIGRATION_HOTFIX.txt

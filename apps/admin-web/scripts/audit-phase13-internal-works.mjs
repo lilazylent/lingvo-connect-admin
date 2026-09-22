@@ -1,0 +1,15 @@
+import fs from "node:fs";
+const orders = fs.readFileSync(new URL("../src/components/crm-orders.tsx", import.meta.url), "utf8");
+const layout = fs.readFileSync(new URL("../src/app/layout.tsx", import.meta.url), "utf8");
+const css = fs.readFileSync(new URL("../src/app/phase5-orders.css", import.meta.url), "utf8");
+const buildId = "phase15-pre-release-audit-20260922-r4";
+const must = (text, needle, label) => { if (!text.includes(needle)) throw new Error(`Missing ${label}: ${needle}`); };
+must(layout, `data-build-id="${buildId}"`, "build provenance");
+must(orders, "client_billable", "client billing flag");
+must(orders, "Не учитывать в расчёте для клиента", "internal work control");
+must(orders, "Исполнители успешно назначены", "assignment confirmation state");
+must(orders, "Редактировать", "assignment edit action");
+must(orders, "filter((work) => work.client_billable !== false)", "client quote filtering");
+must(css, "executor-assignment-confirmation", "confirmation owner CSS");
+console.log("Phase 13 internal works audit: PASS");
+console.log(`Build ID: ${buildId}`);

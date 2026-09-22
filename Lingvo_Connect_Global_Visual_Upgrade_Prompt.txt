@@ -1,0 +1,67 @@
+Продолжай работу над последней актуальной версией Lingvo Connect / CRM-админки.
+Работай самостоятельно БЕЗ режима Work.
+
+0. ОБЯЗАТЕЛЬНЫЙ PRE-FLIGHT
+- Заново изучить последнюю версию проекта как единственный source of truth.
+- Просмотреть shell, dashboard, заявки, клиентов, заказы, исполнителей, файлы, пользователей, настройки и shared UI.
+- Найти текущие CSS layers, design tokens, reusable components, motion, hover/focus states и responsive rules.
+- Не создавать параллельный паттерн, пока не проверено, что аналога нет.
+- Сначала составить технический план; потом менять код.
+
+1. ЦЕЛЬ
+Системно поднять визуальный уровень всей CRM до современного premium SaaS/digital dashboard, сохранив Lingvo Connect navy/burgundy identity и бизнес-логику.
+
+2. ГЛОБАЛЬНАЯ ВИЗУАЛЬНАЯ СИСТЕМА
+- Единая иерархия page title / subtitle / section title / card title / metadata.
+- Более выразительные, но деловые заголовки.
+- Единые поверхности, borders, shadows, radii и spacing.
+- Все модули должны ощущаться частью одного продукта.
+
+3. MOTION SYSTEM
+- Добавить системные hover/active/focus transitions для controls и interactive surfaces.
+- Добавить мягкие entrance animations для контента и секций.
+- Добавить очень слабые цикличные ambient-анимации только там, где они не мешают чтению: shell/header/accent/background/dashboard decorative glow.
+- Предпочитать opacity/transform; избегать layout-thrashing.
+- Обязательно prefers-reduced-motion.
+
+4. ВСЕ МОДУЛИ
+Проверить и визуально поднять:
+- Обзор;
+- Заявки;
+- Клиенты;
+- Заказы;
+- Исполнители;
+- Файлы;
+- Пользователи;
+- Настройки;
+- shared tables/forms/cards/toolbars.
+
+5. INTERACTIONS
+- Buttons: premium hover, active press, focus-visible, disabled.
+- Inputs/select/combobox: hover/focus feedback без layout jump.
+- Tables/rows: понятный hover и кликабельность.
+- Cards/metrics/kanban/list rows: subtle lift/edge accent only when interactive.
+- Sidebar: clearer active/hover motion.
+
+6. НЕ ПЕРЕГРУЖАТЬ
+- Без neon/glow overload.
+- Без постоянного движения текста/данных.
+- Без анимации width/height, если можно использовать transform/opacity.
+- Не превращать CRM в лендинг или игру.
+
+7. НЕ ЛОМАТЬ
+- Не менять backend, API, RBAC, pricing/tariffs/status logic без необходимости.
+- Не ломать responsive/layout.
+- Не маскировать overflow через global overflow-x:hidden.
+- Не наращивать хаотический слой !important.
+
+8. ПРОВЕРКИ
+- CSS parsing;
+- TypeScript syntax/build/typecheck/lint где доступны;
+- duplicate/conflicting selector review;
+- prefers-reduced-motion;
+- responsive rules;
+- regression review shared components.
+
+9. РЕЗУЛЬТАТ
+CRM должна выглядеть как единая профессиональная digital/SaaS система с более сильной визуальной иерархией, приятной реакцией на действия и сдержанной живой анимацией по всему продукту.

@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     cookie_secure: bool = False
     session_hours: int = 12
     session_idle_minutes: int = 60
+    user_invitation_days: int = Field(default=7, ge=1, le=30)
     login_window_seconds: int = 300
     login_max_attempts: int = 8
     public_rate_limit_requests: int = 5
@@ -25,6 +26,18 @@ class Settings(BaseSettings):
     public_min_submit_seconds: float = 1.5
     application_file_max_bytes: int = 15 * 1024 * 1024
     application_storage_path: str = "./storage"
+
+    @model_validator(mode="after")
+    def validate_production_security(self):
+        if self.environment.lower() != "production":
+            return self
+        if not self.cookie_secure:
+            raise ValueError("COOKIE_SECURE=true is required in production")
+        if not self.admin_web_origin.startswith("https://"):
+            raise ValueError("ADMIN_WEB_ORIGIN must use https:// in production")
+        if not self.public_site_origin.startswith("https://"):
+            raise ValueError("PUBLIC_SITE_ORIGIN must use https:// in production")
+        return self
 
 
 @lru_cache

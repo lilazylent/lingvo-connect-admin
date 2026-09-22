@@ -67,11 +67,46 @@ docker compose exec backend python -m app.cli.bootstrap --email owner@example.co
 
 Bootstrap повторно не создает пользователя с тем же email. Первый пароль всегда временный.
 
+## Final pre-release data cleanup
+
+Перед переносом уже использованной локальной базы на hosting можно безопасно удалить тестовые заявки, заказы, клиентов, исполнителей, файлы, приглашения и лишних пользователей, сохранив основной ADMIN и системные справочники/тарифы. Сначала выполните dry-run:
+
+```powershell
+.\scripts\pre-release-cleanup.ps1
+```
+
+Если в базе один ADMIN, он будет выбран автоматически. Если ADMIN несколько, укажите нужный email:
+
+```powershell
+.\scripts\pre-release-cleanup.ps1 -KeepAdminEmail owner@example.com
+```
+
+После проверки строки `ADMIN to keep` выполните очистку:
+
+```powershell
+.\scripts\pre-release-cleanup.ps1 -Execute
+```
+
+или при нескольких администраторах:
+
+```powershell
+.\scripts\pre-release-cleanup.ps1 -Execute -KeepAdminEmail owner@example.com
+```
+
+Команда сохраняет пароль, 2FA, recovery codes и пользовательские настройки выбранного ADMIN, но очищает активные сессии, поэтому после выполнения потребуется войти заново. Reference-данные (`service_types`, языки, статусы заказов, тарифы, pricing rules и Alembic schema state) не удаляются. Файлы из `APPLICATION_STORAGE_PATH` очищаются полностью.
+
 ## Login и security flow
 
 ```text
-Login
+Initial ADMIN / reset-password flow
   → обязательная смена временного пароля
+  → обязательная настройка TOTP authenticator
+  → одноразовый показ 10 recovery codes
+  → authenticated admin shell
+
+Invited employee flow
+  → одноразовая registration link, закреплённая за email и ролью
+  → сотрудник задаёт собственный постоянный пароль
   → обязательная настройка TOTP authenticator
   → одноразовый показ 10 recovery codes
   → authenticated admin shell
@@ -84,7 +119,7 @@ Login
 ### ADMIN
 
 - полный доступ к shell и будущим операционным модулям;
-- список и создание пользователей;
+- список пользователей и приглашения по рабочему email;
 - роли, активация/деактивация;
 - сброс пароля и 2FA другого пользователя;
 - доступ к защищенным administrative endpoints.
@@ -111,7 +146,9 @@ Clients, Orders, Translators, Finance и внешние интеграции н�
 
 ## User management
 
-Маршрут `/admin/users` доступен только ADMIN. При создании/сбросе система генерирует временный пароль и показывает его один раз. Пользователь обязан сменить его при следующем входе. Деактивация и security reset отзывают активные сессии.
+Маршрут `/admin/users` доступен только ADMIN. Новые сотрудники добавляются через одноразовое приглашение: администратор задаёт рабочий email и роль, получает ссылку вида `${ADMIN_WEB_ORIGIN}/register/<token>` и передаёт её сотруднику. Ссылка по умолчанию действует 7 дней (`USER_INVITATION_DAYS`), может быть перевыпущена или отменена, а в базе хранится только хеш токена. Email в форме регистрации зафиксирован приглашением; сотрудник самостоятельно задаёт постоянный пароль и затем подключает обязательную 2FA.
+
+Сброс пароля уже зарегистрированного пользователя остаётся административной security-операцией с одноразовым временным паролем. Деактивация и security reset отзывают активные сессии.
 
 ## Development checks
 

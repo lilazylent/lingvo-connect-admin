@@ -16,7 +16,20 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     window.setTimeout(() => setToasts((current) => current.filter((item) => item.id !== id)), 3600);
   }, []);
   const value = useMemo(() => ({ notify }), [notify]);
-  return <ToastContext.Provider value={value}>{children}<div className="toast-region" aria-live="polite">{toasts.map((toast) => <div className={`toast toast--${toast.tone}`} key={toast.id}><span />{toast.message}<button aria-label="Закрыть уведомление" onClick={() => setToasts((current) => current.filter((item) => item.id !== toast.id))}>×</button></div>)}</div></ToastContext.Provider>;
+  return (
+    <ToastContext.Provider value={value}>
+      {children}
+      <div className="toast-region" aria-live="polite" aria-relevant="additions text">
+        {toasts.map((toast) => (
+          <div className={`toast toast--${toast.tone}`} key={toast.id} role={toast.tone === "error" ? "alert" : "status"}>
+            <span aria-hidden="true" />
+            <span className="toast__message">{toast.message}</span>
+            <button type="button" aria-label="Закрыть уведомление" onClick={() => setToasts((current) => current.filter((item) => item.id !== toast.id))}>×</button>
+          </div>
+        ))}
+      </div>
+    </ToastContext.Provider>
+  );
 }
 
 export function useToast() {

@@ -1,0 +1,32 @@
+Phase 10.5 — functional changes
+- apps/admin-web/src/components/crm-orders.tsx
+  Assignment-specific manual rate controls for direct/routed matching candidates; stage-scoped rate drafts feed existing assignments.
+- apps/admin-web/src/app/phase5-orders.css
+  Canonical Orders-owner styles for compact candidate/stage rate editors.
+- apps/api/tests/test_crm.py
+  Regression proof for independent route-stage actual volumes, manual assignment rates, costs, and unchanged executor defaults.
+- apps/admin-web/scripts/audit-phase10-route-stages.mjs
+  New Phase 10.5 static contract audit.
+- apps/admin-web/scripts/audit-phase10-matching-ui.mjs
+  Updated regression marker to allow assignment-specific effective rate while preserving Phase 10.3 semantics.
+- apps/admin-web/package.json
+  Added `audit:phase10-route-stages`.
+- apps/admin-web/AGENTS.md
+  Added binding Phase 10.5 persistence/rate-override rules.
+- PHASE_10_5_ROUTE_STAGES_RATE_OVERRIDE_TZ.md
+- PHASE_10_5_MASTER_PROMPT.md
+- PHASE_10_5_IMPLEMENTATION_REPORT.md
+- docs/phases/PHASE_10_5_ROUTE_STAGES_RATE_OVERRIDE.md
+- docs/phases/PHASE_10_5_MASTER_EXECUTION_PROMPT.md
+
+Build provenance only
+- apps/admin-web/src/app/layout.tsx
+- apps/admin-web/e2e/phase8-owner-patch02.spec.ts
+- apps/admin-web/e2e/phase8-visual-motion.spec.ts
+- apps/admin-web/e2e/phase9-release-candidate.spec.ts
+- apps/admin-web/scripts/audit-css-ownership.mjs
+- apps/admin-web/scripts/audit-phase8-owner-patch.mjs
+- apps/admin-web/scripts/audit-phase9-release-candidate.mjs
+- apps/admin-web/scripts/audit-phase10-availability.mjs
+- apps/admin-web/scripts/audit-phase10-routing.mjs
+- apps/admin-web/scripts/audit-phase10-client-demo.mjs

@@ -1,0 +1,30 @@
+Only in phase14_tariff_work: CHANGED_FILES_PHASE_13_5_TARIFF_AUTOMATION.txt
+Only in phase14_tariff_work: PHASE_13_5_IMPLEMENTATION_REPORT.md
+Only in phase14_tariff_work: PHASE_13_5_MASTER_PROMPT.md
+Only in phase14_tariff_work: PHASE_13_5_TARIFF_AUTOMATION_TZ.md
+Files phase14_tariff_baseline/apps/admin-web/AGENTS.md and phase14_tariff_work/apps/admin-web/AGENTS.md differ
+Files phase14_tariff_baseline/apps/admin-web/e2e/phase8-owner-patch02.spec.ts and phase14_tariff_work/apps/admin-web/e2e/phase8-owner-patch02.spec.ts differ
+Files phase14_tariff_baseline/apps/admin-web/e2e/phase8-visual-motion.spec.ts and phase14_tariff_work/apps/admin-web/e2e/phase8-visual-motion.spec.ts differ
+Files phase14_tariff_baseline/apps/admin-web/e2e/phase9-release-candidate.spec.ts and phase14_tariff_work/apps/admin-web/e2e/phase9-release-candidate.spec.ts differ
+Files phase14_tariff_baseline/apps/admin-web/e2e/stage2-live.spec.ts and phase14_tariff_work/apps/admin-web/e2e/stage2-live.spec.ts differ
+Files phase14_tariff_baseline/apps/admin-web/package.json and phase14_tariff_work/apps/admin-web/package.json differ
+Files phase14_tariff_baseline/apps/admin-web/scripts/audit-css-ownership.mjs and phase14_tariff_work/apps/admin-web/scripts/audit-css-ownership.mjs differ
+Files phase14_tariff_baseline/apps/admin-web/scripts/audit-phase10-availability.mjs and phase14_tariff_work/apps/admin-web/scripts/audit-phase10-availability.mjs differ
+Files phase14_tariff_baseline/apps/admin-web/scripts/audit-phase10-client-demo.mjs and phase14_tariff_work/apps/admin-web/scripts/audit-phase10-client-demo.mjs differ
+Files phase14_tariff_baseline/apps/admin-web/scripts/audit-phase10-finance.mjs and phase14_tariff_work/apps/admin-web/scripts/audit-phase10-finance.mjs differ
+Files phase14_tariff_baseline/apps/admin-web/scripts/audit-phase10-matching-ui.mjs and phase14_tariff_work/apps/admin-web/scripts/audit-phase10-matching-ui.mjs differ
+Files phase14_tariff_baseline/apps/admin-web/scripts/audit-phase10-route-stages.mjs and phase14_tariff_work/apps/admin-web/scripts/audit-phase10-route-stages.mjs differ
+Files phase14_tariff_baseline/apps/admin-web/scripts/audit-phase10-routing.mjs and phase14_tariff_work/apps/admin-web/scripts/audit-phase10-routing.mjs differ
+Files phase14_tariff_baseline/apps/admin-web/scripts/audit-phase11-data-integrity.mjs and phase14_tariff_work/apps/admin-web/scripts/audit-phase11-data-integrity.mjs differ
+Files phase14_tariff_baseline/apps/admin-web/scripts/audit-phase12-assignment-calculator.mjs and phase14_tariff_work/apps/admin-web/scripts/audit-phase12-assignment-calculator.mjs differ
+Files phase14_tariff_baseline/apps/admin-web/scripts/audit-phase12-order-numbering.mjs and phase14_tariff_work/apps/admin-web/scripts/audit-phase12-order-numbering.mjs differ
+Only in phase14_tariff_work/apps/admin-web/scripts: audit-phase13-5-tariff-automation.mjs
+Files phase14_tariff_baseline/apps/admin-web/scripts/audit-phase13-finance-layout.mjs and phase14_tariff_work/apps/admin-web/scripts/audit-phase13-finance-layout.mjs differ
+Files phase14_tariff_baseline/apps/admin-web/scripts/audit-phase13-internal-works.mjs and phase14_tariff_work/apps/admin-web/scripts/audit-phase13-internal-works.mjs differ
+Files phase14_tariff_baseline/apps/admin-web/scripts/audit-phase8-owner-patch.mjs and phase14_tariff_work/apps/admin-web/scripts/audit-phase8-owner-patch.mjs differ
+Files phase14_tariff_baseline/apps/admin-web/scripts/audit-phase9-release-candidate.mjs and phase14_tariff_work/apps/admin-web/scripts/audit-phase9-release-candidate.mjs differ
+Files phase14_tariff_baseline/apps/admin-web/src/app/layout.tsx and phase14_tariff_work/apps/admin-web/src/app/layout.tsx differ
+Files phase14_tariff_baseline/apps/admin-web/src/components/crm-orders.tsx and phase14_tariff_work/apps/admin-web/src/components/crm-orders.tsx differ
+Only in phase14_tariff_work/apps/api/alembic/versions: 0023_sync_tariffs_2026.py
+Files phase14_tariff_baseline/apps/api/app/routers/crm.py and phase14_tariff_work/apps/api/app/routers/crm.py differ
+Files phase14_tariff_baseline/apps/api/tests/test_crm.py and phase14_tariff_work/apps/api/tests/test_crm.py differ

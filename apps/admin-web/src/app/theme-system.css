@@ -1,0 +1,644 @@
+
+/* ==========================================================================
+   Lingvo Connect semantic theme system
+   Dark mode is a real product theme, not an inversion layer.
+   This file contains legacy dark-theme coverage. Canonical semantic token
+   values are owned by crm-foundation.css, imported after all visual layers.
+   ========================================================================== */
+
+
+html[data-crm-theme="dark"] {
+  color-scheme: dark;
+  --navy: var(--crm-text);
+  --navy-soft: var(--crm-surface-raised);
+  --cream: var(--crm-bg);
+  --paper: var(--crm-surface);
+  --burgundy: var(--crm-accent);
+  --burgundy-dark: var(--crm-accent-hover);
+  --ink-muted: var(--crm-text-secondary);
+  --line: var(--crm-border);
+  --line-dark: var(--crm-border-strong);
+  --danger: var(--crm-danger);
+
+  --lc-canvas: var(--crm-bg);
+  --lc-surface: var(--crm-surface);
+  --lc-surface-subtle: var(--crm-surface-raised);
+  --lc-surface-hover: var(--crm-surface-hover);
+  --lc-text: var(--crm-text);
+  --lc-muted: var(--crm-text-secondary);
+  --lc-border: var(--crm-border);
+  --lc-border-strong: var(--crm-border-strong);
+  --lc-burgundy: var(--crm-accent);
+  --lc-burgundy-dark: var(--crm-accent-hover);
+  --lc-burgundy-soft: var(--crm-accent-soft);
+  --lc-green: var(--crm-success);
+  --lc-green-soft: var(--crm-success-soft);
+  --lc-amber: var(--crm-warning);
+  --lc-amber-soft: var(--crm-warning-soft);
+  --focus-ring: var(--crm-accent);
+}
+
+html[data-crm-theme="dark"],
+html[data-crm-theme="dark"] body {
+  background: var(--crm-bg);
+  color: var(--crm-text);
+}
+
+html[data-crm-theme="dark"] body,
+html[data-crm-theme="dark"] button,
+html[data-crm-theme="dark"] input,
+html[data-crm-theme="dark"] textarea,
+html[data-crm-theme="dark"] select {
+  color: var(--crm-text);
+}
+
+html[data-crm-theme="dark"] ::selection {
+  color: var(--crm-text);
+  background: color-mix(in srgb, var(--crm-accent) 48%, transparent);
+}
+
+html[data-crm-theme="dark"] :is(.workspace,.content,.admin-layout) {
+  background: var(--crm-bg);
+  color: var(--crm-text);
+}
+
+html[data-crm-theme="dark"] .workspace {
+  background:
+    radial-gradient(circle at 82% 2%, color-mix(in srgb, var(--crm-text-muted) 7%, transparent), transparent 28rem),
+    radial-gradient(circle at 52% -5%, color-mix(in srgb, var(--crm-accent) 5%, transparent), transparent 24rem),
+    var(--crm-bg);
+}
+html[data-crm-theme="dark"] .workspace::before { background: color-mix(in srgb, var(--crm-text-muted) 7%, transparent); }
+html[data-crm-theme="dark"] .workspace::after { background: color-mix(in srgb, var(--crm-accent) 6%, transparent); }
+
+html[data-crm-theme="dark"] .sidebar {
+  color: var(--crm-text);
+  border-color: var(--crm-border);
+  background: var(--crm-shell);
+}
+html[data-crm-theme="dark"] :is(.sidebar__brand,.sidebar__foot) { border-color: var(--crm-border); }
+html[data-crm-theme="dark"] :is(.nav-label,.sidebar__foot,.sidebar__brand small) { color: var(--crm-text-muted); }
+html[data-crm-theme="dark"] .nav-link { color: var(--crm-text-secondary); }
+html[data-crm-theme="dark"] .nav-link:hover {
+  color: var(--crm-text);
+  background: var(--crm-surface-hover);
+}
+html[data-crm-theme="dark"] .nav-link[aria-current="page"],
+html[data-crm-theme="dark"] .nav-link.is-active {
+  color: var(--crm-text);
+  background: color-mix(in srgb, var(--crm-accent) 18%, var(--crm-shell));
+}
+html[data-crm-theme="dark"] .topbar {
+  color: var(--crm-text);
+  border-color: var(--crm-border);
+  background: color-mix(in srgb, var(--crm-shell) 95%, transparent);
+}
+html[data-crm-theme="dark"] :is(.breadcrumbs,.user-menu small) { color: var(--crm-text-secondary); }
+
+html[data-crm-theme="dark"] :is(
+  .card,.detail-panel,.form-section,.application-toolbar,.crm-editor,.table-surface,
+  .settings-surface,.directory-summary,.placeholder-surface,.crm-wizard,.crm-order-card,
+  .order-side-card,.order-records__section,.crm-history__group,.dashboard-finance,
+  .metric-strip,.page-head__meta,.context-note,.crm-work,.crm-work-editor,
+  .import-file-picker,.comment-list article,.operational-group,.status-directory__row,
+  .theme-option,.review-hero,.work-draft,.work-inline-editor,.executor-row,.price-row,
+  .file-metric-row,.order-file-row,.recent-card,.executor-assignment-card,.client-quote-summary
+) {
+  color: var(--crm-text);
+  border-color: var(--crm-border);
+  background: var(--crm-surface);
+}
+
+html[data-crm-theme="dark"] :is(
+  .crm-commandbar,.kanban-column,.wizard-steps,.wizard-footer,.detail-sections,
+  .order-card-layout>aside,.order-core-editor,.order-finance-module,.table-caption,
+  .settings-layout,.security-card
+) {
+  color: var(--crm-text);
+  border-color: var(--crm-border);
+  background: var(--crm-shell);
+}
+
+html[data-crm-theme="dark"] :is(
+  h1,h2,h3,h4,h5,h6,.field__label,.panel-title,.order-records__heading h3,
+  .file-picker__copy strong,.file-metric-row__copy strong,.file-metric-row__metric strong,
+  .order-file-row__copy strong,.payment-summary strong,.dashboard-finance strong,
+  .directory-summary__metrics strong,.directory-summary__orders strong
+) { color: var(--crm-text); }
+
+html[data-crm-theme="dark"] :is(
+  p,.lead,.form-note,.field__hint,.settings-help,.settings-head-copy,.context-note,
+  .security-copy,.crm-empty,.order-records__empty,.kanban-empty,.request-message,
+  .data-list dt,.activity-list small,.recent-list small,.file-picker__copy small,
+  .file-metric-row__copy small,.file-metric-row__metric span,.order-file-row__copy small,
+  .payment-summary span,.dashboard-finance span,.order-work-table article>div>span,
+  .order-work-table article small,.table-caption,.pagination,.filter-disclosure,
+  .workflow-help,.overline
+) { color: var(--crm-text-secondary); }
+
+html[data-crm-theme="dark"] :is(
+  .input,.select-trigger,.crm-combobox__input,
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea,select
+) {
+  color: var(--crm-text);
+  border-color: var(--crm-border-strong);
+  background: var(--crm-surface-raised);
+  caret-color: var(--crm-text);
+}
+html[data-crm-theme="dark"] :is(.input,.select-trigger,.crm-combobox__input,input,textarea,select):hover {
+  border-color: color-mix(in srgb, var(--crm-text-muted) 58%, var(--crm-border));
+}
+html[data-crm-theme="dark"] :is(.input,.select-trigger,.crm-combobox__input,input,textarea,select):focus {
+  border-color: var(--crm-accent);
+  background: var(--crm-surface-raised);
+}
+html[data-crm-theme="dark"] :is(input,textarea,.input,.crm-combobox__input)::placeholder {
+  color: var(--crm-text-muted);
+  opacity: 1;
+}
+html[data-crm-theme="dark"] input:-webkit-autofill {
+  -webkit-text-fill-color: var(--crm-text);
+  box-shadow: 0 0 0 1000px var(--crm-surface-raised) inset;
+  caret-color: var(--crm-text);
+}
+
+html[data-crm-theme="dark"] :is(
+  .select-popup,.crm-combobox__menu,.row-menu[open],.settings-dialog
+) {
+  color: var(--crm-text);
+  border-color: var(--crm-border-strong);
+  background: var(--crm-surface-raised);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 48%);
+}
+html[data-crm-theme="dark"] :is(.select-option,.crm-combobox__option) { color: var(--crm-text); }
+html[data-crm-theme="dark"] :is(
+  .select-option[data-highlighted],.select-option[data-selected],
+  .crm-combobox__option:hover,.crm-combobox__option.is-active
+) {
+  color: var(--crm-text);
+  background: var(--crm-surface-hover);
+}
+
+html[data-crm-theme="dark"] .settings-dialog-backdrop { background: rgb(0 0 0 / 68%); }
+html[data-crm-theme="dark"] :is(.settings-dialog__close,.close-button,.crm-combobox__clear,.row-menu summary) {
+  color: var(--crm-text-secondary);
+  border-color: var(--crm-border);
+  background: transparent;
+}
+html[data-crm-theme="dark"] :is(.settings-dialog__close,.close-button,.crm-combobox__clear,.row-menu summary):hover {
+  color: var(--crm-text);
+  background: var(--crm-surface-hover);
+}
+
+html[data-crm-theme="dark"] :is(.button--secondary,.archive-toggle,.compact-upload,.client-directory-action,.work-action--danger) {
+  color: var(--crm-text);
+  border-color: var(--crm-border-strong);
+  background: var(--crm-surface-raised);
+}
+html[data-crm-theme="dark"] :is(.button--secondary,.archive-toggle,.compact-upload,.client-directory-action):hover:not(:disabled) {
+  color: var(--crm-text);
+  border-color: var(--crm-border-strong);
+  background: var(--crm-surface-hover);
+}
+html[data-crm-theme="dark"] .button--primary {
+  color: var(--crm-on-accent);
+  border-color: var(--crm-accent);
+  background: var(--crm-accent);
+}
+html[data-crm-theme="dark"] .button--primary:hover:not(:disabled) { background: var(--crm-accent-hover); }
+html[data-crm-theme="dark"] .button--quiet { color: var(--crm-text-secondary); }
+html[data-crm-theme="dark"] .button--quiet:hover { color: var(--crm-text); background: var(--crm-surface-hover); }
+html[data-crm-theme="dark"] :is(.button,.view-switch button,.settings-tabs button,.settings-subtabs button):disabled {
+  color: var(--crm-text-disabled);
+  border-color: var(--crm-border);
+  background: var(--crm-surface-raised);
+  opacity: 1;
+}
+
+html[data-crm-theme="dark"] :is(.view-switch,.settings-tabs,.settings-subtabs,.archive-toggle) {
+  border-color: var(--crm-border);
+  background: var(--crm-surface-raised);
+}
+html[data-crm-theme="dark"] :is(.view-switch button,.settings-tabs button,.settings-subtabs button) {
+  color: var(--crm-text-secondary);
+}
+html[data-crm-theme="dark"] :is(.view-switch button.is-active,.settings-tabs button.is-active,.settings-subtabs button.is-active) {
+  color: var(--crm-text);
+  border-color: var(--crm-border-strong);
+  background: var(--crm-surface-hover);
+  box-shadow: inset 0 0 0 1px var(--crm-border-strong);
+}
+
+html[data-crm-theme="dark"] table { color: var(--crm-text); border-color: var(--crm-border); }
+html[data-crm-theme="dark"] thead th {
+  color: var(--crm-text);
+  border-color: var(--crm-border);
+  background: var(--crm-surface-raised);
+}
+html[data-crm-theme="dark"] tbody tr { color: var(--crm-text); background: var(--crm-surface); }
+html[data-crm-theme="dark"] tbody :is(td,th) { color: var(--crm-text); border-color: var(--crm-border); }
+html[data-crm-theme="dark"] tbody tr:hover {
+  color: var(--crm-text);
+  background: var(--crm-surface-hover);
+  box-shadow: inset 3px 0 var(--crm-accent);
+}
+
+html[data-crm-theme="dark"] :is(
+  .file-drop,.file-picker__surface,.compact-upload,.import-file-picker
+) {
+  color: var(--crm-text);
+  border-color: var(--crm-border-strong);
+  background: var(--crm-surface-raised);
+}
+html[data-crm-theme="dark"] :is(.file-drop,.file-picker__surface,.compact-upload,.import-file-picker):hover {
+  border-color: color-mix(in srgb, var(--crm-text-muted) 58%, var(--crm-border));
+  background: var(--crm-surface-hover);
+}
+html[data-crm-theme="dark"] input::file-selector-button {
+  color: var(--crm-text);
+  border-color: var(--crm-border-strong);
+  background: var(--crm-surface-hover);
+}
+
+html[data-crm-theme="dark"] :is(.badge--neutral,.badge--success,.badge--warning,.badge--accent) { border-width: 1px; }
+html[data-crm-theme="dark"] .badge--neutral { color: var(--crm-text-secondary); border-color: var(--crm-border); background: var(--crm-surface-raised); }
+html[data-crm-theme="dark"] .badge--success { color: var(--crm-success-text); border-color: color-mix(in srgb, var(--crm-success) 36%, var(--crm-border)); background: var(--crm-success-soft); }
+html[data-crm-theme="dark"] .badge--warning { color: var(--crm-warning-text); border-color: color-mix(in srgb, var(--crm-warning) 36%, var(--crm-border)); background: var(--crm-warning-soft); }
+html[data-crm-theme="dark"] .badge--accent { color: var(--crm-accent-hover); border-color: color-mix(in srgb, var(--crm-accent) 34%, var(--crm-border)); background: var(--crm-accent-soft); }
+
+html[data-crm-theme="dark"] :is(.notice,.calculated-value--total,.file-picker__surface.is-dragging) {
+  color: var(--crm-text);
+  border-color: color-mix(in srgb, var(--crm-accent) 34%, var(--crm-border));
+  background: var(--crm-accent-soft);
+}
+html[data-crm-theme="dark"] .notice--error {
+  color: var(--crm-text);
+  border-color: color-mix(in srgb, var(--crm-danger) 36%, var(--crm-border));
+  background: var(--crm-danger-soft);
+}
+html[data-crm-theme="dark"] .field__error { color: var(--crm-danger); }
+
+html[data-crm-theme="dark"] :is(.text-link,.inline-link,.application-number,.unassigned,.order-file-row__download,.file-picker__action) {
+  color: var(--crm-accent-hover);
+}
+
+html[data-crm-theme="dark"] .activity-list li::before { background: var(--crm-border-strong); }
+html[data-crm-theme="dark"] .activity-list li > span {
+  border-color: var(--crm-accent-hover);
+  background: var(--crm-surface);
+  box-shadow: 0 0 0 3px var(--crm-surface);
+}
+html[data-crm-theme="dark"] .activity-list strong { color: var(--crm-text); }
+
+html[data-crm-theme="dark"] .finance-strip>div.is-positive {
+  border-color: color-mix(in srgb, var(--crm-success) 36%, var(--crm-border));
+  background: var(--crm-success-soft);
+}
+html[data-crm-theme="dark"] .finance-strip>div.is-warning {
+  border-color: color-mix(in srgb, var(--crm-warning) 36%, var(--crm-border));
+  background: var(--crm-warning-soft);
+}
+html[data-crm-theme="dark"] .finance-strip>div.is-positive strong { color: var(--crm-success); }
+html[data-crm-theme="dark"] .finance-strip>div.is-warning strong { color: var(--crm-warning); }
+
+html[data-crm-theme="dark"] .order-stage {
+  color: var(--crm-text-secondary);
+  border-color: var(--crm-border);
+  background: var(--crm-surface);
+}
+html[data-crm-theme="dark"] .order-stage:hover:not(:disabled) {
+  color: var(--crm-text);
+  border-color: var(--crm-border-strong);
+  background: var(--crm-surface-hover);
+}
+html[data-crm-theme="dark"] .order-stage.is-past {
+  color: var(--crm-success);
+  border-color: color-mix(in srgb, var(--crm-success) 36%, var(--crm-border));
+  background: var(--crm-success-soft);
+}
+html[data-crm-theme="dark"] .order-stage.is-current {
+  color: var(--crm-text);
+  border-color: color-mix(in srgb, var(--crm-accent) 48%, var(--crm-border));
+  background: var(--crm-surface-selected);
+}
+html[data-crm-theme="dark"] :is(.order-stage-flow,.order-section-nav) {
+  border-color: var(--crm-border);
+  background: color-mix(in srgb, var(--crm-shell) 92%, transparent);
+}
+html[data-crm-theme="dark"] .order-context-strip > div {
+  color: var(--crm-text);
+  border-color: var(--crm-border);
+  background: var(--crm-surface-raised);
+}
+html[data-crm-theme="dark"] .order-context-strip :is(span,strong) { color: inherit; }
+html[data-crm-theme="dark"] .order-context-strip span { color: var(--crm-text-secondary); }
+html[data-crm-theme="dark"] .order-deal-layout > aside {
+  border-color: var(--crm-border);
+  background: var(--crm-shell);
+}
+html[data-crm-theme="dark"] .order-card-section > header { border-color: var(--crm-border); }
+
+html[data-crm-theme="dark"] .auth-page { background: var(--crm-bg); }
+html[data-crm-theme="dark"] .auth-brand {
+  color: var(--crm-text);
+  background:
+    radial-gradient(circle at 82% 76%, color-mix(in srgb, var(--crm-accent) 12%, transparent), transparent 23rem),
+    var(--crm-shell);
+}
+html[data-crm-theme="dark"] .auth-brand::before,
+html[data-crm-theme="dark"] .auth-brand::after { border-color: var(--crm-border-strong); }
+html[data-crm-theme="dark"] :is(.auth-brand .brand strong,.auth-brand__copy p) { color: var(--crm-text); }
+html[data-crm-theme="dark"] :is(.auth-brand .brand small,.auth-brand__index) { color: var(--crm-text-secondary); }
+html[data-crm-theme="dark"] .auth-panel {
+  color: var(--crm-text);
+  background-color: var(--crm-shell);
+  background-image: linear-gradient(to right, color-mix(in srgb, var(--crm-text) 3%, transparent) 1px, transparent 1px);
+}
+html[data-crm-theme="dark"] .auth-footer { color: var(--crm-text-secondary); border-color: var(--crm-border); }
+html[data-crm-theme="dark"] :is(.totp-setup,.recovery-list code,.manual-key) {
+  color: var(--crm-text);
+  border-color: var(--crm-border);
+  background: var(--crm-surface-raised);
+}
+
+html[data-crm-theme="dark"] :is(.manual-switch--feature input,.archive-toggle__box,.select-check) {
+  border-color: var(--crm-border-strong);
+  background: var(--crm-surface);
+}
+html[data-crm-theme="dark"] :is(.manual-switch--feature input:checked,.archive-toggle input:checked + .archive-toggle__box) {
+  border-color: var(--crm-accent);
+  background: var(--crm-accent);
+}
+
+html[data-crm-theme="dark"] :is(.button,.input,.select-trigger,.crm-combobox__input,a,summary,input,textarea,select):focus-visible {
+  outline: 2px solid var(--crm-accent);
+  outline-offset: 2px;
+}
+
+html[data-crm-theme="dark"] * {
+  scrollbar-color: var(--crm-border-strong) transparent;
+}
+html[data-crm-theme="dark"] ::-webkit-scrollbar { width: 8px; height: 8px; }
+html[data-crm-theme="dark"] ::-webkit-scrollbar-track { background: transparent; }
+html[data-crm-theme="dark"] ::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: var(--ui-radius-round);
+  background: var(--crm-border-strong);
+  background-clip: padding-box;
+}
+
+/* Avoid a light flash while the inline boot script resolves the stored theme. */
+@media (prefers-color-scheme: dark) {
+  html:not([data-crm-theme]) { background: #15181d; color-scheme: dark; }
+}
+
+/* Legacy light-surface leak guards: cover every high-risk class that still has hard-coded light values. */
+html[data-crm-theme="dark"] :is(
+  .detail-panel--contact,.detail-panel--request,.operational-form,.kanban-card,
+  .order-side-link,.crm-wizard__head,.wizard-draft-note,.wizard-empty-work,
+  .order-card-head,.file-picker__clear,.order-records__count
+) {
+  color: var(--crm-text);
+  border-color: var(--crm-border);
+  background: var(--crm-surface);
+}
+html[data-crm-theme="dark"] :is(.clickable-row:hover,.clickable-row:focus-within,.work-row-actions button:hover,.order-side-card__head button:hover) {
+  color: var(--crm-text);
+  background: var(--crm-surface-hover);
+}
+html[data-crm-theme="dark"] .work-row-actions button.is-danger:hover,
+html[data-crm-theme="dark"] .users-table .row-menu__danger:hover {
+  color: var(--crm-danger);
+  background: var(--crm-danger-soft);
+}
+html[data-crm-theme="dark"] :is(.import-file-icon,.import-file-action) {
+  color: var(--crm-accent-hover);
+  border-color: var(--crm-border-strong);
+  background: var(--crm-accent-soft);
+}
+html[data-crm-theme="dark"] .import-file-picker--ready :is(.import-file-icon,.import-file-action) {
+  color: var(--crm-success);
+  border-color: color-mix(in srgb, var(--crm-success) 36%, var(--crm-border));
+  background: var(--crm-success-soft);
+}
+html[data-crm-theme="dark"] :is(.file-metric-row__mark,.order-file-row__mark) {
+  color: var(--crm-accent-hover);
+  border-color: var(--crm-border-strong);
+  background: var(--crm-accent-soft);
+}
+html[data-crm-theme="dark"] .order-side-link:hover {
+  color: var(--crm-accent-hover);
+  border-color: color-mix(in srgb, var(--crm-accent) 34%, var(--crm-border));
+  background: var(--crm-accent-soft);
+}
+html[data-crm-theme="dark"] .file-picker__clear {
+  color: var(--crm-text-secondary);
+  border-color: var(--crm-border-strong);
+  background: var(--crm-surface-raised);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 28%);
+}
+html[data-crm-theme="dark"] .order-records__count {
+  color: var(--crm-text-secondary);
+  background: var(--crm-surface-hover);
+}
+/* ========================================================================== 
+   Lingvo Connect CRM — Phase 07
+   Dark Theme System Audit + Cross-Project Visual Consolidation
+
+   Phase 07 is consolidated into the existing Dark-theme owner rather than a
+   new late override stylesheet. Cross-project Dark normalization lives here;
+   semantic token VALUES stay in crm-foundation.css and shared control geometry
+   stays in Phase 02.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Shared semantic normalization
+   -------------------------------------------------------------------------- */
+
+html[data-crm-theme="dark"] :is(
+  .lc-workspace,
+  .lc-content,
+  .page-head,
+  .detail-head,
+  .card,
+  .table-surface,
+  .detail-panel,
+  .lc-detail-panel,
+  .directory-detail-panel,
+  .directory-editor-panel,
+  .crm-editor,
+  .crm-wizard,
+  .crm-order-card,
+  .order-card-head,
+  .order-card-section,
+  .order-finance-module,
+  .order-history-module,
+  .order-payment-card,
+  .phase5-client-quote,
+  .files-table-surface,
+  .phase6-file-preview,
+  .phase6-upload-panel,
+  .phase6-user-preview,
+  .phase6-user-editor,
+  .settings-surface,
+  .settings-dialog
+) {
+  color: var(--crm-text);
+  border-color: var(--crm-border);
+  background-color: var(--crm-surface);
+}
+
+html[data-crm-theme="dark"] :is(
+  .crm-commandbar,
+  .application-toolbar,
+  .files-toolbar,
+  .phase6-commandbar,
+  .wizard-steps,
+  .order-stage-flow,
+  .table-caption,
+  .settings-module__intro,
+  .settings-modules,
+  .directory-commandbar
+) {
+  color: var(--crm-text);
+  border-color: var(--crm-border);
+  background-color: var(--crm-surface-raised);
+}
+
+html[data-crm-theme="dark"] .lc-content :is(
+  p,
+  small,
+  .field__label,
+  .field__hint,
+  .table-caption,
+  .pagination,
+  .context-note,
+  .settings-help,
+  .settings-head-copy,
+  .directory-muted,
+  .directory-note,
+  .request-message,
+  .lc-detail-state,
+  .order-work-card__meta,
+  .tariff-resolution,
+  .wizard-footer,
+  .overline
+) {
+  color: var(--crm-text-secondary);
+}
+
+html[data-crm-theme="dark"] .lc-content :is(
+  h1,h2,h3,h4,
+  strong,
+  .field__label,
+  .table-wrap td strong,
+  .directory-record-list strong,
+  .lc-detail-data strong,
+  .file-metric-row__copy strong,
+  .order-work-card__identity > strong
+) {
+  color: var(--crm-text);
+}
+
+/* Dark native/control surfaces use exactly the shared semantic hierarchy. */
+html[data-crm-theme="dark"] :is(
+  .input,
+  .select-trigger,
+  .crm-combobox__input,
+  .table-select,
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select
+) {
+  color: var(--crm-text);
+  border-color: var(--crm-border-strong);
+  background-color: var(--crm-surface-raised);
+  caret-color: var(--crm-text);
+}
+
+html[data-crm-theme="dark"] :is(
+  .input,
+  .select-trigger,
+  .crm-combobox__input,
+  .table-select,
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select
+):hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--crm-text-muted) 58%, var(--crm-border));
+}
+
+html[data-crm-theme="dark"] :is(.select-popup,.crm-combobox__menu,.action-menu__popover,.settings-dialog) {
+  color: var(--crm-text);
+  border-color: var(--crm-border-strong);
+  background: var(--crm-surface-raised);
+}
+
+html[data-crm-theme="dark"] :is(.select-option,.crm-combobox__option,.action-menu__popover button) {
+  color: var(--crm-text);
+}
+
+html[data-crm-theme="dark"] :is(
+  .select-option[data-highlighted],
+  .select-option[data-selected],
+  .crm-combobox__option:hover,
+  .crm-combobox__option.is-active,
+  .action-menu__popover button:hover:not(:disabled),
+  .action-menu__popover button:focus-visible
+) {
+  color: var(--crm-text);
+  background: var(--crm-surface-hover);
+}
+
+html[data-crm-theme="dark"] :is(.button--secondary,.files-row__download,.compact-upload) {
+  color: var(--crm-text);
+  border-color: var(--crm-border-strong);
+  background: var(--crm-surface-raised);
+}
+html[data-crm-theme="dark"] :is(.button--secondary,.files-row__download,.compact-upload):hover:not(:disabled) {
+  color: var(--crm-text);
+  border-color: color-mix(in srgb, var(--crm-accent) 42%, var(--crm-border));
+  background: var(--crm-surface-hover);
+}
+html[data-crm-theme="dark"] .button:disabled { color: var(--crm-text-disabled); }
+
+html[data-crm-theme="dark"] :is(.badge--neutral,.files-source) {
+  color: var(--crm-text-secondary);
+  border-color: var(--crm-border);
+  background: var(--crm-surface-raised);
+}
+
+html[data-crm-theme="dark"] :is(.table-wrap table,.table-wrap thead,.table-wrap tbody tr) {
+  color: var(--crm-text);
+  border-color: var(--crm-divider);
+  background: var(--crm-surface);
+}
+html[data-crm-theme="dark"] .table-wrap th { color: var(--crm-text-muted); border-color: var(--crm-divider); background: var(--crm-surface-raised); }
+html[data-crm-theme="dark"] .table-wrap td { color: var(--crm-text-secondary); border-color: var(--crm-divider); }
+html[data-crm-theme="dark"] .table-wrap tbody tr:hover { color: var(--crm-text); background: var(--crm-surface-hover); }
+html[data-crm-theme="dark"] .table-wrap tbody tr.is-selected { background: var(--crm-surface-selected); box-shadow: inset 3px 0 0 var(--crm-accent); }
+
+/* Operational side panes hide scrollbar chrome without disabling scrolling. */
+:is(.lc-detail-panel,.directory-detail-panel,.directory-editor-panel,.phase6-user-editor,.phase6-file-preview,.phase6-upload-panel,.phase5-order-card,.phase5-order-tabs) { scrollbar-width: none; }
+:is(.lc-detail-panel,.directory-detail-panel,.directory-editor-panel,.phase6-user-editor,.phase6-file-preview,.phase6-upload-panel,.phase5-order-card,.phase5-order-tabs)::-webkit-scrollbar { width: 0; height: 0; }
+
+/* --------------------------------------------------------------------------
+   Phase 07 route-specific Dark regressions that are not already owned by the
+   corresponding page layer. Geometry/shared semantics live with their owners.
+   -------------------------------------------------------------------------- */
+html[data-crm-theme="dark"] :is(.detail-panel--contact,.detail-panel--request,.operational-form,.comment-list article,.activity-panel) {
+  color: var(--crm-text);
+  border-color: var(--crm-border);
+  background: var(--crm-surface);
+}
+html[data-crm-theme="dark"] :is(.data-list dt,.activity-list small,.comment-list small,.comment-list time) { color: var(--crm-text-muted); }
+html[data-crm-theme="dark"] :is(.data-list dd,.request-message,.comment-list p) { color: var(--crm-text-secondary); }
+
+/* Safe native date/time/icon treatment follows the semantic Dark color scheme. */
+html[data-crm-theme="dark"] :is(input[type="date"],input[type="time"],input[type="datetime-local"]) { color-scheme: dark; }
+html[data-crm-theme="dark"] :is(input,textarea,select):-webkit-autofill {
+  -webkit-text-fill-color: var(--crm-text);
+  box-shadow: 0 0 0 1000px var(--crm-surface-raised) inset;
+  caret-color: var(--crm-text);
+}

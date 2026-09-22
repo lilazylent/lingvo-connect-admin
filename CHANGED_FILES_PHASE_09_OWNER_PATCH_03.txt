@@ -1,0 +1,47 @@
+Lingvo Connect CRM — Phase 09 Owner Patch 03
+Build: phase09-mvp-release-candidate-20260916-r2
+Baseline: phase09-mvp-release-candidate-20260916-r1
+
+ADDED
+- PHASE_09_OWNER_PATCH_03_MASTER_PROMPT.md
+- PHASE_09_OWNER_PATCH_03_TZ.md
+- PHASE_09_OWNER_PATCH_03_IMPLEMENTATION_REPORT.md
+- CHANGED_FILES_PHASE_09_OWNER_PATCH_03.txt
+- docs/phases/PHASE_09_OWNER_PATCH_03_ARCHIVE_LAYOUT_MASTER_PROMPT.md
+- docs/phases/PHASE_09_OWNER_PATCH_03_TZ.md
+- apps/api/alembic/versions/0018_archive_status_scopes.py
+- apps/admin-web/e2e/phase9-owner-patch03.spec.ts
+
+FUNCTIONAL / ARCHITECTURE CHANGES
+- apps/api/app/crm_models.py
+- apps/api/app/routers/crm.py
+- apps/api/tests/test_crm.py
+- apps/api/tests/test_crm_preferences.py
+- apps/admin-web/src/components/crm-orders.tsx
+- apps/admin-web/src/components/crm-settings.tsx
+- apps/admin-web/src/app/phase5-orders.css
+- apps/admin-web/src/app/phase6-admin.css
+- apps/admin-web/src/app/phase8-visual-motion.css
+
+FIXTURE / REGRESSION TEST UPDATES
+- apps/admin-web/e2e/crm-rhythm.spec.ts
+- apps/admin-web/e2e/phase5-orders-order-detail.spec.ts
+- apps/admin-web/e2e/phase6-files-users-settings.spec.ts
+- apps/admin-web/e2e/phase7-dark-audit.spec.ts
+- apps/admin-web/e2e/phase8-owner-patch02.spec.ts
+- apps/admin-web/e2e/phase8-visual-motion.spec.ts
+- apps/admin-web/e2e/phase9-release-candidate.spec.ts
+
+AUDIT / BUILD-ID UPDATES
+- apps/admin-web/src/app/layout.tsx
+- apps/admin-web/scripts/audit-css-ownership.mjs
+- apps/admin-web/scripts/audit-phase8-owner-patch.mjs
+- apps/admin-web/scripts/audit-phase9-release-candidate.mjs
+
+DOCUMENTATION UPDATES
+- apps/admin-web/AGENTS.md
+- docs/CRM_MVP_MASTER_SPEC.md
+- docs/phases/PHASE_09_FINAL_MVP_QA_RELEASE_CANDIDATE.md
+
+NO REMOVALS
+No source files were deleted by this owner patch.

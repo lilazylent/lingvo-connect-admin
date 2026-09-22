@@ -1,0 +1,427 @@
+/* ==========================================================================\n   Lingvo Connect CRM — Phase 04: Clients + Executors\n   Page-specific workspace composition only. Shared controls remain Phase 02.\n   ========================================================================== */
+
+.phase4-directory { min-width: 0; }
+.phase4-directory__head { margin-bottom: var(--ui-space-4); }
+.phase4-directory__utility-row { min-height: 36px; display: flex; align-items: center; justify-content: space-between; gap: var(--ui-space-3); margin: -4px 0 var(--ui-space-3); }
+.phase4-directory__import { display: inline-flex; align-items: center; gap: 6px; margin: 0; color: var(--crm-accent); font-size: var(--ui-text-sm); }
+
+.directory-commandbar {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(280px,1fr) auto;
+  gap: var(--ui-space-2);
+  align-items: end;
+  margin-bottom: var(--ui-space-4);
+  padding: var(--ui-space-3);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--ui-radius-card);
+  background: var(--crm-surface);
+  box-shadow: var(--ui-shadow-xs);
+}
+.phase4-directory--executor .directory-commandbar { grid-template-columns: minmax(280px,1fr) minmax(170px,.45fr) minmax(190px,.55fr) auto; }
+.directory-commandbar > * { min-width: 0; }
+.directory-commandbar__actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--ui-space-2); min-height: var(--ui-control-height); }
+.directory-commandbar__actions .archive-toggle { margin: 0; }
+
+.directory-workspace { min-width: 0; display: grid; grid-template-columns: minmax(0,1fr); gap: var(--ui-space-3); align-items: start; }
+.directory-workspace.has-panel { grid-template-columns: minmax(0,1.62fr) minmax(360px,.78fr); }
+.directory-list-surface { min-width: 0; }
+
+.directory-table { min-width: 790px; }
+.directory-table th { white-space: nowrap; }
+.directory-table td { vertical-align: middle; }
+.directory-table td strong,
+.directory-table td span { display: block; min-width: 0; }
+.directory-table td strong { color: var(--crm-text); font-size: var(--ui-text-md); font-weight: 660; line-height: 1.25; }
+.directory-table td span { margin-top: 3px; color: var(--crm-text-secondary); font-size: var(--ui-text-sm); line-height: 1.35; }
+.directory-table tbody tr { cursor: pointer; }
+.directory-table tbody tr:focus-visible { outline: 2px solid var(--crm-accent); outline-offset: -2px; }
+.directory-table tbody tr.is-selected { background: var(--crm-surface-selected); }
+.directory-table tbody tr.is-selected td:first-child { box-shadow: inset 3px 0 0 var(--crm-accent); }
+.directory-table__open { width: 40px; color: var(--crm-text-muted); text-align: center; font-size: var(--ui-text-lg); }
+
+.directory-empty { display: grid; gap: 4px; padding: var(--ui-space-5); color: var(--crm-text-secondary); text-align: center; }
+.directory-empty strong { color: var(--crm-text); font-size: var(--ui-text-base); }
+.directory-empty span { font-size: var(--ui-text-sm); }
+.directory-empty--panel { padding: var(--ui-space-6) var(--ui-space-3); border: 1px dashed var(--crm-border-strong); border-radius: var(--ui-radius-card); background: var(--crm-surface-raised); }
+
+.directory-detail-panel,
+.directory-editor-panel {
+  min-width: 0;
+  max-height: calc(100vh - var(--ui-topbar-height) - 28px);
+  position: sticky;
+  top: calc(var(--ui-topbar-height) + 14px);
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  color: var(--crm-text);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--ui-radius-card);
+  background: var(--crm-surface);
+  box-shadow: var(--ui-shadow-sm);
+}
+.directory-detail-panel__header,
+.directory-editor-panel__header { min-height: 72px; display: flex; align-items: center; justify-content: space-between; gap: var(--ui-space-3); padding: var(--ui-space-3) var(--ui-space-4); border-bottom: 1px solid var(--crm-border); }
+.directory-detail-panel__header > div:first-child,
+.directory-editor-panel__header > div:first-child { min-width: 0; }
+.directory-detail-panel__header span,
+.directory-editor-panel__header span { display: block; color: var(--crm-text-muted); font-size: var(--ui-text-xs); font-weight: 650; letter-spacing: .06em; text-transform: uppercase; }
+.directory-detail-panel__header h2,
+.directory-editor-panel__header h2 { margin: 4px 0 0; overflow: hidden; color: var(--crm-text); font-size: var(--ui-text-xl); line-height: 1.15; font-weight: 720; letter-spacing: -.025em; text-overflow: ellipsis; white-space: nowrap; }
+.directory-detail-panel__header-actions { display: flex; align-items: center; gap: var(--ui-space-2); }
+.directory-detail-panel__header button,
+.directory-editor-panel__header button { width: 34px; height: 34px; display: grid; place-items: center; flex: 0 0 auto; color: var(--crm-text-muted); border: 0; border-radius: var(--ui-radius-control); background: transparent; cursor: pointer; }
+.directory-detail-panel__header button:hover,
+.directory-editor-panel__header button:hover { color: var(--crm-text); background: var(--crm-surface-hover); }
+.directory-detail-panel__header button:focus-visible,
+.directory-editor-panel__header button:focus-visible { outline: 2px solid var(--crm-accent); outline-offset: 2px; }
+
+.directory-detail-tabs { min-height: 44px; display: flex; align-items: stretch; gap: var(--ui-space-4); padding: 0 var(--ui-space-4); overflow-x: auto; border-bottom: 1px solid var(--crm-border); scrollbar-width: thin; }
+.directory-detail-tabs button { position: relative; min-height: 44px; padding: 0; color: var(--crm-text-muted); border: 0; background: transparent; font: inherit; font-size: var(--ui-text-sm); white-space: nowrap; cursor: pointer; }
+.directory-detail-tabs button.is-active { color: var(--crm-text); font-weight: 680; }
+.directory-detail-tabs button.is-active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: var(--ui-radius-round); background: var(--crm-accent); }
+.directory-detail-tabs button:focus-visible { outline: 2px solid var(--crm-accent); outline-offset: -2px; border-radius: 5px; }
+
+.directory-detail-panel__body { min-height: 0; flex: 1 1 auto; overflow: visible; overscroll-behavior: auto; }
+.directory-detail-panel__footer { flex: 0 0 auto; padding: var(--ui-space-3) var(--ui-space-4); border-top: 1px solid var(--crm-border); background: color-mix(in srgb,var(--crm-surface) 96%,transparent); }
+.directory-detail-panel__primary { width: 100%; }
+
+.directory-detail-section,
+.directory-tab-section { padding: var(--ui-space-4); border-bottom: 1px solid var(--crm-border); }
+.directory-detail-section:last-child,
+.directory-tab-section:last-child { border-bottom: 0; }
+.directory-detail-section__title { display: flex; align-items: center; gap: 8px; margin-bottom: var(--ui-space-3); color: var(--crm-text-secondary); }
+.directory-detail-section__title strong { color: var(--crm-text); font-size: var(--ui-text-md); font-weight: 680; }
+.directory-facts { display: grid; grid-template-columns: 1fr 1fr; gap: var(--ui-space-2); margin: 0; }
+.directory-facts > div { min-width: 0; padding: 10px 11px; border: 1px solid var(--crm-border); border-radius: var(--ui-radius-control); background: var(--crm-surface-raised); }
+.directory-facts dt { color: var(--crm-text-muted); font-size: var(--ui-text-xs); }
+.directory-facts dd { margin: 4px 0 0; overflow-wrap: anywhere; color: var(--crm-text); font-size: var(--ui-text-md); font-weight: 620; }
+.directory-summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--ui-space-2); }
+.directory-summary-grid > div { min-width: 0; padding: 10px 11px; border: 1px solid var(--crm-border); border-radius: var(--ui-radius-control); background: var(--crm-surface-raised); }
+.directory-summary-grid span { display: block; color: var(--crm-text-muted); font-size: var(--ui-text-xs); }
+.directory-summary-grid strong { display: block; margin-top: 4px; color: var(--crm-text); font-size: var(--ui-text-base); font-weight: 720; overflow-wrap: anywhere; }
+.directory-summary-loading { padding: 0 var(--ui-space-4) var(--ui-space-4); }
+.directory-note,
+.directory-muted { margin: 0; color: var(--crm-text-secondary); font-size: var(--ui-text-sm); line-height: var(--ui-line-relaxed); white-space: pre-wrap; }
+.directory-muted { color: var(--crm-text-muted); }
+.directory-chip-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.directory-chip-list span { padding: 6px 9px; color: var(--crm-text-secondary); border: 1px solid var(--crm-border); border-radius: var(--ui-radius-round); background: var(--crm-surface-raised); font-size: var(--ui-text-xs); font-weight: 620; }
+
+.directory-tab-section > header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--ui-space-3); margin-bottom: var(--ui-space-3); }
+.directory-tab-section > header h3 { margin: 4px 0 0; color: var(--crm-text); font-size: var(--ui-text-lg); font-weight: 700; }
+.directory-direction-list { display: grid; gap: var(--ui-space-2); }
+.directory-direction-list article { display: flex; align-items: center; justify-content: space-between; gap: var(--ui-space-3); padding: 10px 11px; border: 1px solid var(--crm-border); border-radius: var(--ui-radius-control); background: var(--crm-surface-raised); }
+.directory-direction-list strong { color: var(--crm-text); font-size: var(--ui-text-md); }
+.directory-direction-list span { color: var(--crm-text-secondary); font-size: var(--ui-text-sm); text-align: right; }
+
+.directory-record-list { display: grid; gap: 1px; overflow: hidden; border: 1px solid var(--crm-border); border-radius: var(--ui-radius-card); background: var(--crm-border); }
+.directory-record-list > a,
+.directory-record-list > article { min-width: 0; display: grid; grid-template-columns: minmax(0,1fr) auto 18px; gap: var(--ui-space-3); align-items: center; padding: 11px 12px; color: var(--crm-text); background: var(--crm-surface); text-decoration: none; }
+.directory-record-list > a:hover { background: var(--crm-surface-hover); }
+.directory-record-list > a > div:first-child,
+.directory-record-list > article > div:first-child { min-width: 0; }
+.directory-record-list span,
+.directory-record-list strong,
+.directory-record-list small { display: block; }
+.directory-record-list span { color: var(--crm-text-muted); font-size: var(--ui-text-xs); }
+.directory-record-list strong { margin-top: 2px; overflow: hidden; color: var(--crm-text); font-size: var(--ui-text-md); font-weight: 660; text-overflow: ellipsis; white-space: nowrap; }
+.directory-record-list small { margin-top: 3px; color: var(--crm-text-secondary); font-size: var(--ui-text-xs); }
+.directory-record-list > a > div:nth-child(2),
+.directory-record-list > article > div:nth-child(2) { display: grid; justify-items: end; gap: 4px; }
+.directory-record-list i { color: var(--crm-accent); font-style: normal; }
+
+.directory-activity { margin: 0; padding: 0; list-style: none; }
+.directory-activity li { position: relative; display: grid; grid-template-columns: 12px minmax(0,1fr); gap: 10px; padding: 0 0 18px; }
+.directory-activity li::before { content: ""; position: absolute; left: 3px; top: 10px; bottom: 0; width: 1px; background: var(--crm-border); }
+.directory-activity li:last-child::before { display: none; }
+.directory-activity li > span { position: relative; z-index: 1; width: 7px; height: 7px; margin-top: 5px; border: 1px solid var(--crm-accent); border-radius: 50%; background: var(--crm-surface); }
+.directory-activity strong,
+.directory-activity small { display: block; }
+.directory-activity strong { color: var(--crm-text); font-size: var(--ui-text-md); font-weight: 650; }
+.directory-activity small { margin-top: 3px; color: var(--crm-text-muted); font-size: var(--ui-text-xs); }
+
+/* Existing contact CRUD is reused inside the new split workspace. */
+.directory-detail-panel .crm-related { margin: 0; padding: var(--ui-space-4); border: 0; }
+.directory-detail-panel .crm-related .crm-section-head { margin-bottom: var(--ui-space-3); }
+.directory-detail-panel .crm-related .crm-section-head h3 { font-size: var(--ui-text-lg); }
+.directory-detail-panel .crm-related > label { display: inline-flex; align-items: center; gap: 6px; margin-bottom: var(--ui-space-3); color: var(--crm-text-secondary); font-size: var(--ui-text-sm); }
+.directory-detail-panel .crm-related .crm-work { gap: var(--ui-space-2); padding: 10px 0; border-bottom: 1px solid var(--crm-border); }
+.directory-detail-panel .crm-related .crm-work p { color: var(--crm-text-secondary); font-size: var(--ui-text-sm); }
+.directory-detail-panel .crm-related .crm-work-editor { padding: var(--ui-space-3); border: 1px solid var(--crm-border); border-radius: var(--ui-radius-card); background: var(--crm-surface-raised); }
+.directory-detail-panel .crm-related .crm-fields { grid-template-columns: 1fr; }
+
+.directory-editor-panel__form { min-height: 0; overflow: auto; padding: var(--ui-space-4); }
+.directory-editor-fields { min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: var(--ui-space-3); margin: 0; padding: 0; border: 0; }
+.directory-editor-fields > .field:last-child { grid-column: 1 / -1; }
+.directory-editor-directions { margin-top: var(--ui-space-5); padding-top: var(--ui-space-4); border-top: 1px solid var(--crm-border); }
+.directory-editor-directions > header { display: flex; align-items: center; justify-content: space-between; gap: var(--ui-space-3); margin-bottom: var(--ui-space-3); }
+.directory-editor-directions h3 { margin: 0; color: var(--crm-text); font-size: var(--ui-text-base); }
+.directory-editor-directions header span { min-width: 24px; height: 24px; display: grid; place-items: center; color: var(--crm-text-secondary); border-radius: var(--ui-radius-round); background: var(--crm-surface-raised); font-size: var(--ui-text-xs); }
+.directory-editor-direction { display: grid; grid-template-columns: 1fr 1fr; gap: var(--ui-space-2); margin-bottom: var(--ui-space-3); padding: var(--ui-space-3); border: 1px solid var(--crm-border); border-radius: var(--ui-radius-card); background: var(--crm-surface-raised); }
+.directory-editor-direction > :nth-child(3) { grid-column: 1 / -1; }
+.directory-editor-direction > .button { justify-self: end; }
+.directory-editor-panel__actions { display: flex; flex-wrap: wrap; gap: var(--ui-space-2); margin-top: var(--ui-space-5); padding-top: var(--ui-space-4); border-top: 1px solid var(--crm-border); }
+
+@media (max-width: 1180px) {
+  .directory-workspace.has-panel { grid-template-columns: minmax(0,1.35fr) minmax(330px,.85fr); }
+  .directory-table { min-width: 700px; }
+  .directory-table th:nth-child(4), .directory-table td:nth-child(4) { display: none; }
+}
+
+@media (max-width: 900px) {
+  .phase4-directory--executor .directory-commandbar,
+  .directory-commandbar { grid-template-columns: 1fr 1fr; }
+  .directory-commandbar > .field:first-child { grid-column: 1 / -1; }
+  .directory-commandbar__actions { justify-content: flex-start; }
+  .directory-workspace.has-panel { grid-template-columns: 1fr; }
+  .directory-detail-panel,
+  .directory-editor-panel { position: static; order: -1; max-height: none; }
+  .directory-table { min-width: 660px; }
+}
+
+@media (max-width: 620px) {
+  .phase4-directory__head { margin-bottom: var(--ui-space-3); }
+  .phase4-directory__utility-row { margin-bottom: var(--ui-space-2); }
+  .phase4-directory--executor .directory-commandbar,
+  .directory-commandbar { grid-template-columns: 1fr; padding: 10px; }
+  .directory-commandbar > .field:first-child { grid-column: auto; }
+  .directory-commandbar__actions { justify-content: stretch; }
+  .directory-commandbar__actions .button { flex: 1 1 auto; }
+  .directory-commandbar__actions .archive-toggle { flex: 0 0 auto; }
+  .directory-detail-panel,
+  .directory-editor-panel { position: fixed; z-index: var(--z-modal); inset: var(--ui-topbar-height) 0 0; max-height: none; border-radius: 0; border-inline: 0; border-bottom: 0; box-shadow: var(--ui-shadow-lg); }
+  .directory-detail-panel__header,
+  .directory-editor-panel__header { min-height: 64px; padding-inline: var(--ui-space-3); }
+  .directory-detail-tabs { padding-inline: var(--ui-space-3); gap: var(--ui-space-3); }
+  .directory-detail-section,
+  .directory-tab-section,
+  .directory-detail-panel .crm-related { padding: var(--ui-space-3); }
+  .directory-detail-panel__footer { padding: var(--ui-space-3); }
+  .directory-facts,
+  .directory-summary-grid,
+  .directory-editor-fields { grid-template-columns: 1fr; }
+  .directory-editor-fields > .field:last-child { grid-column: auto; }
+  .directory-editor-direction { grid-template-columns: 1fr; }
+  .directory-editor-direction > :nth-child(3) { grid-column: auto; }
+  .directory-record-list > a,
+  .directory-record-list > article { grid-template-columns: minmax(0,1fr) auto; }
+  .directory-record-list i { display: none; }
+  .directory-table { min-width: 620px; }
+}
+
+@media (max-width: 430px) {
+  .directory-commandbar__actions { flex-direction: column; align-items: stretch; }
+  .directory-commandbar__actions .archive-toggle { width: 100%; justify-content: center; }
+  .directory-detail-panel__header-actions .badge { display: none; }
+  .directory-record-list > a,
+  .directory-record-list > article { grid-template-columns: 1fr; }
+  .directory-record-list > a > div:nth-child(2),
+  .directory-record-list > article > div:nth-child(2) { justify-items: start; }
+  .directory-direction-list article { align-items: flex-start; flex-direction: column; }
+  .directory-direction-list span { text-align: left; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .directory-table tbody tr,
+  .directory-record-list > a,
+  .directory-detail-tabs button { transition-duration: .01ms; }
+}
+
+
+/* Phase 08 owner patch 02: detail tabs are the navigation. On desktop, let
+   the document scroll naturally instead of rendering a second vertical rail
+   inside the client/executor preview. Existing mobile overlay behavior remains. */
+@media (min-width: 901px) {
+  .directory-detail-panel {
+    position: relative;
+    top: auto;
+    max-height: none;
+    overflow: visible;
+  }
+  .directory-detail-panel__body { overflow: visible; }
+}
+
+/* Phase 10.1 owner correction — availability is a team workspace first.
+   The executor card keeps a compact summary; editing lives in the full calendar. */
+.directory-view-switch { flex: 0 0 auto; color: var(--crm-text-secondary); border-color: var(--crm-border-strong); background: var(--crm-surface-raised); }
+.directory-view-switch button { color: var(--crm-text-secondary); }
+.directory-view-switch button.is-active { color: var(--crm-text); background: var(--crm-surface); }
+
+.executor-availability__hint { margin: calc(var(--ui-space-2) * -1) 0 var(--ui-space-3); }
+.executor-availability-summary__open { width: 100%; margin-bottom: var(--ui-space-3); }
+.executor-availability__list { display: grid; gap: var(--ui-space-2); }
+.executor-availability__list > article {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-3);
+  padding: 11px 12px;
+  border: 1px solid var(--crm-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--crm-surface);
+}
+.executor-availability__list > article > div:first-child { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.executor-availability__list strong { color: var(--crm-text); font-size: var(--ui-text-md); }
+.executor-availability__list span:not(.badge) { flex: 1 1 100%; color: var(--crm-text-secondary); font-size: var(--ui-text-sm); overflow-wrap: anywhere; }
+
+.executor-calendar { min-width: 0; overflow: hidden; }
+.executor-calendar__toolbar {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-4);
+  padding: var(--ui-space-4);
+  border-bottom: 1px solid var(--crm-border);
+}
+.executor-calendar__toolbar > div:first-child { min-width: 0; }
+.executor-calendar__toolbar h2 { margin: 3px 0 2px; color: var(--crm-text); font-size: var(--ui-text-xl); line-height: 1.15; }
+.executor-calendar__toolbar p { margin: 0; color: var(--crm-text-secondary); font-size: var(--ui-text-sm); }
+.executor-calendar__nav { flex: 0 0 auto; display: flex; align-items: center; gap: var(--ui-space-2); }
+.executor-calendar__loading { padding: 8px var(--ui-space-4); color: var(--crm-text-muted); border-bottom: 1px solid var(--crm-border); font-size: var(--ui-text-xs); }
+.executor-calendar__scroll { min-width: 0; overflow-x: auto; overscroll-behavior-inline: contain; }
+.executor-calendar__table { width: 100%; min-width: 1040px; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
+.executor-calendar__table th,
+.executor-calendar__table td { padding: 0; border-right: 1px solid var(--crm-border); border-bottom: 1px solid var(--crm-border); }
+.executor-calendar__table tr > *:last-child { border-right: 0; }
+.executor-calendar__table tbody tr:last-child > * { border-bottom: 0; }
+.executor-calendar__table thead th { height: 48px; padding: 0 8px; color: var(--crm-text-muted); background: var(--crm-surface-raised); font-size: var(--ui-text-xs); font-weight: 680; text-align: center; text-transform: capitalize; }
+.executor-calendar__table thead th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  width: 250px;
+  text-align: left;
+  background: var(--crm-surface-raised);
+}
+.executor-calendar__table tbody th {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  width: 250px;
+  background: var(--crm-surface);
+  text-align: left;
+}
+.executor-calendar__table tbody th > button {
+  width: 100%;
+  min-height: 64px;
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  padding: 9px 12px;
+  color: var(--crm-text);
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.executor-calendar__table tbody th > button:hover { background: var(--crm-surface-hover); }
+.executor-calendar__table tbody th > button:focus-visible { outline: 2px solid var(--crm-accent); outline-offset: -2px; }
+.executor-calendar__table tbody th strong { overflow: hidden; font-size: var(--ui-text-md); font-weight: 680; text-overflow: ellipsis; white-space: nowrap; }
+.executor-calendar__table tbody th span { overflow: hidden; color: var(--crm-text-muted); font-size: var(--ui-text-xs); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.executor-calendar__table td { height: 64px; background: var(--crm-surface); }
+.executor-calendar__cell {
+  width: 100%;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  padding: 6px;
+  color: var(--crm-text-secondary);
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.executor-calendar__cell span {
+  width: 100%;
+  min-height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 4px 6px;
+  border: 1px solid var(--crm-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--crm-surface-raised);
+  font-size: var(--ui-text-xs);
+  font-weight: 680;
+  line-height: 1.15;
+  text-align: center;
+}
+.executor-calendar__cell:hover span { border-color: var(--crm-border-strong); background: var(--crm-surface-hover); }
+.executor-calendar__cell:focus-visible { outline: 2px solid var(--crm-accent); outline-offset: -3px; }
+.executor-calendar__cell.is-free span { color: var(--crm-success-text); border-color: color-mix(in srgb, var(--crm-success) 45%, var(--crm-border)); background: color-mix(in srgb, var(--crm-success) 11%, var(--crm-surface)); }
+.executor-calendar__cell.is-busy span { color: var(--crm-warning-text); border-color: color-mix(in srgb, var(--crm-warning) 48%, var(--crm-border)); background: color-mix(in srgb, var(--crm-warning) 12%, var(--crm-surface)); }
+.executor-calendar__cell.is-unavailable span { color: var(--crm-danger-text); border-color: color-mix(in srgb, var(--crm-danger) 42%, var(--crm-border)); background: color-mix(in srgb, var(--crm-danger) 9%, var(--crm-surface)); }
+.executor-calendar__cell.is-vacation span { color: var(--crm-info-text); border-color: color-mix(in srgb, var(--crm-info) 42%, var(--crm-border)); background: color-mix(in srgb, var(--crm-info) 10%, var(--crm-surface)); }
+.executor-calendar__cell.is-unknown span { color: var(--crm-text-muted); border-style: dashed; background: transparent; }
+.executor-calendar__cell:disabled { cursor: default; opacity: .6; }
+.executor-calendar__pager { min-height: 52px; display: flex; align-items: center; justify-content: space-between; gap: var(--ui-space-3); padding: 8px var(--ui-space-4); border-top: 1px solid var(--crm-border); color: var(--crm-text-secondary); font-size: var(--ui-text-sm); }
+.executor-calendar__pager > div { display: flex; align-items: center; gap: var(--ui-space-2); }
+
+.executor-availability-dialog-backdrop { position: fixed; z-index: var(--z-modal); inset: 0; display: grid; place-items: center; padding: var(--ui-space-4); background: rgb(7 12 18 / 58%); backdrop-filter: blur(4px); }
+.executor-availability-dialog { width: min(620px, 100%); max-height: calc(100dvh - 32px); overflow: auto; color: var(--crm-text); border: 1px solid var(--crm-border-strong); border-radius: var(--ui-radius-card); background: var(--crm-surface); box-shadow: var(--ui-shadow-lg); }
+.executor-availability-dialog > header { min-height: 72px; display: flex; align-items: center; justify-content: space-between; gap: var(--ui-space-3); padding: var(--ui-space-3) var(--ui-space-4); border-bottom: 1px solid var(--crm-border); }
+.executor-availability-dialog > header span { display: block; color: var(--crm-text-muted); font-size: var(--ui-text-xs); font-weight: 650; letter-spacing: .06em; text-transform: uppercase; }
+.executor-availability-dialog > header h2 { margin: 4px 0 0; color: var(--crm-text); font-size: var(--ui-text-xl); }
+.executor-availability-dialog > header button { width: 36px; height: 36px; display: grid; place-items: center; color: var(--crm-text-muted); border: 0; border-radius: var(--ui-radius-control); background: transparent; cursor: pointer; }
+.executor-availability-dialog > header button:hover { color: var(--crm-text); background: var(--crm-surface-hover); }
+.executor-availability-dialog form { padding: var(--ui-space-4); }
+.executor-availability-dialog__fields { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: var(--ui-space-3); }
+.executor-availability-dialog__fields > :first-child,
+.executor-availability-dialog__fields > :last-child { grid-column: 1 / -1; }
+.executor-availability-dialog__actions { display: grid; grid-template-columns: auto 1fr auto auto; gap: var(--ui-space-2); align-items: center; margin-top: var(--ui-space-4); padding-top: var(--ui-space-3); border-top: 1px solid var(--crm-border); }
+
+@media (max-width: 900px) {
+  .executor-calendar__toolbar { align-items: flex-start; flex-direction: column; }
+  .executor-calendar__nav { width: 100%; }
+  .executor-calendar__nav .button:nth-child(2) { flex: 1 1 auto; }
+}
+
+@media (max-width: 620px) {
+  .phase4-directory__utility-row { align-items: stretch; flex-direction: column; }
+  .directory-view-switch { width: 100%; }
+  .directory-view-switch button { flex: 1 1 0; }
+  .executor-calendar__toolbar { padding: var(--ui-space-3); }
+  .executor-calendar__table { min-width: 920px; }
+  .executor-calendar__table thead th:first-child,
+  .executor-calendar__table tbody th { width: 210px; }
+  .executor-calendar__pager { align-items: stretch; flex-direction: column; }
+  .executor-calendar__pager > div { justify-content: space-between; }
+  .executor-availability-dialog-backdrop { padding: 0; align-items: end; }
+  .executor-availability-dialog { width: 100%; max-height: calc(100dvh - var(--ui-topbar-height)); border-radius: var(--ui-radius-card) var(--ui-radius-card) 0 0; border-inline: 0; border-bottom: 0; }
+  .executor-availability-dialog__fields { grid-template-columns: 1fr; }
+  .executor-availability-dialog__fields > :first-child,
+  .executor-availability-dialog__fields > :last-child { grid-column: auto; }
+  .executor-availability-dialog__actions { grid-template-columns: 1fr 1fr; }
+  .executor-availability-dialog__actions > span { display: none; }
+  .executor-availability-dialog__actions .button { width: 100%; }
+}
+
+
+/* Phase 15 — client deposit ledger. */
+.client-deposit-panel { gap: var(--ui-space-4); }
+.client-deposit-panel__balance {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-3) var(--ui-space-4);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--crm-surface-raised);
+}
+.client-deposit-panel__balance span { color: var(--crm-text-secondary); font-size: var(--ui-text-sm); }
+.client-deposit-panel__balance strong { color: var(--crm-text); font-size: var(--ui-text-2xl); }
+.client-deposit-panel__editor { display: grid; grid-template-columns: minmax(0,.7fr) minmax(0,1.3fr); gap: var(--ui-space-3); }
+.client-deposit-panel__actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: var(--ui-space-2); }
+.client-deposit-panel__history { display: grid; gap: var(--ui-space-3); padding-top: var(--ui-space-3); border-top: 1px solid var(--crm-border); }
+.client-deposit-operation { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: var(--ui-space-3); align-items: center; padding: 9px 0; border-bottom: 1px solid var(--crm-border); }
+.client-deposit-operation > div { min-width: 0; display: grid; gap: 2px; }
+.client-deposit-operation > div:last-child { text-align: right; }
+.client-deposit-operation span { color: var(--crm-text-muted); font-size: var(--ui-text-xs); overflow-wrap: anywhere; }
+.client-deposit-operation .is-credit { color: var(--crm-success-text); }
+.client-deposit-operation .is-debit { color: var(--crm-text); }
+@media (max-width: 620px) {
+  .client-deposit-panel__editor { grid-template-columns: 1fr; }
+  .client-deposit-panel__actions { grid-column: 1; }
+  .client-deposit-panel__actions .button { width: 100%; }
+}

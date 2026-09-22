@@ -1,0 +1,16 @@
+PHASE_10_0_10_1_ARCHITECTURE_AVAILABILITY.md
+PHASE_10_0_10_1_IMPLEMENTATION_REPORT.md
+PHASE_10_1_OWNER_CORRECTION_CALENDAR_PROMPT.md
+PHASE_10_1_OWNER_CORRECTION_CALENDAR_REPORT.md
+apps/admin-web/AGENTS.md
+apps/admin-web/src/components/crm-directory.tsx
+apps/admin-web/src/app/phase4-directories.css
+apps/admin-web/src/app/layout.tsx
+apps/admin-web/scripts/audit-phase10-availability.mjs
+apps/admin-web/scripts/audit-phase9-release-candidate.mjs
+apps/admin-web/scripts/audit-css-ownership.mjs
+apps/admin-web/scripts/audit-phase8-owner-patch.mjs
+apps/admin-web/e2e/phase10-availability.spec.ts
+apps/admin-web/e2e/phase8-owner-patch02.spec.ts
+apps/admin-web/e2e/phase8-visual-motion.spec.ts
+apps/admin-web/e2e/phase9-release-candidate.spec.ts

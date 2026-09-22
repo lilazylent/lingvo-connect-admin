@@ -1,0 +1,240 @@
+/* ========================================================================== 
+   Lingvo Connect CRM — canonical frontend foundation
+   Phase 0 / 2026-09-15
+
+   This file owns the semantic design tokens used by every frontend phase.
+   It is intentionally imported AFTER legacy visual layers so older :root
+   declarations cannot silently redefine the design system. New code must use
+   these semantic tokens instead of adding new literal colors/sizes.
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+
+  /* Typography */
+  --ui-font-sans: "Onest Variable", "Onest", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ui-font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  /* Owner readability pass (video review 2026-09-15): working UI copy is
+     intentionally ~1.5x larger than the previous 10-13px micro scale.
+     Display/page titles stay on the title scale below. */
+  --ui-text-xs: 15px;
+  --ui-text-sm: 16px;
+  --ui-text-md: 17px;
+  --ui-text-base: 18px;
+  --ui-text-lg: 19px;
+  --ui-text-xl: 22px;
+  --ui-title-sm: 28px;
+  --ui-title-md: 36px;
+  --ui-title-lg: 46px;
+  --ui-line-tight: 1.15;
+  --ui-line-normal: 1.45;
+  --ui-line-relaxed: 1.6;
+
+  /* Spacing rhythm */
+  --ui-space-1: 4px;
+  --ui-space-2: 8px;
+  --ui-space-3: 12px;
+  --ui-space-4: 16px;
+  --ui-space-5: 20px;
+  --ui-space-6: 24px;
+  --ui-space-8: 32px;
+  --ui-space-10: 40px;
+  --ui-space-12: 48px;
+
+  /* Geometry */
+  --ui-sidebar-width: 236px;
+  --ui-topbar-height: 72px;
+  --ui-control-height: 44px;
+  --ui-control-height-compact: 38px;
+  --ui-touch-target: 44px;
+  --ui-page-pad-x: clamp(24px, 2.6vw, 42px);
+  --ui-page-pad-y: 24px;
+  --ui-page-section-gap: 18px;
+  --ui-radius-control: 8px;
+  --ui-radius-card: 12px;
+  --ui-radius-panel: 16px;
+  --ui-radius-round: 999px;
+
+  /* Light semantic palette: approved Minimal / Professional reference. */
+  --crm-bg: #fbfbfc;
+  --crm-shell: #ffffff;
+  --crm-surface: #ffffff;
+  --crm-surface-raised: #f7f8fa;
+  --crm-surface-hover: #f5f6f8;
+  --crm-surface-selected: #f9edf2;
+  --crm-border: #e5e8ee;
+  --crm-border-strong: #d8dde6;
+  --crm-divider: #edf0f4;
+  --crm-text: #101522;
+  --crm-text-secondary: #5f6d86;
+  --crm-text-muted: #68758b;
+  --crm-text-disabled: #9ba4b3;
+  --crm-accent: #b23a5a;
+  --crm-accent-hover: #962e4a;
+  --crm-accent-soft: #f6e8ed;
+  --crm-on-accent: #ffffff;
+  --crm-success: #10a87b;
+  --crm-success-text: #11765b;
+  --crm-success-soft: #e5f8f1;
+  --crm-warning: #f39226;
+  --crm-warning-text: #8a5a10;
+  --crm-warning-soft: #fff1e2;
+  --crm-danger: #dc3157;
+  --crm-danger-text: #b51e45;
+  --crm-danger-soft: #fde8ee;
+  --crm-info: #1688e8;
+  --crm-info-text: #1769a7;
+  --crm-info-soft: #e8f4ff;
+  --crm-violet: #775ee9;
+  --crm-violet-soft: #f0edff;
+
+  /* Elevation */
+  --ui-shadow-xs: 0 1px 2px rgb(17 28 45 / 2.5%);
+  --ui-shadow-sm: 0 1px 2px rgb(17 28 45 / 2.5%), 0 7px 24px rgb(22 34 52 / 3.5%);
+  --ui-shadow-md: 0 10px 30px rgb(22 34 52 / 7%);
+  --ui-shadow-lg: 0 18px 58px rgb(22 34 52 / 13%);
+  --ui-focus-ring: 0 0 0 3px color-mix(in srgb, var(--crm-accent) 14%, transparent);
+
+  /* Motion — one timing vocabulary for all future phases. */
+  --motion-instant: 70ms;
+  --motion-interaction: 100ms;
+  --motion-state: 150ms;
+  --motion-popup: 170ms;
+  --motion-panel: 230ms;
+  --motion-page: 250ms;
+  --motion-ease-out: cubic-bezier(0, .4, 0, 1);
+  --motion-ease-in-out: cubic-bezier(.4, 0, 0, 1);
+  --motion-ease-exit: cubic-bezier(.6, 0, .8, .6);
+  --motion-ease-practical: cubic-bezier(.4, 1, .6, 1);
+  --ui-ease: cubic-bezier(.2, .72, .2, 1);
+
+  /* Layering contract */
+  --z-content: 1;
+  --z-sticky: 20;
+  --z-sidebar-scrim: 50;
+  --z-sidebar: 60;
+  --z-topbar: 70;
+  --z-popover: 90;
+  --z-modal: 110;
+  --z-toast: 130;
+
+  /* Master-reference aliases. Existing modules can migrate incrementally. */
+  --ref-bg: var(--crm-bg);
+  --ref-shell: var(--crm-shell);
+  --ref-surface: var(--crm-surface);
+  --ref-surface-soft: var(--crm-surface-raised);
+  --ref-surface-hover: var(--crm-surface-hover);
+  --ref-border: var(--crm-border);
+  --ref-border-strong: var(--crm-border-strong);
+  --ref-text: var(--crm-text);
+  --ref-text-soft: var(--crm-text-secondary);
+  --ref-text-muted: var(--crm-text-muted);
+  --ref-accent: var(--crm-accent);
+  --ref-accent-strong: var(--crm-accent-hover);
+  --ref-accent-soft: var(--crm-accent-soft);
+  --ref-blue: var(--crm-info);
+  --ref-blue-soft: var(--crm-info-soft);
+  --ref-green: var(--crm-success);
+  --ref-green-soft: var(--crm-success-soft);
+  --ref-orange: var(--crm-warning);
+  --ref-orange-soft: var(--crm-warning-soft);
+  --ref-violet: var(--crm-violet);
+  --ref-violet-soft: var(--crm-violet-soft);
+  --ref-danger: var(--crm-danger);
+  --ref-danger-soft: var(--crm-danger-soft);
+  --ref-shadow: var(--ui-shadow-sm);
+  --ref-shadow-lg: var(--ui-shadow-lg);
+  --ref-radius-sm: var(--ui-radius-control);
+  --ref-radius: var(--ui-radius-card);
+  --ref-radius-lg: var(--ui-radius-panel);
+  --ref-sidebar: var(--ui-sidebar-width);
+  --ref-topbar: var(--ui-topbar-height);
+  --ref-control: var(--ui-control-height);
+  --ref-ease: var(--ui-ease);
+
+  /* Compatibility aliases for legacy code. No new code should invent aliases. */
+  --navy: var(--crm-text);
+  --navy-soft: var(--crm-text-secondary);
+  --cream: var(--crm-bg);
+  --paper: var(--crm-surface);
+  --burgundy: var(--crm-accent);
+  --burgundy-dark: var(--crm-accent-hover);
+  --ink-muted: var(--crm-text-secondary);
+  --line: var(--crm-border);
+  --line-dark: var(--crm-border-strong);
+  --danger: var(--crm-danger);
+  --sidebar: var(--ui-sidebar-width);
+  --radius: var(--ui-radius-control);
+  --focus-ring: var(--crm-accent);
+
+  --lc-canvas: var(--crm-bg);
+  --lc-surface: var(--crm-surface);
+  --lc-surface-subtle: var(--crm-surface-raised);
+  --lc-surface-hover: var(--crm-surface-hover);
+  --lc-border: var(--crm-border);
+  --lc-border-strong: var(--crm-border-strong);
+  --lc-text: var(--crm-text);
+  --lc-muted: var(--crm-text-secondary);
+  --lc-subtle: var(--crm-text-muted);
+  --lc-navy: var(--crm-text);
+  --lc-burgundy: var(--crm-accent);
+  --lc-burgundy-dark: var(--crm-accent-hover);
+  --lc-burgundy-soft: var(--crm-accent-soft);
+  --lc-green: var(--crm-success);
+  --lc-green-soft: var(--crm-success-soft);
+  --lc-amber: var(--crm-warning);
+  --lc-amber-soft: var(--crm-warning-soft);
+  --lc-danger: var(--crm-danger);
+  --lc-radius-sm: var(--ui-radius-control);
+  --lc-radius-md: var(--ui-radius-card);
+  --lc-radius-lg: var(--ui-radius-panel);
+  --lc-control-height: var(--ui-control-height);
+  --lc-control-radius: var(--ui-radius-control);
+  --lc-radius-control: var(--ui-radius-control);
+  --lc-radius-panel: var(--ui-radius-card);
+  --lc-radius-card: var(--ui-radius-panel);
+  --lc-shadow-soft: var(--ui-shadow-sm);
+  --lc-shadow-hover: var(--ui-shadow-md);
+  --lc-fast: var(--motion-state) var(--motion-ease-practical);
+  --lc-base: 180ms var(--motion-ease-out);
+
+  /* Old motion names still referenced by globals.css. */
+  --ease: var(--ui-ease);
+  --motion-fast: var(--motion-state);
+  --motion-standard: 210ms;
+}
+
+html[data-crm-theme="dark"] {
+  color-scheme: dark;
+  --crm-bg: #171a1f;
+  --crm-shell: #1c2026;
+  --crm-surface: #20252c;
+  --crm-surface-raised: #252b33;
+  --crm-surface-hover: #2a313a;
+  --crm-surface-selected: #34242b;
+  --crm-border: #353e49;
+  --crm-border-strong: #4a5562;
+  --crm-divider: #303741;
+  --crm-text: #f5f7fa;
+  --crm-text-secondary: #c8ced7;
+  --crm-text-muted: #939dab;
+  --crm-text-disabled: #707b89;
+  --crm-accent: #d16b87;
+  --crm-accent-hover: #df819a;
+  --crm-accent-soft: #39252d;
+  --crm-on-accent: #171a1f;
+  --crm-success: #9bd5b4;
+  --crm-success-text: #b9e7cc;
+  --crm-success-soft: #173126;
+  --crm-warning: #f2cc85;
+  --crm-warning-text: #f6daa5;
+  --crm-warning-soft: #342b1c;
+  --crm-danger: #f3a1a7;
+  --crm-danger-text: #f6b8bd;
+  --crm-danger-soft: #382126;
+  --crm-info: #a9c8ee;
+  --crm-info-text: #c2d8f2;
+  --crm-info-soft: #1c2938;
+  --crm-violet: #b8abff;
+  --crm-violet-soft: #2b2742;
+}

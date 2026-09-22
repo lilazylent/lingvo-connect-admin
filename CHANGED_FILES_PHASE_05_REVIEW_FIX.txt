@@ -1,0 +1,25 @@
+PHASE 05 — Owner review fix
+
+Documentation
+- PHASE_05_REVIEW_FIX_REPORT.md
+- docs/OWNER_PHASE05_REVIEW_FIX_2026-09-15.md
+- docs/phases/PHASE_05_ORDERS_ORDER_DETAIL.md
+- docs/references/OWNER_PHASE05_REVIEW_TRANSCRIPT_2026-09-15.pdf
+
+Frontend rules/tests
+- apps/admin-web/AGENTS.md
+- apps/admin-web/e2e/phase5-orders-order-detail.spec.ts
+
+Frontend composition / logic
+- apps/admin-web/src/app/admin/applications/page.tsx
+- apps/admin-web/src/app/admin/applications/[id]/page.tsx
+
+Frontend CSS
+- apps/admin-web/src/app/phase1-shell.css
+- apps/admin-web/src/app/master-reference.css
+- apps/admin-web/src/app/workspace-polish.css
+- apps/admin-web/src/app/owner-readability.css
+- apps/admin-web/src/app/phase5-orders.css
+
+Backend / migrations / Docker
+- no changes

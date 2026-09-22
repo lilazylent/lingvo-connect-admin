@@ -1,8 +1,15 @@
 import type { Metadata } from "next";
 import "@fontsource-variable/onest";
 import "./globals.css";
-import "./workspace-polish.css";
-import "./workspace-rhythm.css";
+import "./legacy-visual-core.css";
+import "./phase1-shell.css";
+import "./phase2-ui-kit.css";
+import "./phase4-directories.css";
+import "./owner-readability.css";
+import "./phase5-orders.css";
+import "./phase6-admin.css";
+import "./phase8-visual-motion.css";
+import "./crm-foundation.css";
 import { AuthProvider } from "@/components/auth-provider";
 import { ToastProvider } from "@/components/toast";
 
@@ -15,7 +22,7 @@ const themeBootScript = `(()=>{try{const p=localStorage.getItem("lc-crm-theme")|
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="ru" suppressHydrationWarning>
+    <html lang="ru" suppressHydrationWarning data-build-id="phase15-pre-release-audit-20260922-r4">
       <body>
         <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
         <AuthProvider><ToastProvider>{children}</ToastProvider></AuthProvider>

@@ -75,6 +75,36 @@ class UserCreateView(BaseModel):
     warning: str
 
 
+class UserInvitationCreateRequest(BaseModel):
+    email: EmailStr
+    role: Role = Role.MANAGER
+
+
+class UserInvitationView(BaseModel):
+    id: str
+    email: EmailStr
+    role: Role
+    expires_at: datetime
+    created_at: datetime
+    status: Literal["PENDING", "EXPIRED"]
+
+
+class UserInvitationCreateView(BaseModel):
+    invitation: UserInvitationView
+    registration_url: str
+
+
+class UserInvitationPublicView(BaseModel):
+    email: EmailStr
+    role: Role
+    expires_at: datetime
+
+
+class UserInvitationAcceptRequest(BaseModel):
+    display_name: str = Field(default="", max_length=160)
+    password: str = Field(min_length=10, max_length=1024)
+
+
 class UserUpdateRequest(BaseModel):
     display_name: str | None = Field(default=None, max_length=160)
     role: Role | None = None

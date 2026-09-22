@@ -1,0 +1,66 @@
+name: lingvo-connect-crm
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-lingvo_admin}
+      POSTGRES_USER: ${POSTGRES_USER:-lingvo_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lingvo_admin} -d ${POSTGRES_DB:-lingvo_admin}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./apps/api
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: ${DATABASE_URL}
+      SESSION_SECRET: ${SESSION_SECRET}
+      TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY}
+      COOKIE_SECURE: "true"
+      ADMIN_WEB_ORIGIN: ${ADMIN_WEB_ORIGIN}
+      USER_INVITATION_DAYS: ${USER_INVITATION_DAYS:-7}
+      PUBLIC_SITE_ORIGIN: ${PUBLIC_SITE_ORIGIN}
+      APPLICATION_STORAGE_PATH: /app/storage
+      APPLICATION_FILE_MAX_BYTES: ${APPLICATION_FILE_MAX_BYTES:-15728640}
+      PUBLIC_RATE_LIMIT_REQUESTS: ${PUBLIC_RATE_LIMIT_REQUESTS:-5}
+      PUBLIC_RATE_LIMIT_WINDOW_SECONDS: ${PUBLIC_RATE_LIMIT_WINDOW_SECONDS:-600}
+      PUBLIC_MAX_BODY_BYTES: ${PUBLIC_MAX_BODY_BYTES:-65536}
+    ports:
+      - "127.0.0.1:${API_PORT:-8002}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+    volumes:
+      - application_storage:/app/storage
+
+  frontend:
+    build:
+      context: ./apps/admin-web
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    ports:
+      - "127.0.0.1:${ADMIN_WEB_PORT:-3003}:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  application_storage:

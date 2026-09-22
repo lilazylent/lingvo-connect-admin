@@ -1,0 +1,32 @@
+Build ID: phase14-ui-copy-cleanup-20260921-r3
+
+Functional/UI changes:
+- apps/admin-web/src/components/crm-orders.tsx
+- apps/admin-web/src/app/layout.tsx
+- apps/admin-web/scripts/audit-ui-copy-guard.mjs
+- apps/admin-web/package.json
+
+Build-provenance updates:
+- apps/admin-web/scripts/audit-css-ownership.mjs
+- apps/admin-web/scripts/audit-phase8-owner-patch.mjs
+- apps/admin-web/scripts/audit-phase9-release-candidate.mjs
+- apps/admin-web/scripts/audit-phase10-availability.mjs
+- apps/admin-web/scripts/audit-phase10-matching-ui.mjs
+- apps/admin-web/scripts/audit-phase10-routing.mjs
+- apps/admin-web/scripts/audit-phase10-client-demo.mjs
+- apps/admin-web/scripts/audit-phase10-route-stages.mjs
+- apps/admin-web/scripts/audit-phase10-finance.mjs
+- apps/admin-web/scripts/audit-phase11-data-integrity.mjs
+- apps/admin-web/scripts/audit-phase12-assignment-calculator.mjs
+- apps/admin-web/scripts/audit-phase12-order-numbering.mjs
+- apps/admin-web/scripts/audit-phase13-internal-works.mjs
+- apps/admin-web/scripts/audit-phase13-finance-layout.mjs
+- apps/admin-web/scripts/audit-phase13-5-tariff-automation.mjs
+- apps/admin-web/scripts/audit-phase14-service-driven-forms.mjs
+- apps/admin-web/e2e/phase8-owner-patch02.spec.ts
+- apps/admin-web/e2e/phase8-visual-motion.spec.ts
+- apps/admin-web/e2e/phase9-release-candidate.spec.ts
+
+Report:
+- PHASE_14_OWNER_PATCH_02_UI_COPY_REPORT.md
+- CHANGED_FILES_PHASE_14_OWNER_PATCH_02_UI_COPY.txt

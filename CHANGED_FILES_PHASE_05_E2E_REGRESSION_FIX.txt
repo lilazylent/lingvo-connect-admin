@@ -1,0 +1,10 @@
+apps/admin-web/AGENTS.md
+apps/admin-web/e2e/test-helpers.ts
+apps/admin-web/e2e/phase1-shell.spec.ts
+apps/admin-web/e2e/phase2-ui-kit.spec.ts
+apps/admin-web/e2e/phase3-dashboard-applications.spec.ts
+apps/admin-web/e2e/phase4-clients-executors.spec.ts
+apps/admin-web/e2e/phase5-orders-order-detail.spec.ts
+PHASE_05_E2E_REGRESSION_FIX_REPORT.md
+CHANGED_FILES_PHASE_05_E2E_REGRESSION_FIX.txt
+apps/admin-web/e2e/workspace.spec.ts

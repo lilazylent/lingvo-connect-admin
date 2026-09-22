@@ -1,4 +1,5 @@
 import re
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -7,7 +8,7 @@ from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.client_models import ClientActivity, Company, Representative
+from app.client_models import ClientActivity, ClientDepositTransaction, Company, Representative
 from app.db import get_db
 from app.dependencies import SessionContext, require_authenticated, require_authenticated_write
 from app.models import User, utcnow
@@ -53,6 +54,19 @@ class ArchiveChange(BaseModel):
     model_config = ConfigDict(extra="forbid")
     archived: bool
     version: int = Field(ge=1)
+
+
+
+
+class DepositChange(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    mode: Literal["TOP_UP", "SET_BALANCE"] = "TOP_UP"
+    amount: Decimal = Field(ge=0, max_digits=14, decimal_places=2)
+    note: str = Field(default="", max_length=500)
+
+
+def money(value: Decimal | int | str) -> Decimal:
+    return Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 class PersonFields(BaseModel):
@@ -197,6 +211,54 @@ def create_company(payload: CompanyFields, db: DB, context: Write):
 @router.get("/{company_id}")
 def get_company(company_id: str, db: DB, context: Read):
     return view(company(db, company_id))
+
+
+@router.get("/{company_id}/deposit")
+def get_deposit(company_id: str, db: DB, context: Read, limit: int = Query(20, ge=1, le=100)):
+    row = company(db, company_id)
+    items = db.scalars(
+        select(ClientDepositTransaction)
+        .where(ClientDepositTransaction.company_id == company_id)
+        .order_by(ClientDepositTransaction.created_at.desc(), ClientDepositTransaction.id.desc())
+        .limit(limit)
+    ).all()
+    return {
+        "company_id": row.id,
+        "balance": money(row.deposit_balance or 0),
+        "transactions": [view(item) for item in items],
+    }
+
+
+@router.post("/{company_id}/deposit")
+def change_deposit(company_id: str, payload: DepositChange, db: DB, context: Write):
+    row = company(db, company_id, active=True, lock=True)
+    before = money(row.deposit_balance or 0)
+    requested = money(payload.amount)
+    if payload.mode == "TOP_UP":
+        if requested <= 0:
+            raise HTTPException(422, "Укажите сумму пополнения больше нуля")
+        delta = requested
+        kind = "MANUAL_TOP_UP"
+    else:
+        delta = money(requested - before)
+        kind = "MANUAL_SET"
+    after = money(before + delta)
+    row.deposit_balance = after
+    row.version += 1
+    row.updated_at = utcnow()
+    transaction = ClientDepositTransaction(
+        company_id=row.id,
+        actor_user_id=context.user.id,
+        kind=kind,
+        amount=delta,
+        balance_after=after,
+        note=payload.note,
+    )
+    db.add(transaction)
+    record(db, context, row.id, "company.deposit_changed")
+    db.commit()
+    db.refresh(transaction)
+    return {"balance": after, "transaction": view(transaction)}
 
 
 @router.patch("/{company_id}")

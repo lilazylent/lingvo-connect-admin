@@ -1,0 +1,48 @@
+PHASE 08 FINAL OWNER PATCH 02 — CHANGED FILES
+
+Baseline: Lingvo_Connect_Admin_Phase_08_Visual_Identity_Motion_v1.zip
+Build ID: phase08-settings-concept-c-20260916-r1
+
+Modified (21):
+- PHASE_08_IMPLEMENTATION_REPORT.md
+- apps/admin-web/e2e/phase7-dark-audit.spec.ts
+- apps/admin-web/e2e/phase8-visual-motion.spec.ts
+- apps/admin-web/package.json
+- apps/admin-web/scripts/audit-css-ownership.mjs
+- apps/admin-web/src/app/admin/applications/page.tsx
+- apps/admin-web/src/app/admin/page.tsx
+- apps/admin-web/src/app/admin/users/page.tsx
+- apps/admin-web/src/app/crm-foundation.css
+- apps/admin-web/src/app/layout.tsx
+- apps/admin-web/src/app/legacy-visual-core.css
+- apps/admin-web/src/app/owner-readability.css
+- apps/admin-web/src/app/phase4-directories.css
+- apps/admin-web/src/app/phase5-orders.css
+- apps/admin-web/src/app/phase6-admin.css
+- apps/admin-web/src/app/phase8-visual-motion.css
+- apps/admin-web/src/components/crm-directory.tsx
+- apps/admin-web/src/components/crm-orders.tsx
+- apps/admin-web/src/components/crm-settings.tsx
+- docs/CSS_OWNERSHIP_MAP.md
+- docs/phases/PHASE_08_VISUAL_IDENTITY_MOTION.md
+
+Added (3):
+- apps/admin-web/e2e/phase8-owner-patch02.spec.ts
+- apps/admin-web/scripts/audit-phase8-owner-patch.mjs
+- docs/phases/PHASE_08_OWNER_REVIEW_PATCH_02.md
+
+Removed (0):
+
+Final polish addendum — Settings Concept C / Graphite Fade Hero:
+- apps/admin-web/src/components/crm-settings.tsx
+- apps/admin-web/src/components/select.tsx
+- apps/admin-web/src/app/phase2-ui-kit.css
+- apps/admin-web/src/app/phase6-admin.css
+- apps/admin-web/src/app/phase8-visual-motion.css
+- apps/admin-web/src/app/layout.tsx
+- apps/admin-web/scripts/audit-css-ownership.mjs
+- apps/admin-web/scripts/audit-phase8-owner-patch.mjs
+- apps/admin-web/e2e/phase8-owner-patch02.spec.ts
+- apps/admin-web/e2e/phase8-visual-motion.spec.ts
+- apps/admin-web/e2e/crm-rhythm.spec.ts
+- docs/phases/PHASE_08_SETTINGS_CONCEPT_C_FINAL.md

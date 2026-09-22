@@ -1,0 +1,25 @@
+Phase 09 Owner Patch 04
+Build: phase09-mvp-release-candidate-20260916-r3
+
+Modified:
+- apps/admin-web/src/app/phase5-orders.css
+  - Added a dedicated vertically centered action lane for `Скопировать текст` in the expanded preliminary client calculation.
+- apps/admin-web/src/app/layout.tsx
+  - Bumped release-candidate build provenance to r3.
+- apps/admin-web/scripts/audit-phase9-release-candidate.mjs
+  - Added static regression checks for the centered preliminary-calculation action lane and updated build ID.
+- apps/admin-web/scripts/audit-phase8-owner-patch.mjs
+- apps/admin-web/scripts/audit-css-ownership.mjs
+- apps/admin-web/e2e/phase9-release-candidate.spec.ts
+- apps/admin-web/e2e/phase8-visual-motion.spec.ts
+- apps/admin-web/e2e/phase8-owner-patch02.spec.ts
+  - Updated expected release-candidate build ID.
+- CHANGED_FILES_PHASE_09.txt
+- PHASE_09_IMPLEMENTATION_REPORT.md
+  - Updated current build provenance reference.
+
+Added:
+- PHASE_09_OWNER_PATCH_04_IMPLEMENTATION_REPORT.md
+- CHANGED_FILES_PHASE_09_OWNER_PATCH_04.txt
+
+Backend / DB / migrations: unchanged.

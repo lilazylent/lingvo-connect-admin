@@ -1,0 +1,1004 @@
+/* ==========================================================================
+   Lingvo Connect CRM — Phase 05: Orders + order card
+   Dense operational workspace. Shared controls remain owned by Phase 02.
+   ========================================================================== */
+
+.phase5-orders-command {
+  min-width: 0;
+  display: grid;
+  gap: var(--ui-space-2);
+  margin: var(--ui-space-3) 0 var(--ui-space-4);
+  padding: var(--ui-space-3);
+  color: var(--crm-text);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--ui-radius-card);
+  background: var(--crm-surface);
+  box-shadow: var(--ui-shadow-xs);
+}
+.phase5-orders-filters {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(320px, 1.4fr) minmax(150px,.65fr) minmax(170px,.72fr) minmax(190px,.82fr) minmax(155px,.65fr) minmax(165px,.7fr);
+  gap: var(--ui-space-2);
+  align-items: end;
+}
+.phase5-orders-filters > * { min-width: 0; }
+.phase5-orders-search { min-width: 0; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: var(--ui-space-2); align-items: end; }
+.phase5-orders-viewbar {
+  min-height: var(--ui-control-height);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ui-space-2);
+  padding-top: var(--ui-space-2);
+  border-top: 1px solid var(--crm-border);
+}
+.phase5-orders-viewbar .archive-toggle,
+.phase5-orders-viewbar .view-switch {
+  width: max-content;
+  margin: 0;
+  color: var(--crm-text-secondary);
+  border-color: var(--crm-border-strong);
+  background: var(--crm-surface-raised);
+}
+.phase5-orders-viewbar .view-switch button { color: var(--crm-text-secondary); }
+.phase5-orders-viewbar .view-switch button.is-active { color: var(--crm-text); background: var(--crm-surface); }
+
+.crm-order-table table { min-width: 860px; }
+.crm-order-table td > strong,
+.crm-order-table td > span { display: block; }
+.crm-order-table td > span { margin-top: 3px; color: var(--crm-text-secondary); }
+.order-debt { width: max-content; margin: 0; font-weight: 650; }
+.order-debt.is-open { color: var(--crm-warning-text); }
+.order-debt.is-paid { color: var(--crm-success-text); }
+
+.kanban-board {
+  min-width: 0;
+  grid-template-columns: repeat(8, minmax(245px, 1fr));
+  gap: var(--ui-space-2);
+  padding-bottom: var(--ui-space-3);
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+.kanban-column { min-height: 320px; border-color: var(--crm-border); background: var(--crm-surface-raised); }
+.kanban-column > header { background: color-mix(in srgb, var(--crm-surface) 88%, var(--status-color)); }
+.kanban-card { color: var(--crm-text); border-color: var(--crm-border); background: var(--crm-surface); box-shadow: var(--ui-shadow-xs); }
+.kanban-card__main { display: grid; gap: 4px; color: var(--crm-text); text-align: left; }
+.kanban-card__main span { color: var(--crm-accent); font-size: var(--ui-text-xs); }
+.kanban-card__main strong { color: var(--crm-text); font-size: var(--ui-text-md); }
+.kanban-card__main small { color: var(--crm-text-secondary); font-size: var(--ui-text-xs); }
+.kanban-card__debt { color: var(--crm-warning-text); }
+
+/* Order detail becomes a tabbed working card instead of a long document. */
+.phase5-order-card { margin: 0 0 var(--ui-space-4); overflow: clip; }
+.phase5-order-card .order-card-head {
+  min-height: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-4);
+  padding: var(--ui-space-4) var(--ui-space-5);
+  border-bottom: 1px solid var(--crm-border);
+  background: var(--crm-surface);
+}
+.phase5-order-card .order-card-head h2 { margin: 4px 0; font-size: var(--ui-title-sm); }
+.phase5-order-card .order-card-head p { margin: 0; color: var(--crm-text-secondary); }
+.phase5-order-card .order-card-head__actions { align-items: center; }
+
+.phase5-order-card .order-stage-flow {
+  padding: 9px var(--ui-space-4);
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--crm-divider);
+  background: var(--crm-surface-raised);
+}
+.phase5-order-card .order-stage-flow::-webkit-scrollbar { width: 0; height: 0; }
+.phase5-order-card .order-stage-flow__track { min-width: max-content; display: flex; align-items: center; gap: 6px; }
+.phase5-order-card .order-stage {
+  min-width: 112px;
+  min-height: 44px;
+  display: inline-grid;
+  grid-template-columns: 32px minmax(0,1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 5px 9px;
+  color: var(--crm-text-secondary);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--ui-radius-control);
+  background: color-mix(in srgb,var(--crm-surface) 92%,transparent);
+  text-align: left;
+  transform: none;
+  transition: border-color var(--motion-state) var(--motion-ease-out), background var(--motion-state) var(--motion-ease-out), color var(--motion-state) var(--motion-ease-out);
+}
+.phase5-order-card .order-stage__glyph {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 30px;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
+  isolation: isolate;
+}
+.phase5-order-card .order-stage__dial {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transform: rotate(-90deg);
+}
+.phase5-order-card .order-stage__dial-track,
+.phase5-order-card .order-stage__dial-progress {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+.phase5-order-card .order-stage__dial-track {
+  stroke: var(--crm-border-strong);
+  stroke-width: 1.15;
+  opacity: .72;
+}
+.phase5-order-card .order-stage__dial-progress {
+  stroke: var(--crm-accent);
+  stroke-width: 1.55;
+  stroke-linecap: round;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+}
+.phase5-order-card .order-stage__index {
+  position: relative;
+  z-index: 1;
+  width: auto;
+  height: auto;
+  display: inline;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--crm-text-secondary);
+  font-family: var(--ui-font-sans);
+  font-size: 9.5px;
+  font-weight: 640;
+  line-height: 1;
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+}
+.phase5-order-card .order-stage__label {
+  min-width: 0;
+  color: inherit;
+  font-size: var(--ui-text-xs);
+  font-weight: 590;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.phase5-order-card .order-stage.is-past {
+  color: var(--crm-success-text);
+  border-color: color-mix(in srgb,var(--crm-success) 26%,var(--crm-border));
+  background: color-mix(in srgb,var(--crm-success-soft) 24%,var(--crm-surface));
+}
+.phase5-order-card .order-stage.is-past .order-stage__glyph { background: transparent; }
+.phase5-order-card .order-stage.is-past .order-stage__dial-track { stroke: color-mix(in srgb,var(--crm-success) 30%,var(--crm-border)); }
+.phase5-order-card .order-stage.is-past .order-stage__dial-progress { stroke: var(--crm-success); stroke-dashoffset: 0; }
+.phase5-order-card .order-stage.is-past .order-stage__index { color: var(--crm-success-text); background: transparent; border: 0; box-shadow: none; }
+.phase5-order-card .order-stage.is-current {
+  color: var(--crm-text);
+  border-color: color-mix(in srgb,var(--crm-accent) 36%,var(--crm-border));
+  background: color-mix(in srgb,var(--crm-accent-soft) 18%,var(--crm-surface));
+}
+.phase5-order-card .order-stage.is-current .order-stage__glyph { background: transparent; }
+.phase5-order-card .order-stage.is-current .order-stage__dial-track { stroke: color-mix(in srgb,var(--crm-accent) 24%,var(--crm-border-strong)); }
+.phase5-order-card .order-stage.is-current .order-stage__dial-progress { stroke: var(--crm-accent); }
+.phase5-order-card .order-stage.is-current .order-stage__index { color: var(--crm-text); font-weight: 660; background: transparent; border: 0; box-shadow: none; }
+.phase5-order-card .order-stage.is-current .order-stage__label { color: var(--crm-text); font-weight: 650; }
+.phase5-order-card .order-stage:hover:not(:disabled) {
+  color: var(--crm-text);
+  border-color: var(--crm-border-strong);
+  background: var(--crm-surface-hover);
+  transform: none;
+}
+
+
+.phase5-order-tabs {
+  min-height: 50px;
+  display: flex;
+  align-items: stretch;
+  gap: var(--ui-space-5);
+  padding: 0 var(--ui-space-5);
+  overflow-x: auto;
+  border-bottom: 1px solid var(--crm-border);
+  background: var(--crm-surface);
+}
+.phase5-order-tabs button {
+  position: relative;
+  min-height: 50px;
+  padding: 0;
+  color: var(--crm-text-muted);
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: var(--ui-text-sm);
+  font-weight: 620;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.phase5-order-tabs button:hover { color: var(--crm-text); }
+.phase5-order-tabs button.is-active { color: var(--crm-text); }
+.phase5-order-tabs button.is-active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  border-radius: var(--ui-radius-round);
+  background: var(--crm-accent);
+}
+.phase5-order-tabs button:focus-visible { outline: 2px solid var(--crm-accent); outline-offset: -4px; border-radius: 5px; }
+
+.phase5-order-card .phase5-order-panel { display: none; }
+.phase5-order-card .phase5-order-panel.is-active { display: block; }
+.phase5-order-card .order-card-layout,
+.phase5-order-card .order-card-layout > main,
+.phase5-order-card .order-card-layout > aside { display: contents; }
+
+.phase5-order-card .order-core-editor,
+.phase5-order-card .order-finance-module,
+.phase5-order-card .order-card-section,
+.phase5-order-card .order-history-module,
+.phase5-order-card .order-payment-card,
+.phase5-order-card .phase5-client-quote {
+  margin: 0;
+  padding: var(--ui-space-4) var(--ui-space-5);
+  border: 0;
+  border-bottom: 1px solid var(--crm-border);
+  border-radius: 0;
+  background: var(--crm-surface);
+  box-shadow: none;
+}
+.phase5-order-card .order-context-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: var(--ui-space-2);
+  padding: 0;
+  background: transparent;
+}
+.phase5-order-card .order-context-strip > div {
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--crm-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--crm-surface-raised);
+}
+.phase5-order-card .order-context-strip span { display: block; color: var(--crm-text-muted); }
+.phase5-order-card .order-context-strip strong { display: block; margin-top: 4px; color: var(--crm-text); overflow-wrap: anywhere; }
+
+.phase5-order-card .order-finance-module > header { align-items: start; margin-bottom: var(--ui-space-3); }
+.phase5-order-card .order-finance-module > header p { max-width: 560px; color: var(--crm-text-secondary); }
+.phase5-order-card .finance-strip {
+  width: min(100%, 1040px); display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 7px;
+  align-items: stretch; border: 0; background: transparent;
+}
+.phase5-order-card .finance-strip > .finance-metric {
+  min-width: 0; min-height: 68px; display: grid; align-content: center; gap: 3px;
+  padding: 9px 11px; border: 1px solid var(--crm-border); border-radius: var(--ui-radius-control); background: var(--crm-surface-raised);
+}
+.phase5-order-card .finance-metric--total,
+.phase5-order-card .finance-metric--debt,
+.phase5-order-card .finance-metric--profit { grid-column: span 2; }
+.phase5-order-card .finance-metric--executor,
+.phase5-order-card .finance-metric--margin { grid-column: span 3; }
+.phase5-order-card .finance-metric--total { border-color: color-mix(in srgb, var(--crm-accent) 30%, var(--crm-border)); background: color-mix(in srgb, var(--crm-accent-soft) 42%, var(--crm-surface)); }
+.phase5-order-card .finance-metric--debt.is-debt-open { border-color: color-mix(in srgb, var(--crm-warning) 35%, var(--crm-border)); background: color-mix(in srgb, var(--crm-warning-soft) 52%, var(--crm-surface)); }
+.phase5-order-card .finance-metric--debt.is-paid { border-color: color-mix(in srgb, var(--crm-success) 28%, var(--crm-border)); background: color-mix(in srgb, var(--crm-success-soft) 48%, var(--crm-surface)); }
+.phase5-order-card .finance-strip span { color: var(--crm-text-muted); font-size: var(--ui-text-xs); font-weight: 620; line-height: 1.2; }
+.phase5-order-card .finance-strip strong { color: var(--crm-text); font-size: var(--ui-text-lg); line-height: 1.08; font-variant-numeric: tabular-nums; }
+.phase5-order-card .finance-strip small { color: var(--crm-text-secondary); font-size: var(--ui-text-xs); line-height: 1.25; }
+
+.phase5-client-quote { color: var(--crm-text); }
+.phase5-client-quote > summary {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-3);
+  list-style: none;
+  cursor: pointer;
+}
+.phase5-client-quote > summary::-webkit-details-marker { display: none; }
+.phase5-client-quote > summary div { min-width: 0; }
+.phase5-client-quote > summary strong { display: block; margin-top: 3px; color: var(--crm-text); font-size: var(--ui-text-md); }
+.phase5-client-quote > summary small { display: block; margin-top: 3px; color: var(--crm-text-secondary); font-size: var(--ui-text-xs); }
+.phase5-client-quote > summary > span { color: var(--crm-accent); font-size: var(--ui-text-sm); font-weight: 650; }
+.phase5-client-quote__body {
+  display: grid;
+  grid-template-rows: minmax(54px, auto) auto;
+  gap: 0;
+  padding-top: 0;
+  border-top: 1px solid var(--crm-border);
+}
+.phase5-client-quote__body .button {
+  justify-self: end;
+  align-self: center;
+}
+.phase5-client-quote pre {
+  max-height: 300px;
+  margin: 0;
+  padding: var(--ui-space-3);
+  overflow: auto;
+  color: var(--crm-text-secondary);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--crm-surface-raised);
+  font: inherit;
+  font-size: var(--ui-text-sm);
+  line-height: var(--ui-line-relaxed);
+  white-space: pre-wrap;
+}
+
+.phase5-order-card .order-work-table { display: grid; gap: var(--ui-space-2); }
+.phase5-order-card .order-work-card {
+  display: grid;
+  grid-template-columns: minmax(250px,1.2fr) minmax(420px,2fr) auto;
+  gap: var(--ui-space-3);
+  align-items: center;
+  padding: 12px;
+  color: var(--crm-text);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--crm-surface-raised);
+}
+.phase5-order-card .order-work-card__lead { min-width: 0; }
+.phase5-order-card .order-work-table article.order-work-card > .order-work-card__lead {
+  grid-template-columns: 38px minmax(0,1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 10px 12px;
+}
+.phase5-order-card .order-work-table__index {
+  width: 34px;
+  height: 34px;
+  border: 1px solid color-mix(in srgb, var(--crm-accent) 28%, var(--crm-border));
+  border-radius: 9px;
+  color: var(--crm-accent-hover);
+  background: var(--crm-accent-soft);
+  font-family: var(--ui-font-sans);
+  font-size: 13px;
+  font-weight: 620;
+  line-height: 1;
+  letter-spacing: .02em;
+  font-variant-numeric: tabular-nums;
+}
+.phase5-order-card .order-work-card__identity { align-self: center; }
+.phase5-order-card .order-work-card__identity > strong {
+  font-size: var(--ui-text-md);
+  line-height: 1.25;
+}
+.phase5-order-card .order-work-card__meta { margin-top: 3px; }
+.phase5-order-card .order-work-card__grid { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: var(--ui-space-2); }
+.phase5-order-card .order-work-card__grid > div { min-width: 0; }
+.phase5-order-card .work-row-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 4px; }
+.phase5-order-card .work-inline-editor { margin: 0; border: 0; border-bottom: 1px solid var(--crm-border); border-radius: 0; box-shadow: none; }
+
+.phase5-order-card .file-metrics-list { display: grid; gap: var(--ui-space-2); }
+.phase5-order-card .file-metric-row { grid-template-columns: auto minmax(0,1fr) auto auto auto auto; gap: var(--ui-space-3); align-items: center; border-color: var(--crm-border); background: var(--crm-surface-raised); }
+.phase5-order-card .file-metric-row__actions { display:flex; align-items:center; justify-content:flex-end; gap:var(--ui-space-2); white-space:nowrap; }
+.phase5-order-card .order-payment-card { width: 100%; }
+.phase5-order-card .payment-summary { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: var(--ui-space-2); }
+.phase5-order-card .payment-summary > div { min-width: 0; padding: 11px 12px; border: 1px solid var(--crm-border); border-radius: var(--ui-radius-control); background: var(--crm-surface-raised); }
+.phase5-order-card .payment-summary span { display: block; color: var(--crm-text-muted); font-size: var(--ui-text-xs); }
+.phase5-order-card .payment-summary strong { display: block; margin-top: 4px; color: var(--crm-text); font-size: var(--ui-text-md); }
+.phase5-order-card .payment-edit { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: var(--ui-space-2); }
+.phase5-order-card .payment-edit .textarea,
+.phase5-order-card .payment-edit__actions { grid-column: 1 / -1; }
+.phase5-order-card .order-side-link { display: inline-flex; margin: var(--ui-space-3) var(--ui-space-5); color: var(--crm-accent); font-size: var(--ui-text-sm); }
+
+
+/* Phase 10.3: factual direct executor matching inside the existing work editor. */
+:is(.phase5-order-card, .executor-step) .executor-assignments__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2);
+}
+:is(.phase5-order-card, .executor-step) .executor-matching-note {
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--crm-text-secondary);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--crm-surface-raised);
+  font-size: var(--ui-text-sm);
+  line-height: var(--ui-line-relaxed);
+}
+:is(.phase5-order-card, .executor-step) .executor-matching {
+  min-width: 0;
+  display: grid;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-3);
+  border: 1px solid color-mix(in srgb, var(--crm-accent) 24%, var(--crm-border));
+  border-radius: var(--ui-radius-card);
+  background: color-mix(in srgb, var(--crm-accent-soft) 18%, var(--crm-surface));
+}
+:is(.phase5-order-card, .executor-step) .executor-matching__head {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ui-space-3);
+}
+:is(.phase5-order-card, .executor-step) .executor-matching__head > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+:is(.phase5-order-card, .executor-step) .executor-matching__head strong {
+  color: var(--crm-text);
+  font-size: var(--ui-text-md);
+}
+:is(.phase5-order-card, .executor-step) .executor-matching__head small {
+  max-width: 760px;
+  color: var(--crm-text-secondary);
+  font-size: var(--ui-text-sm);
+  line-height: var(--ui-line-relaxed);
+}
+:is(.phase5-order-card, .executor-step) .executor-matching__count {
+  flex: 0 0 auto;
+  color: var(--crm-text-secondary);
+  font-size: var(--ui-text-sm);
+  font-weight: 650;
+  white-space: nowrap;
+}
+:is(.phase5-order-card, .executor-step) .executor-matching__empty {
+  display: grid;
+  justify-items: start;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-3);
+  color: var(--crm-text-secondary);
+  border: 1px dashed var(--crm-border-strong);
+  border-radius: var(--ui-radius-control);
+  background: var(--crm-surface-raised);
+}
+:is(.phase5-order-card, .executor-step) .executor-matching__empty strong { color: var(--crm-text); }
+:is(.phase5-order-card, .executor-step) .executor-candidate-list {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ui-space-2);
+}
+:is(.phase5-order-card, .executor-step) .executor-candidate-card {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-3);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--crm-surface-raised);
+}
+:is(.phase5-order-card, .executor-step) .executor-candidate-card.is-available {
+  border-color: color-mix(in srgb, var(--crm-success) 34%, var(--crm-border));
+}
+:is(.phase5-order-card, .executor-step) .executor-candidate-card.is-unavailable {
+  opacity: .78;
+}
+:is(.phase5-order-card, .executor-step) .executor-candidate-card__identity {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ui-space-2);
+}
+:is(.phase5-order-card, .executor-step) .executor-candidate-card__identity > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+:is(.phase5-order-card, .executor-step) .executor-candidate-card__identity strong {
+  color: var(--crm-text);
+  font-size: var(--ui-text-md);
+  overflow-wrap: anywhere;
+}
+:is(.phase5-order-card, .executor-step) .executor-candidate-card__identity span:not(.badge) {
+  color: var(--crm-text-secondary);
+  font-size: var(--ui-text-sm);
+}
+:is(.phase5-order-card, .executor-step) .executor-candidate-card__facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--ui-space-2);
+}
+:is(.phase5-order-card, .executor-step) .executor-candidate-card__facts > div {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 3px;
+}
+:is(.phase5-order-card, .executor-step) .executor-candidate-card__facts span {
+  color: var(--crm-text-muted);
+  font-size: var(--ui-text-xs);
+}
+:is(.phase5-order-card, .executor-step) .executor-candidate-card__facts strong {
+  color: var(--crm-text);
+  font-size: var(--ui-text-sm);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+:is(.phase5-order-card, .executor-step) .executor-candidate-card__note {
+  margin: 0;
+  color: var(--crm-text-secondary);
+  font-size: var(--ui-text-sm);
+  line-height: var(--ui-line-relaxed);
+  overflow-wrap: anywhere;
+}
+:is(.phase5-order-card, .executor-step) .executor-candidate-card__action {
+  display: flex;
+  justify-content: flex-end;
+  align-items: end;
+}
+
+@media (max-width: 1180px) {
+  .phase5-orders-filters { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .phase5-orders-search { grid-column: span 2; }
+  .phase5-order-card .finance-strip { grid-template-columns: repeat(6,minmax(0,1fr)); }
+  .phase5-order-card .finance-metric--total, .phase5-order-card .finance-metric--debt, .phase5-order-card .finance-metric--profit { grid-column: span 2; }
+  .phase5-order-card .finance-metric--executor, .phase5-order-card .finance-metric--margin { grid-column: span 3; }
+  .phase5-order-card .order-work-card { grid-template-columns: 1fr; }
+  .phase5-order-card .order-work-card__grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
+}
+
+@media (max-width: 900px) {
+  :is(.phase5-order-card, .executor-step) .executor-candidate-list { grid-template-columns: 1fr; }
+  .phase5-orders-filters { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .phase5-orders-search { grid-column: 1 / -1; }
+  .phase5-order-card .order-card-head { align-items: flex-start; }
+  .phase5-order-card .order-context-strip,
+  .phase5-order-card .payment-summary { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .phase5-order-card .finance-strip { grid-template-columns: repeat(2,minmax(0,1fr)); width: 100%; }
+  .phase5-order-card .finance-metric--total, .phase5-order-card .finance-metric--debt, .phase5-order-card .finance-metric--profit, .phase5-order-card .finance-metric--executor, .phase5-order-card .finance-metric--margin { grid-column: auto; }
+  .phase5-order-card .order-work-card__grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .phase5-order-card .file-metric-row { grid-template-columns: auto minmax(0,1fr) auto auto; }
+  .phase5-order-card .file-metric-row__metric { display: none; }
+  .phase5-order-card .payment-edit { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+
+@media (max-width: 620px) {
+  :is(.phase5-order-card, .executor-step) .executor-assignments__head,
+  :is(.phase5-order-card, .executor-step) .executor-matching__head { align-items: stretch; flex-direction: column; }
+  :is(.phase5-order-card, .executor-step) .executor-assignments__actions { width: 100%; justify-content: stretch; }
+  :is(.phase5-order-card, .executor-step) .executor-assignments__actions .button { flex: 1 1 100%; }
+  :is(.phase5-order-card, .executor-step) .executor-candidate-card__facts { grid-template-columns: 1fr; }
+  :is(.phase5-order-card, .executor-step) .executor-candidate-card__action .button { width: 100%; }
+  .phase5-orders-filters { grid-template-columns: 1fr; }
+  .phase5-orders-search { grid-column: auto; grid-template-columns: 1fr; }
+  .phase5-orders-viewbar { justify-content: space-between; }
+  .phase5-orders-viewbar .archive-toggle { flex: 0 0 auto; }
+  .phase5-orders-viewbar .view-switch { margin-left: auto; }
+  .phase5-order-card .order-card-head { display: grid; padding: var(--ui-space-3); }
+  .phase5-order-card .order-card-head__actions { width: 100%; }
+  .phase5-order-card .order-card-head__actions .button { flex: 1 1 0; }
+  .phase5-order-card .order-stage-flow,
+  .phase5-order-card .phase5-order-panel.is-active,
+  .phase5-order-card .order-card-section,
+  .phase5-order-card .order-history-module,
+  .phase5-order-card .order-payment-card,
+  .phase5-order-card .phase5-client-quote { padding-inline: var(--ui-space-3); }
+  .phase5-order-tabs { gap: var(--ui-space-4); padding-inline: var(--ui-space-3); }
+  .phase5-order-card .order-context-strip,
+  .phase5-order-card .finance-strip,
+  .phase5-order-card .payment-summary,
+  .phase5-order-card .order-work-card__grid,
+  .phase5-order-card .payment-edit { grid-template-columns: 1fr; }
+  .phase5-order-card .finance-strip > .finance-metric { grid-column: auto; }
+  .phase5-order-card .file-metrics-list { overflow-x:auto; overscroll-behavior-inline:contain; }
+  .phase5-order-card .file-metric-row { min-width:560px; grid-template-columns: auto minmax(180px,1fr) auto auto; }
+  .phase5-order-card .file-metric-row .badge { grid-column:auto; justify-self:start; }
+}
+
+@media (max-width: 430px) {
+  .phase5-orders-viewbar { align-items: stretch; flex-direction: column; }
+  .phase5-orders-viewbar .archive-toggle,
+  .phase5-orders-viewbar .view-switch { width: 100%; }
+  .phase5-orders-viewbar .view-switch button { flex: 1 1 0; }
+  .phase5-order-card .order-stage { min-width: 118px; }
+}
+
+/* Phase 08 owner patch 02: compact pipeline geometry survives narrow viewports. */
+@media (max-width:430px) {
+  .phase5-order-card .order-stage { min-width:106px; grid-template-columns:30px minmax(0,1fr); padding-inline:7px; }
+  .phase5-order-card .order-stage__glyph { width:28px; height:28px; }
+  .phase5-order-card .order-stage__index { font-size:9.5px; }
+}
+
+/* Phase 10.4: read-only routed matching through Russian; persistence belongs to 10.5. */
+:is(.phase5-order-card, .executor-step) .executor-routing {
+  min-width: 0;
+  display: grid;
+  gap: var(--ui-space-3);
+  padding-top: var(--ui-space-3);
+  border-top: 1px solid var(--crm-border);
+}
+:is(.phase5-order-card, .executor-step) .executor-routing__head {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ui-space-3);
+}
+:is(.phase5-order-card, .executor-step) .executor-routing__head > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+:is(.phase5-order-card, .executor-step) .executor-routing__head strong {
+  color: var(--crm-text);
+  font-size: var(--ui-text-md);
+}
+:is(.phase5-order-card, .executor-step) .executor-routing__head small {
+  max-width: 780px;
+  color: var(--crm-text-secondary);
+  font-size: var(--ui-text-sm);
+  line-height: var(--ui-line-relaxed);
+}
+:is(.phase5-order-card, .executor-step) .executor-route-flow {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ui-space-3);
+}
+:is(.phase5-order-card, .executor-step) .executor-route-stage {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-3);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--crm-surface-raised);
+}
+:is(.phase5-order-card, .executor-step) .executor-route-stage__head {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ui-space-2);
+}
+:is(.phase5-order-card, .executor-step) .executor-route-stage__head > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+:is(.phase5-order-card, .executor-step) .executor-route-stage__head strong {
+  color: var(--crm-text);
+  font-size: var(--ui-text-md);
+}
+:is(.phase5-order-card, .executor-step) .executor-route-stage__head > span {
+  flex: 0 0 auto;
+  color: var(--crm-text-muted);
+  font-size: var(--ui-text-xs);
+}
+:is(.phase5-order-card, .executor-step) .executor-route-candidates {
+  min-width: 0;
+  display: grid;
+  gap: var(--ui-space-2);
+}
+:is(.phase5-order-card, .executor-step) .executor-route-candidate {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--ui-space-2);
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--crm-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--crm-surface);
+}
+:is(.phase5-order-card, .executor-step) .executor-route-candidate.is-unavailable { opacity: .76; }
+:is(.phase5-order-card, .executor-step) .executor-route-candidate > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+:is(.phase5-order-card, .executor-step) .executor-route-candidate > div strong,
+:is(.phase5-order-card, .executor-step) .executor-route-candidate > div span { overflow-wrap: anywhere; }
+:is(.phase5-order-card, .executor-step) .executor-route-candidate > div strong { color: var(--crm-text); }
+:is(.phase5-order-card, .executor-step) .executor-route-candidate > div span {
+  color: var(--crm-text-secondary);
+  font-size: var(--ui-text-sm);
+}
+:is(.phase5-order-card, .executor-step) .executor-route-candidate .button {
+  grid-column: 1 / -1;
+  justify-self: end;
+}
+:is(.phase5-order-card, .executor-step) .executor-routing__ready {
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--crm-text-secondary);
+  border: 1px solid color-mix(in srgb, var(--crm-success) 34%, var(--crm-border));
+  border-radius: var(--ui-radius-control);
+  background: color-mix(in srgb, var(--crm-success) 8%, var(--crm-surface));
+  font-size: var(--ui-text-sm);
+  line-height: var(--ui-line-relaxed);
+}
+
+@media (max-width: 900px) {
+  :is(.phase5-order-card, .executor-step) .executor-route-flow { grid-template-columns: 1fr; }
+}
+@media (max-width: 620px) {
+  :is(.phase5-order-card, .executor-step) .executor-routing__head,
+  :is(.phase5-order-card, .executor-step) .executor-route-stage__head { align-items: stretch; flex-direction: column; }
+  :is(.phase5-order-card, .executor-step) .executor-route-candidate { grid-template-columns: 1fr; }
+  :is(.phase5-order-card, .executor-step) .executor-route-candidate .button { grid-column: auto; justify-self: stretch; width: 100%; }
+}
+
+
+/* Priority client-demo patch: shared numbered work badges are optically centered. */
+.phase5-order-card .lc-number-badge {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  margin: 0;
+  line-height: 1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.phase5-order-card .work-edit-module__head > .lc-number-badge {
+  width: 32px;
+  height: 32px;
+  border: 1px solid color-mix(in srgb, var(--crm-accent) 28%, var(--crm-border));
+  border-radius: 9px;
+  color: var(--crm-accent-hover);
+  background: var(--crm-accent-soft);
+  font-family: var(--ui-font-sans);
+  font-size: 13px;
+  font-weight: 620;
+}
+.executor-step .executor-matching { margin-top: var(--ui-space-3); }
+.executor-step .executor-routing__ready { display:flex; align-items:center; justify-content:space-between; gap:var(--ui-space-3); flex-wrap:wrap; }
+
+/* Phase 10.5: assignment-specific rate override inside matching candidates. */
+:is(.phase5-order-card, .executor-step) .executor-candidate-rate {
+  min-width: 0;
+  display: grid;
+  justify-items: start;
+  gap: var(--ui-space-2);
+  padding-top: var(--ui-space-1);
+  border-top: 1px solid var(--crm-border);
+}
+:is(.phase5-order-card, .executor-step) .executor-candidate-rate__editor {
+  width: min(100%, 360px);
+  min-width: 0;
+  display: grid;
+  gap: var(--ui-space-2);
+}
+:is(.phase5-order-card, .executor-step) .executor-rate-toggle {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  color: var(--crm-accent);
+  background: transparent;
+  font: inherit;
+  font-size: var(--ui-text-sm);
+  font-weight: 650;
+  line-height: var(--ui-line-normal);
+  cursor: pointer;
+}
+:is(.phase5-order-card, .executor-step) .executor-rate-toggle:hover { color: var(--crm-accent-hover); }
+:is(.phase5-order-card, .executor-step) .executor-rate-toggle:focus-visible {
+  outline: 2px solid var(--crm-focus-ring);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+:is(.phase5-order-card, .executor-step) .executor-route-rate-editor {
+  min-width: 0;
+  display: grid;
+  gap: var(--ui-space-2);
+  margin-top: var(--ui-space-1);
+}
+
+:is(.phase5-order-card, .executor-step) .executor-route-rate-editor .field { min-width: 0; }
+:is(.phase5-order-card, .executor-step) .executor-route-rate-editor .button {
+  grid-column: auto;
+  justify-self: start;
+  width: auto;
+}
+:is(.phase5-order-card, .executor-step) .executor-route-candidate > .badge {
+  align-self: center;
+  justify-self: end;
+}
+
+
+@media (max-width: 620px) {
+  :is(.phase5-order-card, .executor-step) .executor-candidate-rate__editor { width: 100%; }
+  :is(.phase5-order-card, .executor-step) .executor-route-rate-editor .button { width: 100%; }
+}
+
+/* Phase 10.6 — persisted executor costs inside order finance. */
+.phase5-order-card .executor-finance-breakdown {
+  width:100%;
+  min-width:0;
+  margin:0;
+  padding:0;
+  border-top:0;
+}
+.phase5-order-card .executor-finance-breakdown > header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--ui-space-3);
+  margin-bottom: var(--ui-space-2);
+}
+.phase5-order-card .executor-finance-breakdown > header h4 {
+  margin: 3px 0 0;
+  color: var(--crm-text);
+  font-size: var(--ui-text-md);
+}
+.phase5-order-card .executor-finance-breakdown > header > strong {
+  color: var(--crm-text);
+  font-size: var(--ui-text-lg);
+  font-variant-numeric: tabular-nums;
+}
+.phase5-order-card .executor-finance-breakdown__works,
+.phase5-order-card .executor-finance-stages { display: grid; gap: var(--ui-space-2); }
+.phase5-order-card .executor-finance-work {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--crm-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--crm-surface-raised);
+}
+.phase5-order-card .executor-finance-work__head {
+  display: grid;
+  grid-template-columns: 34px minmax(0,1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--crm-border);
+}
+.phase5-order-card .executor-finance-work__head > div { min-width: 0; }
+.phase5-order-card .executor-finance-work__head > div > strong,
+.phase5-order-card .executor-finance-work__head > div > small { display: block; }
+.phase5-order-card .executor-finance-work__head > div > small { margin-top: 2px; color: var(--crm-text-secondary); }
+.phase5-order-card .executor-finance-work__head > strong { font-variant-numeric: tabular-nums; }
+.phase5-order-card .executor-finance-stages { padding: var(--ui-space-2); }
+.phase5-order-card .executor-finance-stage {
+  min-width: 0;
+  display: grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px 10px;
+  align-items: center;
+  padding: 9px 10px;
+  border: 1px solid var(--crm-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--crm-surface);
+}
+.phase5-order-card .executor-finance-stage > div { min-width:0; }
+.phase5-order-card .executor-finance-stage > div:first-child { grid-column:1 / -1; padding-bottom:7px; border-bottom:1px solid var(--crm-border); }
+.phase5-order-card .executor-finance-stage > div:nth-child(n+2) { align-self:start; }
+.phase5-order-card .executor-finance-stage span,
+.phase5-order-card .executor-finance-stage small { display: block; color: var(--crm-text-muted); font-size: var(--ui-text-xs); line-height: 1.25; }
+.phase5-order-card .executor-finance-stage strong { display: block; margin-top: 2px; color: var(--crm-text); font-size: var(--ui-text-sm); line-height: 1.3; overflow-wrap: anywhere; }
+.phase5-order-card .executor-finance-work__legacy { margin: 0; padding: var(--ui-space-3); color: var(--crm-text-secondary); }
+@media (max-width: 900px) {
+  .phase5-order-card .executor-finance-stage { grid-template-columns:repeat(3,minmax(0,1fr)); }
+}
+@media (max-width: 620px) {
+  .phase5-order-card .executor-finance-breakdown > header { align-items:start; }
+  .phase5-order-card .executor-finance-stage { grid-template-columns:1fr; }
+  .phase5-order-card .executor-finance-stage > div:first-child { grid-column:1; }
+}
+
+/* Phase 12: immutable order identity metadata. */
+.order-created-date {
+  display: block;
+  margin-top: 3px;
+  color: var(--crm-text-muted);
+  font-size: var(--ui-text-xs);
+  line-height: 1.35;
+}
+
+/* Phase 13: confirmed routed assignments collapse into a compact success state. */
+.executor-step .executor-assignment-confirmation,
+.phase5-order-card .executor-assignment-confirmation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-3);
+  border: 1px solid color-mix(in srgb, var(--crm-success) 38%, var(--crm-border));
+  border-radius: var(--ui-radius-control);
+  background: color-mix(in srgb, var(--crm-success) 8%, var(--crm-surface));
+}
+.executor-step .executor-assignment-confirmation > div,
+.phase5-order-card .executor-assignment-confirmation > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+.executor-step .executor-assignment-confirmation strong,
+.phase5-order-card .executor-assignment-confirmation strong { color: var(--crm-text); }
+.executor-step .executor-assignment-confirmation span,
+.phase5-order-card .executor-assignment-confirmation span {
+  color: var(--crm-text-secondary);
+  font-size: var(--ui-text-sm);
+  overflow-wrap: anywhere;
+}
+@media (max-width: 620px) {
+  .executor-step .executor-assignment-confirmation,
+  .phase5-order-card .executor-assignment-confirmation { align-items: stretch; flex-direction: column; }
+  .executor-step .executor-assignment-confirmation .button,
+  .phase5-order-card .executor-assignment-confirmation .button { width: 100%; }
+}
+
+/* Phase 14 — service-driven order/work forms. The service matrix owns field visibility;
+   reset the legacy positional grid so dynamic fields do not inherit nth-child spans. */
+.work-draft.service-driven-work-draft .wizard-grid.service-driven-grid {
+  grid-auto-flow: row dense;
+}
+.work-draft.service-driven-work-draft .wizard-grid.service-driven-grid > * {
+  grid-column: span 6;
+  min-width: 0;
+}
+/* Dynamic service schemas can end with an odd number of half-width controls.
+   Let the orphaned final control consume the whole row instead of leaving a
+   dead half-column before the full-width internal-work switch. Because every
+   preceding dynamic control is a six-column item, odd child parity identifies
+   the orphan without hard-coding any service. The rule automatically adapts
+   when urgency/manual-discount controls are toggled on and off. */
+.work-draft.service-driven-work-draft .wizard-grid.service-driven-grid
+  > :nth-child(odd):not(.service-form-intro):not(.textarea):has(+ .internal-work-switch) {
+  grid-column: 1 / -1;
+}
+.work-draft.service-driven-work-draft .wizard-grid.service-driven-grid > .service-form-intro,
+.work-draft.service-driven-work-draft .wizard-grid.service-driven-grid > .internal-work-switch,
+.work-draft.service-driven-work-draft .wizard-grid.service-driven-grid > .textarea {
+  grid-column: 1 / -1;
+}
+.service-form-intro {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px dashed var(--crm-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--crm-surface-raised);
+  color: var(--crm-text-secondary);
+}
+.service-form-intro strong { color: var(--crm-text); }
+.service-form-intro span { font-size: var(--ui-text-sm); line-height: 1.4; }
+.service-driven-work-draft input[readonly] {
+  cursor: default;
+  color: var(--crm-text-secondary);
+  background: var(--crm-surface-raised);
+}
+.executor-assignment-grid .executor-unit-readonly,
+.work-inline-editor__finance .executor-unit-readonly { align-self: end; }
+@media (max-width: 620px) {
+  .work-draft.service-driven-work-draft .wizard-grid.service-driven-grid > * { grid-column: 1; }
+  .work-draft.service-driven-work-draft .wizard-grid.service-driven-grid > .service-form-intro,
+  .work-draft.service-driven-work-draft .wizard-grid.service-driven-grid > .internal-work-switch,
+  .work-draft.service-driven-work-draft .wizard-grid.service-driven-grid > .textarea { grid-column: 1; }
+}
+
+/* Phase 15 — deposit preview inside the order wizard. */
+.client-deposit-preview {
+  display: grid;
+  grid-template-columns: repeat(4,minmax(0,1fr));
+  gap: 1px;
+  margin-top: var(--ui-space-4);
+  overflow: hidden;
+  border: 1px solid var(--crm-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--crm-border);
+}
+.client-deposit-preview > div { min-width: 0; display: grid; gap: 4px; padding: var(--ui-space-3); background: var(--crm-surface-raised); }
+.client-deposit-preview span { color: var(--crm-text-secondary); font-size: var(--ui-text-xs); }
+.client-deposit-preview strong { color: var(--crm-text); font-size: var(--ui-text-lg); overflow-wrap: anywhere; }
+.client-deposit-preview__remaining strong { color: var(--crm-accent-text); }
+@media (max-width: 900px) { .client-deposit-preview { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media (max-width: 620px) { .client-deposit-preview { grid-template-columns: 1fr; } }

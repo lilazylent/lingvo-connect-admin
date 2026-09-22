@@ -32,7 +32,7 @@ test.beforeEach(async ({page}, info) => {await fixtures(page, info.title.include
 
 test("dropdown: custom hover, selection, Escape, keyboard and disabled roles", async ({page}) => {
   await page.goto("/admin/applications/new");
-  const trigger = page.getByRole("combobox", {name:"Способ связи *",exact:true});
+  const trigger = page.getByRole("combobox", {name:"Способ связи",exact:true});
   await trigger.click();
   const phone=page.getByRole("option",{name:"Телефон",exact:true});
   await phone.hover();
@@ -84,9 +84,9 @@ test("save state and comments preserve unsaved work; status saves immediately", 
 
 test("manual creation keeps API contract and uses a clear contact label", async ({page}) => {
   await page.goto("/admin/applications/new");
-  await page.getByLabel("Имя контакта *",{exact:true}).fill("Тестовый заказчик");
-  await page.getByLabel("Email *",{exact:true}).fill("customer@example.invalid");
-  await page.getByLabel("Описание задачи *",{exact:true}).fill("Перевод технической документации на английский язык.");
+  await page.getByLabel("Имя контакта",{exact:true}).fill("Тестовый заказчик");
+  await page.getByLabel("Email",{exact:true}).fill("customer@example.invalid");
+  await page.getByLabel("Описание задачи",{exact:true}).fill("Перевод технической документации на английский язык.");
   const request=page.waitForRequest(r=>r.method()==="POST" && r.url().endsWith("/api/admin/applications"));
   await page.getByRole("button",{name:"Создать заявку →"}).click();
   expect((await request).postDataJSON()).toMatchObject({name:"Тестовый заказчик",contact_method:"email",contact:"customer@example.invalid",company:null});

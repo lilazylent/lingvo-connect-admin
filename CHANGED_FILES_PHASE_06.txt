@@ -1,0 +1,34 @@
+Phase 06 — Files + Users + Settings
+Baseline: Phase 05 E2E Last 1 Fix
+
+Legend: + added, M modified, - removed
+
++ CHANGED_FILES_PHASE_06.txt
++ PHASE_06_IMPLEMENTATION_REPORT.md
+M apps/admin-web/AGENTS.md
+M apps/admin-web/e2e/phase4-clients-executors.spec.ts
++ apps/admin-web/e2e/phase6-files-users-settings.spec.ts
+M apps/admin-web/src/app/admin/users/page.tsx
+M apps/admin-web/src/app/layout.tsx
++ apps/admin-web/src/app/phase6-admin.css
+M apps/admin-web/src/components/crm-directory.tsx
+M apps/admin-web/src/components/crm-files.tsx
+M apps/admin-web/src/components/crm-orders.tsx
+M apps/admin-web/src/components/crm-settings.tsx
+M apps/admin-web/src/components/language-combobox.tsx
+M apps/admin-web/src/components/ui.tsx
+- apps/admin-web/tsconfig.tsbuildinfo
++ apps/api/alembic/versions/0017_phase6_catalogs.py
+M apps/api/app/crm_models.py
+M apps/api/app/operations_models.py
+M apps/api/app/routers/applications.py
+M apps/api/app/routers/crm.py
+M apps/api/app/routers/operations.py
+M apps/api/tests/test_crm.py
++ docs/OWNER_REVIEW_2026-09-15_17-37_REQUIREMENTS.md
+M docs/phases/PHASE_06_FILES_USERS_SETTINGS.md
+M docs/post-mvp/PHASE_10_EXECUTOR_MATCHING_ROUTING.md
++ docs/references/OWNER_REVIEW_2026-09-15_17-37_contact_1.jpg
++ docs/references/OWNER_REVIEW_2026-09-15_17-37_contact_2.jpg
++ docs/references/OWNER_REVIEW_2026-09-15_17-37_contact_3.jpg
++ docs/references/OWNER_REVIEW_TRANSCRIPT_2026-09-15_17-37.pdf

@@ -1,0 +1,32 @@
+PHASE 05 — Orders + Order detail + required owner-video shared regressions
+
+Documentation
+- PHASE_05_IMPLEMENTATION_REPORT.md
+- docs/CRM_MVP_MASTER_SPEC.md
+- docs/OWNER_FEEDBACK_PHASE_MAP_2026-09-15.md
+- docs/OWNER_VIDEO_REVIEW_REQUIREMENTS_2026-09-15.md
+- docs/phases/PHASE_05_ORDERS_ORDER_DETAIL.md
+- docs/references/OWNER_VIDEO_REVIEW_TRANSCRIPT_2026-09-15.pdf
+- docs/references/OWNER_VIDEO_REVIEW_TRANSCRIPT_2026-09-15.txt
+
+Frontend rules/tests
+- apps/admin-web/AGENTS.md
+- apps/admin-web/e2e/phase5-orders-order-detail.spec.ts
+
+Frontend composition / logic
+- apps/admin-web/src/components/admin-shell.tsx
+- apps/admin-web/src/components/crm-directory.tsx
+- apps/admin-web/src/components/crm-orders.tsx
+- apps/admin-web/src/components/language-combobox.tsx
+- apps/admin-web/src/app/admin/applications/page.tsx
+- apps/admin-web/src/app/layout.tsx
+
+Frontend CSS
+- apps/admin-web/src/app/crm-foundation.css
+- apps/admin-web/src/app/owner-readability.css
+- apps/admin-web/src/app/phase1-shell.css
+- apps/admin-web/src/app/phase4-directories.css
+- apps/admin-web/src/app/phase5-orders.css
+
+Backend / migrations / Docker
+- no changes

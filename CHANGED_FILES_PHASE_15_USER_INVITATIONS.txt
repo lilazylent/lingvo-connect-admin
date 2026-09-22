@@ -1,0 +1,32 @@
+PHASE 15 PRE-RELEASE USER INVITATION PATCH — CHANGED FILES
+
+Backend / DB
+- apps/api/app/models.py
+- apps/api/app/schemas.py
+- apps/api/app/config.py
+- apps/api/app/routers/users.py
+- apps/api/app/routers/auth.py
+- apps/api/alembic/versions/0026_user_invitations.py
+- apps/api/tests/test_auth.py
+
+Frontend
+- apps/admin-web/src/app/admin/users/page.tsx
+- apps/admin-web/src/app/register/[token]/page.tsx
+- apps/admin-web/src/app/phase6-admin.css
+- apps/admin-web/src/app/layout.tsx
+- apps/admin-web/package.json
+- apps/admin-web/scripts/audit-user-invitations.mjs
+- apps/admin-web/scripts/audit-pre-release-rbac-actions.mjs
+- apps/admin-web/scripts/audit-*.mjs (Build ID r3 expectation only where applicable)
+- apps/admin-web/e2e/phase8-owner-patch02.spec.ts (Build ID r3 expectation only)
+- apps/admin-web/e2e/phase8-visual-motion.spec.ts (Build ID r3 expectation only)
+- apps/admin-web/e2e/phase9-release-candidate.spec.ts (Build ID r3 expectation only)
+
+Runtime / docs
+- .env.example
+- .env.production.example
+- docker-compose.yml
+- docker-compose.prod.yml
+- README.md
+- PHASE_15_USER_INVITATIONS_IMPLEMENTATION_REPORT.md
+- CHANGED_FILES_PHASE_15_USER_INVITATIONS.txt

@@ -1,0 +1,222 @@
+/* ========================================================================== 
+   Motion & FX behavior — functional, brief and accessible.
+   Canonical timings/easing live in crm-foundation.css. This file contains the
+   actual interaction rules. No perpetual decorative motion in working CRM UI.
+   ========================================================================== */
+:root {
+  --motion-interaction: 100ms;
+  --motion-state: 150ms;
+  --motion-popup: 170ms;
+  --motion-panel: 230ms;
+  --motion-page: 250ms;
+  --motion-ease-out: cubic-bezier(0, .4, 0, 1);
+  --motion-ease-in-out: cubic-bezier(.4, 0, 0, 1);
+  --motion-ease-exit: cubic-bezier(.6, 0, .8, .6);
+  --motion-ease-practical: cubic-bezier(.4, 1, .6, 1);
+}
+
+/* Remove legacy perpetual decoration. The atmosphere remains, but stays still. */
+.workspace::before,
+.workspace::after,
+.sidebar__brand::after,
+.topbar::after,
+.metric-strip a::after,
+.empty__mark,
+.security-dot,
+.overline--accent::after { animation:none; }
+.sidebar__brand::after { opacity:0; }
+.topbar::after { opacity:.28; background-position:50% 0; }
+.workspace::before { transform:translate3d(-18px,10px,0) scale(1.02); }
+.workspace::after { transform:translate3d(22px,-12px,0) scale(1.03); }
+
+/* Page arrival: one small context-preserving entrance, not a cascade of flying cards. */
+.content > * {
+  animation:lc-context-enter var(--motion-page) var(--motion-ease-out) both;
+  animation-delay:0ms;
+}
+.content > *:nth-child(n+2) { animation-delay:25ms; }
+.content > *:nth-child(n+4) { animation-delay:40ms; }
+@keyframes lc-context-enter {
+  from { opacity:0; transform:translate3d(0,5px,0); }
+  to { opacity:1; transform:translate3d(0,0,0); }
+}
+
+/* High-frequency navigation stays nearly instant. */
+.nav-link {
+  transition:
+    color var(--motion-interaction) var(--motion-ease-practical),
+    background-color var(--motion-interaction) var(--motion-ease-practical),
+    border-color var(--motion-interaction) var(--motion-ease-practical),
+    box-shadow var(--motion-state) var(--motion-ease-out),
+    transform var(--motion-state) var(--motion-ease-out);
+}
+.nav-link:hover { transform:translateX(2px); }
+.nav-link:active { transform:translateX(1px) scale(.99); }
+
+/* Buttons use a tactile 1px lift/press; no recurring shine. */
+.button {
+  transition:
+    transform var(--motion-interaction) var(--motion-ease-out),
+    box-shadow var(--motion-state) var(--motion-ease-out),
+    background-color var(--motion-interaction) var(--motion-ease-practical),
+    border-color var(--motion-interaction) var(--motion-ease-practical),
+    color var(--motion-interaction) var(--motion-ease-practical);
+}
+.button--primary::after { display:none; animation:none; }
+.button:not(:disabled):hover { transform:translateY(-1px); }
+.button:not(:disabled):active { transform:translateY(0) scale(.985); transition-duration:70ms; }
+
+/* Inputs: feedback through border/shadow, not movement. */
+.input,
+.select-trigger,
+.crm-combobox__input,
+textarea,
+select {
+  transition:
+    border-color var(--motion-interaction) var(--motion-ease-practical),
+    background-color var(--motion-state) var(--motion-ease-practical),
+    box-shadow var(--motion-state) var(--motion-ease-out);
+}
+
+/* Popovers/dialogs establish spatial context, then get out of the way. */
+.select-popup,
+.row-menu > div,
+.crm-combobox__menu {
+  animation:lc-popup-enter var(--motion-popup) var(--motion-ease-out) both;
+  transform-origin:top;
+}
+@keyframes lc-popup-enter {
+  from { opacity:0; transform:translateY(-3px) scale(.988); }
+  to { opacity:1; transform:translateY(0) scale(1); }
+}
+.settings-dialog { animation:lc-dialog-enter var(--motion-panel) var(--motion-ease-out) both; }
+.settings-dialog-backdrop { animation:lc-backdrop-enter 160ms linear both; }
+@keyframes lc-dialog-enter {
+  from { opacity:0; transform:translateY(7px) scale(.99); }
+  to { opacity:1; transform:translateY(0) scale(1); }
+}
+@keyframes lc-backdrop-enter { from { opacity:0; } to { opacity:1; } }
+.toast { animation:lc-toast-enter 190ms var(--motion-ease-out) both; }
+@keyframes lc-toast-enter {
+  from { opacity:0; transform:translateY(6px) scale(.99); }
+  to { opacity:1; transform:translateY(0) scale(1); }
+}
+
+/* Product surfaces: subtle response, no bouncing dashboard. */
+:is(.card,.detail-panel,.form-section,.application-toolbar,.crm-editor,.table-surface,.settings-surface,.directory-summary,.placeholder-surface,.crm-wizard,.order-side-card,.files-summary article,.files-table-surface) {
+  transition:
+    border-color var(--motion-state) var(--motion-ease-practical),
+    box-shadow var(--motion-panel) var(--motion-ease-out),
+    background-color var(--motion-state) var(--motion-ease-practical);
+}
+:is(.card,.detail-panel,.form-section,.application-toolbar,.crm-editor,.table-surface,.settings-surface,.directory-summary,.placeholder-surface,.crm-wizard,.order-side-card):hover {
+  transform:none;
+}
+
+/* Rows/cards communicate clickability and current location. */
+:is(.recent-list a,.directory-summary__orders a,.kanban-card,.crm-record-link,.order-file-row,.file-metric-row,.crm-history__link,.files-row,.order-work-card) {
+  transition:
+    transform var(--motion-state) var(--motion-ease-out),
+    border-color var(--motion-state) var(--motion-ease-practical),
+    background-color var(--motion-interaction) var(--motion-ease-practical),
+    box-shadow var(--motion-panel) var(--motion-ease-out);
+}
+:is(.recent-list a,.directory-summary__orders a,.kanban-card,.crm-record-link):hover { transform:translateY(-1px); }
+:is(.order-file-row,.file-metric-row,.crm-history__link,.files-row):hover { transform:translateX(2px); }
+.crm-order-card .order-work-table article.order-work-card:hover { transform:none; border-color:var(--lc-border-strong); box-shadow:0 10px 26px rgb(13 30 43 / 7%); }
+.files-row:hover { background:var(--lc-surface-hover); }
+.files-row__download {
+  transition:
+    color var(--motion-interaction) var(--motion-ease-practical),
+    border-color var(--motion-interaction) var(--motion-ease-practical),
+    background-color var(--motion-interaction) var(--motion-ease-practical),
+    transform var(--motion-interaction) var(--motion-ease-out);
+}
+.files-row__download:hover { border-color:var(--lc-border-strong); background:var(--lc-surface-hover); transform:translateY(-1px); }
+.files-row__download:active { transform:translateY(0); }
+
+/* Status pipeline and section chips: state change is the animation. */
+.order-stage {
+  transition:
+    color var(--motion-interaction) var(--motion-ease-practical),
+    border-color var(--motion-state) var(--motion-ease-practical),
+    background-color var(--motion-state) var(--motion-ease-practical),
+    box-shadow var(--motion-panel) var(--motion-ease-out),
+    transform var(--motion-state) var(--motion-ease-out);
+}
+.order-stage:hover:not(:disabled) { transform:translateY(-1px); }
+.order-stage:active:not(:disabled) { transform:translateY(0) scale(.992); }
+.order-section-nav a,
+.settings-tabs button,
+.settings-subtabs button,
+.view-switch button,
+.theme-option {
+  transition:
+    color var(--motion-interaction) var(--motion-ease-practical),
+    border-color var(--motion-interaction) var(--motion-ease-practical),
+    background-color var(--motion-interaction) var(--motion-ease-practical),
+    box-shadow var(--motion-state) var(--motion-ease-out),
+    transform var(--motion-state) var(--motion-ease-out);
+}
+
+/* A static, very low-contrast edge gives large operational surfaces some digital depth. */
+.crm-order-card,
+.files-table-surface { position:relative; isolation:isolate; }
+.crm-order-card::before,
+.files-table-surface::before {
+  content:"";
+  position:absolute;
+  z-index:1;
+  left:16px;
+  right:16px;
+  top:0;
+  height:1px;
+  pointer-events:none;
+  background:linear-gradient(90deg,transparent,var(--lc-burgundy),transparent);
+  opacity:.14;
+}
+
+/* Loaders can animate because they communicate progress. */
+.state--loading .state__line {
+  animation-duration:1.05s;
+  animation-timing-function:var(--motion-ease-in-out);
+}
+
+/* Accessibility: no transform/position motion when reduced motion is requested. */
+@media (prefers-reduced-motion: reduce) {
+  .content > *,
+  .select-popup,
+  .row-menu > div,
+  .crm-combobox__menu,
+  .settings-dialog,
+  .settings-dialog-backdrop,
+  .toast,
+  .state--loading .state__line { animation:none; }
+
+  .nav-link,
+  .button,
+  .input,
+  .select-trigger,
+  .crm-combobox__input,
+  textarea,
+  select,
+  .recent-list a,
+  .directory-summary__orders a,
+  .kanban-card,
+  .crm-record-link,
+  .order-file-row,
+  .file-metric-row,
+  .crm-history__link,
+  .files-row,
+  .files-row__download,
+  .order-work-card,
+  .order-stage,
+  .order-section-nav a,
+  .settings-tabs button,
+  .settings-subtabs button,
+  .view-switch button,
+  .theme-option {
+    transition-duration:.01ms;
+    transform:none;
+  }
+}

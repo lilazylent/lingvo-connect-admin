@@ -1,0 +1,28 @@
+Phase 12 — Order Numbering & Metadata
+Build ID: phase13-internal-works-20260919-r1
+
+Backend
+- apps/api/app/order_numbering.py (new)
+- apps/api/app/operations_models.py
+- apps/api/app/routers/operations.py
+- apps/api/app/routers/crm.py
+- apps/api/app/routers/imports.py
+- apps/api/tests/test_operations.py
+- apps/api/tests/test_crm.py
+
+Frontend
+- apps/admin-web/src/components/crm-orders.tsx
+- apps/admin-web/src/app/phase5-orders.css
+- apps/admin-web/src/app/layout.tsx
+- apps/admin-web/package.json
+- apps/admin-web/scripts/audit-phase12-order-numbering.mjs (new)
+- frozen audit/e2e files: build provenance only
+
+Documentation
+- PHASE_12_ORDER_NUMBERING_METADATA_TZ.md
+- PHASE_12_MASTER_PROMPT.md
+- PHASE_12_IMPLEMENTATION_REPORT.md
+- CHANGED_FILES_PHASE_12.txt
+
+Database schema migrations: none.
+Current Alembic head: 0020_executor_route_metadata.

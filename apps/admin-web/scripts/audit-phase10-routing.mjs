@@ -1,0 +1,18 @@
+import fs from "node:fs";
+const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
+const layout = read("src/app/layout.tsx");
+const orders = read("src/components/crm-orders.tsx");
+const css = read("src/app/phase5-orders.css");
+const buildId = "phase15-pre-release-audit-20260922-r4";
+const must = (text, needle, label) => { if (!text.includes(needle)) throw new Error(`Phase 10.4 audit failed: ${label}`); };
+must(layout, `data-build-id="${buildId}"`, "build provenance");
+must(orders, "Маршрут через", "routing UI");
+must(orders, "Выбрать для этапа", "stage candidate selection");
+must(orders, "routed_match", "routed response contract");
+must(orders, "Назначить предложенных исполнителей", "route assignment confirmation");
+must(orders, "route_stage_index", "persisted route metadata");
+must(css, ".executor-route-flow", "route layout owner");
+must(css, ".executor-route-stage", "route stage layout");
+if (orders.includes("recommendation_score") || orders.includes("match_percent")) throw new Error("Phase 10.4 audit failed: fake score marker");
+console.log("Phase 10.4 routing audit: PASS");
+console.log(`Build ID: ${buildId}`);

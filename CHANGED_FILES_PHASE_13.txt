@@ -1,0 +1,17 @@
+Build ID: phase13-internal-works-20260919-r1
+
+apps/api/app/operations_models.py
+apps/api/app/routers/crm.py
+apps/api/alembic/versions/0022_non_billable_works.py
+apps/api/tests/test_crm.py
+apps/admin-web/src/components/crm-orders.tsx
+apps/admin-web/src/app/phase5-orders.css
+apps/admin-web/src/app/layout.tsx
+apps/admin-web/package.json
+apps/admin-web/scripts/audit-phase13-internal-works.mjs
+apps/admin-web/scripts/* (build provenance updated)
+apps/admin-web/e2e/* (build provenance updated)
+PHASE_13_INTERNAL_NON_BILLABLE_WORKS_TZ.md
+PHASE_13_MASTER_PROMPT.md
+PHASE_13_IMPLEMENTATION_REPORT.md
+CHANGED_FILES_PHASE_13.txt

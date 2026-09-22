@@ -8,7 +8,7 @@ import { Button, ErrorState, FilePicker } from "./ui";
 type FileItem = { id: string; original_name: string; size_bytes: number };
 type EventItem = { id: string; action: string; created_at: string };
 
-export function OrderRecords({ id, disabled }: { id: string; disabled: boolean }) {
+export function OrderRecords({ id, disabled, showFiles = true }: { id: string; disabled: boolean; showFiles?: boolean }) {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [events, setEvents] = useState<EventItem[]>([]);
   const [page, setPage] = useState(1);
@@ -22,7 +22,9 @@ export function OrderRecords({ id, disabled }: { id: string; disabled: boolean }
   const load = useCallback(async () => {
     try {
       const [fileData, eventData] = await Promise.all([
-        api<{ items: FileItem[]; pages: number }>(`/api/admin/orders/${id}/files?page=${filePage}`),
+        showFiles
+          ? api<{ items: FileItem[]; pages: number }>(`/api/admin/orders/${id}/files?page=${filePage}`)
+          : Promise.resolve({ items: [] as FileItem[], pages: 1 }),
         api<{ items: EventItem[]; pages: number }>(`/api/admin/orders/${id}/activity?page=${page}`),
       ]);
       setFiles(fileData.items);
@@ -33,7 +35,7 @@ export function OrderRecords({ id, disabled }: { id: string; disabled: boolean }
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Не удалось загрузить историю");
     }
-  }, [id, page, filePage]);
+  }, [id, page, filePage, showFiles]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -61,6 +63,7 @@ export function OrderRecords({ id, disabled }: { id: string; disabled: boolean }
   return <section className="order-records">
     {error && <ErrorState message={error} />}
 
+    {showFiles && (
     <section className="order-records__section">
       <div className="order-records__heading">
         <div>
@@ -105,6 +108,7 @@ export function OrderRecords({ id, disabled }: { id: string; disabled: boolean }
       </div>}
     </section>
 
+    )}
     <section className="order-records__section order-history">
       <div className="order-records__heading">
         <div>

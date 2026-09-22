@@ -1,0 +1,17 @@
+.gitignore
+.env.example
+.env.production.example
+docker-compose.prod.yml
+apps/api/app/config.py
+apps/api/app/main.py
+apps/api/app/routers/users.py
+apps/api/tests/test_auth.py
+apps/admin-web/package.json
+apps/admin-web/src/app/layout.tsx
+apps/admin-web/src/app/admin/applications/page.tsx
+apps/admin-web/src/app/admin/page.tsx
+apps/admin-web/src/components/admin-shell.tsx
+apps/admin-web/scripts/audit-pre-release-rbac-actions.mjs
+apps/admin-web/scripts/* (Build ID expectation updated to phase15-pre-release-audit-20260922-r2 where applicable)
+PHASE_15_PRE_RELEASE_AUDIT_REPORT.md
+CHANGED_FILES_PHASE_15_PRE_RELEASE_AUDIT.txt

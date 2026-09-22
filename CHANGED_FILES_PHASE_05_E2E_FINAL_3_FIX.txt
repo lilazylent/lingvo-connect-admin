@@ -1,0 +1,7 @@
+apps/admin-web/src/components/crm-theme-loader.tsx
+apps/admin-web/src/app/admin/applications/page.tsx
+apps/admin-web/e2e/test-helpers.ts
+apps/admin-web/e2e/phase2-ui-kit.spec.ts
+apps/admin-web/e2e/phase3-dashboard-applications.spec.ts
+PHASE_05_E2E_FINAL_3_FIX_REPORT.md
+CHANGED_FILES_PHASE_05_E2E_FINAL_3_FIX.txt

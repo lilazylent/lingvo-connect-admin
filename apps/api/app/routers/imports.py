@@ -19,7 +19,8 @@ from app.client_models import ClientActivity, Company, Representative
 from app.dependencies import SessionContext, as_utc, require_admin, require_admin_write
 from app.import_models import ImportBatch
 from app.models import utcnow
-from app.operations_models import Executor, OperationalActivity, Order, OrderCounter
+from app.operations_models import Executor, OperationalActivity, Order
+from app.order_numbering import next_order_number
 from app.routers.clients import DB, CompanyFields, PersonFields
 from app.routers.operations import ExecutorFields, OrderFields, validate_order
 
@@ -346,15 +347,8 @@ def apply_batch(batch_id, payload, db, context):
         else:
             model = OrderFields.model_validate(values)
             validate_order(db, model)
-            number = db.scalar(
-                update(OrderCounter)
-                .where(OrderCounter.id == 1)
-                .values(value=OrderCounter.value + 1)
-                .returning(OrderCounter.value)
-            )
-            if number is None:
-                raise HTTPException(503, "Сначала выполните миграции базы")
-            row = Order(number=f"LC-O-{number:06d}", **model.model_dump())
+            number = next_order_number(db, execution_year=model.deadline.year if model.deadline else None)
+            row = Order(number=number, **model.model_dump())
         db.add(row)
         db.flush()
         if batch.entity in {"clients", "contacts"}:

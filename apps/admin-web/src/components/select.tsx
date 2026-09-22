@@ -34,7 +34,7 @@ export function Select({ label, children, value, onChange, disabled, hint, error
             <Primitive.List>
               {options.map((option) => <Primitive.Item key={option.value} value={option.value} disabled={option.disabled} className="select-option">
                 <Primitive.ItemText>{option.label}</Primitive.ItemText>
-                <Primitive.ItemIndicator className="select-check" aria-hidden="true">✓</Primitive.ItemIndicator>
+                <Primitive.ItemIndicator className="select-check" aria-hidden="true"><svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="m3.5 8.2 2.7 2.7 6.1-6" stroke="currentColor" strokeWidth="1.55" strokeLinecap="round" strokeLinejoin="round" /></svg></Primitive.ItemIndicator>
               </Primitive.Item>)}
             </Primitive.List>
             <Primitive.ScrollDownArrow className="select-scroll" aria-hidden="true">↓</Primitive.ScrollDownArrow>

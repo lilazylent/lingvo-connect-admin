@@ -1,0 +1,219 @@
+/* ========================================================================== 
+   Lingvo Connect CRM — owner readability contract (video review 2026-09-15)
+   Global shared regression patch. Display/page titles keep their established
+   scale; working copy is intentionally enlarged for comfortable reading.
+   ========================================================================== */
+
+body { font-size: var(--ui-text-base); }
+
+/* Safety net for legacy pages that still carry 9-13px declarations. The
+   selector intentionally targets working-copy elements, not h1-h3/display
+   headings. Later phase-specific composition may increase these values, but
+   should not shrink them back below this readable floor. */
+.lc-content :is(p, small, label, button, input, textarea, select, td, th, dt, dd, a) {
+  font-size: max(var(--ui-text-xs), .92em);
+}
+.auth-panel :is(p, small, label, button, input, textarea, select, a),
+.auth-footer,
+.auth-brand__index {
+  font-size: max(var(--ui-text-xs), .92em);
+}
+
+/* Shell / navigation */
+.lc-sidebar-nav .nav-link strong { font-size: var(--ui-text-sm); }
+.lc-global-search input { font-size: var(--ui-text-sm); }
+.lc-profile__copy strong { font-size: var(--ui-text-sm); }
+.lc-profile__copy small,
+.lc-profile__menu small { font-size: var(--ui-text-xs); }
+.lc-profile__menu > div strong { font-size: var(--ui-text-sm); }
+.lc-sidebar-promo strong { font-size: var(--ui-text-sm); }
+
+/* Page copy — intentionally excludes page h1 / display headings. */
+.overline { font-size: var(--ui-text-xs); }
+.page-head p,
+.detail-head p,
+.crm-section-head p { font-size: var(--ui-text-base); }
+
+/* Dashboard/reference micro-copy. */
+.lc-metric-card__label { font-size: var(--ui-text-sm); }
+.lc-metric-card small { font-size: var(--ui-text-xs); }
+.lc-finance-strip span { font-size: var(--ui-text-xs); }
+.lc-finance-strip small { font-size: var(--ui-text-xs); }
+.lc-card-title > span:first-child { font-size: var(--ui-text-sm); }
+.lc-card-title > a { font-size: var(--ui-text-xs); }
+.lc-compact-table__head,
+.lc-compact-table__row,
+.lc-compact-table__row strong,
+.lc-compact-empty { font-size: var(--ui-text-sm); }
+.lc-quick-action { font-size: var(--ui-text-sm); }
+.lc-health { font-size: var(--ui-text-xs); }
+.lc-system-card > strong { font-size: var(--ui-text-base); }
+.lc-system-card > p { font-size: var(--ui-text-sm); }
+.lc-system-grid small { font-size: var(--ui-text-xs); }
+.lc-system-grid b { font-size: var(--ui-text-sm); }
+
+/* Shared data / detail copy. */
+.table-surface th,
+.table-surface td { font-size: var(--ui-text-sm); }
+.table-caption,
+.pagination,
+.filter-disclosure,
+.workflow-help { font-size: var(--ui-text-sm); }
+.data-list dt,
+.lc-detail-data span,
+.directory-facts dt,
+.directory-summary-grid span { font-size: var(--ui-text-xs); }
+.data-list dd,
+.lc-detail-data strong,
+.directory-facts dd { font-size: var(--ui-text-md); }
+.request-message,
+.context-note,
+.directory-note,
+.directory-muted { font-size: var(--ui-text-sm); }
+
+/* Orders / work surfaces. */
+.order-card-head p,
+.order-context-strip span,
+.finance-strip span,
+.order-work-card__grid span,
+.file-metric-row__metric span { font-size: var(--ui-text-xs); }
+.order-context-strip strong,
+.order-stage__label,
+.order-section-nav button,
+.order-section-nav a,
+.order-work-card__grid strong,
+.file-metric-row__copy strong,
+.file-metric-row__copy small { font-size: var(--ui-text-sm); }
+.finance-strip strong { font-size: var(--ui-text-lg); }
+
+/* Forms and actions already use the shared token scale, but old local rules
+   occasionally set smaller pixels. Reassert the common contract here. */
+.button,
+.input,
+.select-trigger,
+.crm-combobox__input,
+.table-select { font-size: var(--ui-text-md); }
+.field__label { font-size: var(--ui-text-sm); }
+.field__hint,
+.field__error,
+.badge { font-size: var(--ui-text-xs); }
+
+/* Owner transcript: application overflow actions must be genuine controls, not decorative dots. */
+.applications-table .row-arrow {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+.applications-table .row-arrow .row-menu summary {
+  color: var(--crm-text-secondary);
+}
+
+
+/* Phase 05 owner review fix: align application status/actions and keep accents clipped. */
+.application-detail-head__controls {
+  min-width: min(100%, 420px);
+  grid-template-columns: minmax(120px, .7fr) minmax(210px, 1.3fr);
+  align-items: end;
+  gap: 10px;
+}
+.application-status-control {
+  min-width: 0;
+  display: grid;
+  align-content: end;
+  gap: 7px;
+  min-height: 68px;
+}
+.application-status-control > span {
+  color: var(--crm-text-secondary);
+  font-size: var(--ui-text-sm);
+  font-weight: 620;
+}
+.application-status-control .badge { justify-self: start; }
+.application-detail-head__controls > .crm-related {
+  grid-column: 1 / -1;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.application-detail-head__controls > .crm-related > .button { margin: 0; }
+.application-detail-head__controls > .crm-related > .workflow-help {
+  width: auto;
+  margin: 0;
+  border: 0;
+}
+.application-detail-head__controls > .crm-related > .workflow-help > summary {
+  min-height: var(--ui-control-height);
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--ui-space-3);
+  color: var(--crm-accent);
+  border: 1px solid color-mix(in srgb, var(--crm-accent) 22%, var(--crm-border));
+  border-radius: var(--ui-radius-control);
+  background: var(--crm-accent-soft);
+  list-style: none;
+}
+.application-detail-head__controls > .crm-related > .workflow-help > summary::-webkit-details-marker { display: none; }
+.application-detail-head__controls > .crm-related > .workflow-help[open] { flex-basis: 100%; }
+.application-detail-head__controls > .crm-related > .workflow-help[open] > div { margin-top: 8px; }
+
+@media (max-width: 900px) {
+  .application-detail-head__controls { width: 100%; grid-template-columns: minmax(120px,.7fr) minmax(210px,1.3fr); }
+}
+@media (max-width: 620px) {
+  .application-detail-head__controls { grid-template-columns: 1fr; }
+  .application-status-control { min-height: 0; }
+  .application-detail-head__controls > .crm-related { justify-content: flex-start; }
+}
+
+/* Phase 07 consolidation: full Application header uses one compact identity/status/action grid. */
+.application-detail-head {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) minmax(360px,440px);
+  align-items: end;
+  gap: var(--ui-space-4);
+}
+.application-detail-head__controls {
+  min-width: 0;
+  width: 100%;
+  max-width: 440px;
+  grid-template-columns: minmax(150px,.8fr) minmax(200px,1.2fr);
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-3);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--ui-radius-card);
+  background: var(--crm-surface-raised);
+}
+.application-status-control { min-height: var(--ui-control-height); gap: 4px; align-content: center; }
+.application-detail-head__controls > .crm-related { justify-content: flex-start; gap: var(--ui-space-2); }
+@media (max-width: 1180px) {
+  .application-detail-head { grid-template-columns: 1fr; }
+  .application-detail-head__controls { max-width: 760px; justify-self: start; }
+}
+
+
+/* Phase 08 owner patch 02: the application operational form still inherited
+   10–13px legacy copy. These are working instructions, not micro-captions. */
+.operational-group > div:first-child h3 {
+  font-size: var(--ui-text-sm);
+  line-height: 1.3;
+}
+.operational-group > div:first-child p,
+.form-section__head p,
+.panel-title p,
+.panel-actions > span,
+.settings-head-copy,
+.settings-help {
+  font-size: var(--ui-text-sm);
+  line-height: var(--ui-line-normal);
+}
+.operational-group :is(.field__hint,.field__error),
+.crm-editor :is(.field__hint,.field__error) {
+  font-size: var(--ui-text-xs);
+  line-height: var(--ui-line-normal);
+}

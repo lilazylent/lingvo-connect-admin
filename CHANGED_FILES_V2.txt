@@ -1,0 +1,24 @@
+V2 files added/changed on top of the dark-theme/order-workspace baseline:
+
+Backend
+- apps/api/app/routers/operations.py
+- apps/api/tests/test_operations.py
+
+Admin frontend
+- apps/admin-web/src/app/layout.tsx
+- apps/admin-web/src/app/admin/files/page.tsx
+- apps/admin-web/src/components/admin-shell.tsx
+- apps/admin-web/src/components/crm-files.tsx
+- apps/admin-web/src/components/crm-orders.tsx
+- apps/admin-web/src/app/order-deal-redesign.css
+- apps/admin-web/src/app/files-workspace.css
+- apps/admin-web/src/app/motion-system.css
+- apps/admin-web/e2e/crm-rhythm.spec.ts
+- apps/admin-web/AGENTS.md
+
+Documentation
+- IMPLEMENTATION_REPORT.md
+- MOTION_DESIGN_NOTES.md
+- CHANGED_FILES_V2.txt
+
+Baseline files from v1 (including theme-system.css) remain included in the archive.

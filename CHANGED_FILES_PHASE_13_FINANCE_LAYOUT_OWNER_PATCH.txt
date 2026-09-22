@@ -1,0 +1,29 @@
+Build ID: phase13-finance-layout-owner-fix-20260919-r2
+Baseline: Lingvo_Connect_Admin_Phase_13_Internal_Works_v1.zip
+
+Runtime/UI files:
+- apps/admin-web/src/components/crm-orders.tsx
+- apps/admin-web/src/app/phase8-visual-motion.css
+- apps/admin-web/src/app/phase5-orders.css
+- apps/admin-web/src/app/layout.tsx
+
+Verification files:
+- apps/admin-web/scripts/audit-phase13-finance-layout.mjs
+- apps/admin-web/package.json
+- apps/admin-web/scripts/audit-css-ownership.mjs
+- apps/admin-web/scripts/audit-phase8-owner-patch.mjs
+- apps/admin-web/scripts/audit-phase9-release-candidate.mjs
+- apps/admin-web/scripts/audit-phase10-availability.mjs
+- apps/admin-web/scripts/audit-phase10-matching-ui.mjs
+- apps/admin-web/scripts/audit-phase10-routing.mjs
+- apps/admin-web/scripts/audit-phase10-client-demo.mjs
+- apps/admin-web/scripts/audit-phase10-route-stages.mjs
+- apps/admin-web/scripts/audit-phase10-finance.mjs
+- apps/admin-web/scripts/audit-phase11-data-integrity.mjs
+- apps/admin-web/scripts/audit-phase12-assignment-calculator.mjs
+- apps/admin-web/scripts/audit-phase12-order-numbering.mjs
+- apps/admin-web/scripts/audit-phase13-internal-works.mjs
+
+Documentation:
+- PHASE_13_FINANCE_LAYOUT_OWNER_PATCH_REPORT.md
+- CHANGED_FILES_PHASE_13_FINANCE_LAYOUT_OWNER_PATCH.txt

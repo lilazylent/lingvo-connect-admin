@@ -1,0 +1,426 @@
+/* Phase 06 — Files + Users + Settings
+   Canonical Phase 6 visual layer. Semantic tokens only; crm-foundation.css remains last. */
+
+.action-menu__trigger {
+  display:inline-grid; place-items:center; width:38px; height:38px; padding:0;
+  border:1px solid transparent; border-radius:var(--ui-radius-control);
+  color:var(--crm-text-secondary); background:transparent; cursor:pointer;
+}
+.action-menu__trigger:hover,.action-menu__trigger[aria-expanded="true"] { color:var(--crm-text); border-color:var(--crm-border); background:var(--crm-surface-hover); }
+.action-menu__trigger:focus-visible { outline:2px solid var(--crm-accent); outline-offset:2px; }
+.action-menu__popover {
+  position:fixed; z-index:var(--z-popover); width:224px; max-height:min(320px,calc(100vh - 16px)); overflow:auto;
+  padding:6px; border:1px solid var(--crm-border-strong); border-radius:var(--ui-radius-card);
+  background:var(--crm-surface-raised); box-shadow:var(--ui-shadow-lg);
+}
+.action-menu__popover button {
+  display:flex; width:100%; min-height:40px; align-items:center; padding:8px 10px; border:0;
+  border-radius:var(--ui-radius-control); color:var(--crm-text); background:transparent;
+  font:inherit; font-size:var(--ui-text-sm); text-align:left; cursor:pointer;
+}
+.action-menu__popover button:hover:not(:disabled),.action-menu__popover button:focus-visible { background:var(--crm-surface-hover); outline:none; }
+.action-menu__popover button.is-danger { color:var(--crm-danger-text); }
+.action-menu__popover button.is-danger:hover:not(:disabled) { background:var(--crm-danger-soft); }
+.action-menu__popover button:disabled { color:var(--crm-text-muted); cursor:not-allowed; opacity:.65; }
+
+/* Hide the visual scrollbar in compact side workspaces without disabling scrolling. */
+.lc-detail-panel,.directory-detail-panel,.directory-editor-panel,.phase6-user-editor,.phase6-file-preview,.phase6-upload-panel {
+  scrollbar-width:none;
+}
+.lc-detail-panel::-webkit-scrollbar,.directory-detail-panel::-webkit-scrollbar,.directory-editor-panel::-webkit-scrollbar,.phase6-user-editor::-webkit-scrollbar,.phase6-file-preview::-webkit-scrollbar,.phase6-upload-panel::-webkit-scrollbar { width:0; height:0; }
+
+/* Files */
+.phase6-files { min-width:0; }
+.phase6-files .files-head { align-items:flex-end; }
+.phase6-files .files-head__actions { gap:var(--ui-space-2); }
+.phase6-files .files-head__actions .button { min-height:44px; color:var(--crm-text); border-color:var(--crm-border); background:var(--crm-surface-raised); }
+.phase6-files .files-head__actions .button--primary { color:var(--crm-on-accent); border-color:var(--crm-accent); background:var(--crm-accent); }
+.phase6-files .files-summary { grid-template-columns:minmax(210px,1.25fr) repeat(3,minmax(155px,1fr)); gap:var(--ui-space-2); margin:var(--ui-space-4) 0 var(--ui-space-3); }
+.phase6-files .files-summary article { min-height:104px; padding:var(--ui-space-3); border-color:var(--crm-border); border-radius:var(--ui-radius-card); background:var(--crm-surface); }
+.phase6-files .files-summary article::after { display:none; }
+.phase6-files .files-summary article.files-summary__primary { border-color:color-mix(in srgb,var(--crm-accent) 35%,var(--crm-border)); background:color-mix(in srgb,var(--crm-accent-soft) 24%,var(--crm-surface)); }
+.phase6-files .files-summary span { margin-bottom:5px; color:var(--crm-text-muted); font-size:var(--ui-text-xs); letter-spacing:.02em; text-transform:none; }
+.phase6-files .files-summary strong { color:var(--crm-text); font-size:var(--ui-title-sm); }
+.phase6-files .files-summary small { margin-top:6px; color:var(--crm-text-secondary); font-size:var(--ui-text-sm); }
+.phase6-files .files-toolbar { grid-template-columns:minmax(300px,1fr) minmax(160px,210px) minmax(160px,210px) auto; gap:var(--ui-space-2); margin-bottom:var(--ui-space-3); padding:var(--ui-space-3); border-color:var(--crm-border); border-radius:var(--ui-radius-card); background:var(--crm-surface-raised); }
+.phase6-files .files-table-surface { overflow:hidden; border-color:var(--crm-border); border-radius:var(--ui-radius-card); background:var(--crm-surface); box-shadow:none; }
+.phase6-files .files-table-head,.phase6-files .files-row { grid-template-columns:minmax(240px,1.55fr) minmax(210px,1.15fr) 100px 120px 132px 116px; gap:var(--ui-space-3); }
+.phase6-files .files-table-head { min-height:44px; padding:0 var(--ui-space-3); border-color:var(--crm-border); color:var(--crm-text-muted); background:var(--crm-surface-raised); font-size:var(--ui-text-xs); letter-spacing:.02em; text-transform:none; }
+.phase6-files .files-row { min-height:76px; padding:var(--ui-space-2) var(--ui-space-3); border-color:var(--crm-border); color:var(--crm-text); background:var(--crm-surface); cursor:pointer; }
+.phase6-files .files-row:hover { background:var(--crm-surface-hover); }
+.phase6-files .files-row.is-selected { background:var(--crm-surface-selected); box-shadow:inset 3px 0 0 var(--crm-accent); }
+.phase6-files .files-row__mark,.phase6-file-preview .lc-file-preview__mark { color:var(--crm-accent); border-color:color-mix(in srgb,var(--crm-accent) 34%,var(--crm-border)); background:var(--crm-accent-soft); }
+.phase6-files .files-row strong,.phase6-files .files-row__source a strong { color:var(--crm-text); font-size:var(--ui-text-sm); }
+.phase6-files .files-row small,.phase6-files .files-row__value small { color:var(--crm-text-secondary); font-size:var(--ui-text-xs); }
+.phase6-files .files-row__source a:hover strong { color:var(--crm-accent); }
+.phase6-files .files-source { color:var(--crm-text-secondary); border-color:var(--crm-border); background:var(--crm-surface-raised); font-size:var(--ui-text-xs); }
+.phase6-files .files-row__download { display:inline-flex; min-width:104px; min-height:40px; align-items:center; justify-content:center; gap:6px; padding:0 10px; border:1px solid var(--crm-border); border-radius:var(--ui-radius-control); color:var(--crm-text); background:var(--crm-surface-raised); text-decoration:none; overflow:hidden; }
+.phase6-files .files-row__download:hover { color:var(--crm-accent); border-color:color-mix(in srgb,var(--crm-accent) 45%,var(--crm-border)); background:var(--crm-surface-hover); }
+.phase6-files .files-row__download span { color:inherit; font-size:var(--ui-text-xs); white-space:nowrap; }
+.phase6-files-workspace,.phase6-users-workspace { align-items:start; }
+.phase6-file-preview,.phase6-upload-panel,.phase6-user-preview,.phase6-user-editor { overflow:auto; overscroll-behavior:contain; border-color:var(--crm-border); background:var(--crm-surface); }
+.phase6-file-preview__identity { display:flex; gap:var(--ui-space-3); align-items:center; padding:var(--ui-space-4); border-bottom:1px solid var(--crm-border); }
+.phase6-file-preview .lc-file-preview__summary strong { color:var(--crm-text); }
+.phase6-file-preview .lc-file-preview__summary span,.phase6-file-preview .lc-file-preview__summary small,.phase6-file-preview p { color:var(--crm-text-secondary); }
+.phase6-detail-actions { display:grid; gap:var(--ui-space-2); padding:var(--ui-space-4); border-top:1px solid var(--crm-border); }
+.phase6-detail-actions .button { width:100%; justify-content:center; }
+.phase6-upload-panel__form { display:grid; gap:var(--ui-space-3); padding:var(--ui-space-4); }
+.phase6-upload-targets { display:grid; gap:6px; max-height:260px; overflow:auto; padding:4px; border:1px solid var(--crm-border); border-radius:var(--ui-radius-card); background:var(--crm-surface-raised); }
+.phase6-upload-targets button { display:grid; gap:2px; min-height:52px; padding:8px 10px; border:1px solid transparent; border-radius:var(--ui-radius-control); color:var(--crm-text); background:transparent; text-align:left; cursor:pointer; }
+.phase6-upload-targets button:hover,.phase6-upload-targets button.is-selected { border-color:var(--crm-border); background:var(--crm-surface-hover); }
+.phase6-upload-targets button.is-selected { box-shadow:inset 3px 0 0 var(--crm-accent); }
+.phase6-upload-targets button small,.phase6-upload-targets__state { color:var(--crm-text-secondary); font-size:var(--ui-text-xs); }
+.phase6-upload-selected { padding:var(--ui-space-3); border:1px solid color-mix(in srgb,var(--crm-accent) 30%,var(--crm-border)); border-radius:var(--ui-radius-card); color:var(--crm-text); background:var(--crm-accent-soft); }
+.phase6-upload-panel__actions { display:flex; flex-wrap:wrap; gap:var(--ui-space-2); }
+
+/* Users */
+.phase6-users { min-width:0; }
+.phase6-commandbar { display:grid; grid-template-columns:minmax(300px,1fr) minmax(160px,210px) minmax(170px,220px) auto; gap:var(--ui-space-2); align-items:end; margin-bottom:var(--ui-space-3); padding:var(--ui-space-3); border:1px solid var(--crm-border); border-radius:var(--ui-radius-card); background:var(--crm-surface-raised); }
+.phase6-users-table { overflow:visible; }
+.phase6-users-table .table-wrap { overflow-x:auto; border-radius:inherit; }
+.phase6-users-table table { min-width:900px; }
+.phase6-users-table tbody tr.is-selected { background:var(--crm-surface-selected); box-shadow:inset 3px 0 0 var(--crm-accent); }
+.phase6-users-table td strong,.phase6-user-preview strong,.phase6-user-editor strong { color:var(--crm-text); }
+.phase6-users-table td span,.phase6-users-table td small,.phase6-user-preview p,.phase6-user-preview span { color:var(--crm-text-secondary); }
+.phase6-user-preview .lc-user-preview__identity { border-color:var(--crm-border); background:var(--crm-surface-raised); }
+.phase6-user-preview .lc-user-preview__identity > span { color:var(--crm-accent); background:var(--crm-accent-soft); }
+.phase6-user-editor__form { display:grid; gap:var(--ui-space-3); padding:var(--ui-space-4); }
+.phase6-user-editor__actions { display:flex; flex-wrap:wrap; gap:var(--ui-space-2); }
+.phase6-secret { border-color:color-mix(in srgb,var(--crm-warning) 32%,var(--crm-border)); background:var(--crm-warning-soft); color:var(--crm-text); }
+.phase6-secret p { color:var(--crm-text-secondary); }
+
+/* Settings */
+.phase6-settings .settings-layout { gap:var(--ui-space-4); }
+.phase6-settings .settings-modules:not(.settings-module-dock) { border-color:var(--crm-border); background:var(--crm-surface); }
+.phase6-settings .settings-modules:not(.settings-module-dock) button { color:var(--crm-text); border-color:transparent; background:transparent; }
+.phase6-settings .settings-modules:not(.settings-module-dock) button:hover { background:var(--crm-surface-hover); }
+.phase6-settings .settings-modules:not(.settings-module-dock) button.is-active { color:var(--crm-text); border-color:color-mix(in srgb,var(--crm-accent) 32%,var(--crm-border)); background:var(--crm-accent-soft); }
+.phase6-settings .settings-modules:not(.settings-module-dock) button small,.phase6-settings .settings-module__intro p,.phase6-settings .settings-head-copy,.phase6-settings .settings-help { color:var(--crm-text-secondary); }
+.phase6-settings .settings-surface { overflow:hidden; border-color:var(--crm-border); background:var(--crm-surface); box-shadow:none; }
+.phase6-settings .settings-surface > header { border-color:var(--crm-border); }
+.phase6-settings .settings-surface table th { color:var(--crm-text-muted); background:var(--crm-surface-raised); border-color:var(--crm-border); }
+.phase6-settings .settings-surface table td { color:var(--crm-text); border-color:var(--crm-border); background:var(--crm-surface); }
+.phase6-settings .settings-surface table tbody tr:hover td { background:var(--crm-surface-hover); }
+.phase6-settings .status-directory__row { border-color:var(--crm-border); background:var(--crm-surface-raised); }
+.phase6-settings .settings-dialog-backdrop { background:color-mix(in srgb,var(--crm-shell) 65%,transparent); }
+.phase6-settings .settings-dialog { color:var(--crm-text); border-color:var(--crm-border-strong); background:var(--crm-surface); box-shadow:var(--ui-shadow-lg); }
+.phase6-settings .settings-dialog > header { border-color:var(--crm-border); background:var(--crm-surface-raised); }
+.phase6-settings .settings-dialog__close { color:var(--crm-text-secondary); border-color:var(--crm-border); background:var(--crm-surface); }
+.phase6-language-settings .table-wrap { max-height:min(560px,60vh); overflow:auto; }
+
+/* Phase 6 canonical executor capability editor. */
+.phase4-directory--executor .directory-editor-direction { grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--ui-space-2); padding:var(--ui-space-3); border-color:var(--crm-border); background:var(--crm-surface-raised); }
+.phase4-directory--executor .directory-editor-direction > .button { align-self:end; justify-self:start; }
+
+@media (max-width:1180px) {
+  .phase6-files .files-summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .phase6-files .files-table-head,.phase6-files .files-row { grid-template-columns:minmax(220px,1.4fr) minmax(190px,1fr) 100px 120px 108px; }
+  .phase6-files .files-table-head > :nth-child(4),.phase6-files .files-row > :nth-child(4) { display:none; }
+}
+@media (max-width:900px) {
+  .phase6-files .files-toolbar,.phase6-commandbar { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .phase6-files .files-toolbar__search,.phase6-commandbar > :first-child { grid-column:1/-1; }
+  .phase6-files-workspace,.phase6-users-workspace { grid-template-columns:1fr; }
+  .phase6-file-preview,.phase6-upload-panel,.phase6-user-preview,.phase6-user-editor { max-height:none; }
+  .phase6-settings .settings-layout { grid-template-columns:1fr; }
+  .phase6-settings .settings-modules:not(.settings-module-dock) { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width:620px) {
+  .phase6-files .files-head,.phase6-users__head { align-items:stretch; }
+  .phase6-files .files-head__actions { justify-content:flex-start; }
+  .phase6-files .files-summary,.phase6-files .files-toolbar,.phase6-commandbar,.phase6-settings .settings-modules:not(.settings-module-dock),.phase4-directory--executor .directory-editor-direction { grid-template-columns:1fr; }
+  .phase6-files .files-table-head { display:none; }
+  .phase6-files .files-row { grid-template-columns:1fr auto; gap:var(--ui-space-2); }
+  .phase6-files .files-row__source,.phase6-files .files-row__value { grid-column:1; }
+  .phase6-files .files-row__download { grid-column:2; grid-row:1; min-width:42px; width:42px; padding:0; }
+  .phase6-files .files-row__download span { display:none; }
+  .phase6-settings .settings-surface { overflow-x:auto; }
+}
+@media (max-width:430px) {
+  .phase6-files .files-head__actions .button { flex:1 1 auto; }
+  .phase6-files .files-summary { gap:6px; }
+  .phase6-files .files-summary article { min-height:88px; }
+  .phase6-user-editor__form,.phase6-upload-panel__form,.phase6-file-preview__identity,.phase6-detail-actions { padding:var(--ui-space-3); }
+}
+
+/* Executor capability metadata remains owned by Phase 06. */
+.directory-direction-list__meta { display:grid; justify-items:end; gap:3px; }
+.directory-direction-list__meta small { color:var(--crm-text-muted); font-size:var(--ui-text-xs); }
+@media (max-width:620px) { .directory-direction-list__meta { justify-items:start; } }
+
+
+/* Phase 08 owner patch 02 — Settings operational density and scroll hierarchy.
+   One document flow prevents module navigation / action toolbar overlap. */
+.phase6-settings .settings-layout { align-items:start; }
+.phase6-settings .settings-modules {
+  position: static;
+  top: auto;
+  align-self: start;
+}
+.phase6-settings .settings-module { min-width:0; }
+.phase6-settings .settings-module__intro,
+.phase6-settings .settings-surface > header { position:static; top:auto; z-index:auto; }
+.phase6-settings .settings-surface > header {
+  align-items:center;
+  flex-wrap:wrap;
+  row-gap:var(--ui-space-2);
+}
+.phase6-settings .settings-surface > header > .button { margin-left:auto; }
+.phase6-settings .settings-catalog-tools {
+  display:grid;
+  grid-template-columns:minmax(240px,1fr) minmax(130px,180px);
+  gap:var(--ui-space-2);
+  align-items:end;
+  padding:var(--ui-space-3) var(--ui-space-4);
+  border-bottom:1px solid var(--crm-border);
+  background:var(--crm-surface-raised);
+}
+.phase6-settings .settings-catalog-tools--filters { grid-template-columns:minmax(240px,340px) minmax(130px,180px); }
+.phase6-settings .settings-pagination {
+  min-height:52px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:var(--ui-space-3);
+  padding:var(--ui-space-2) var(--ui-space-4);
+  border-top:1px solid var(--crm-border);
+  color:var(--crm-text-secondary);
+  background:var(--crm-surface-raised);
+  font-size:var(--ui-text-sm);
+}
+.phase6-settings .settings-pagination > div { display:flex; align-items:center; gap:var(--ui-space-2); }
+.phase6-settings .settings-pagination strong { color:var(--crm-text); font-size:var(--ui-text-sm); font-variant-numeric:tabular-nums; }
+.phase6-settings .settings-pagination .button { min-height:36px; }
+.phase6-settings .settings-surface .table-wrap { max-height:none; overflow-x:auto; overflow-y:visible; }
+.phase6-settings .settings-surface table th,
+.phase6-settings .settings-surface table td { padding-block:10px; }
+.phase6-language-settings .table-wrap { max-height:none; overflow-x:auto; overflow-y:visible; }
+@media (max-width:620px) {
+  .phase6-settings .settings-catalog-tools,
+  .phase6-settings .settings-catalog-tools--filters { grid-template-columns:1fr; }
+  .phase6-settings .settings-pagination { align-items:stretch; flex-direction:column; }
+  .phase6-settings .settings-pagination > div { justify-content:space-between; }
+  .phase6-settings .settings-surface > header > .button { width:100%; margin-left:0; }
+}
+
+
+/* Phase 08 final polish — Concept C settings workspace structure. */
+.phase6-settings .settings-layout {
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  gap:var(--ui-space-3);
+  align-items:start;
+}
+.phase6-settings .settings-module { min-width:0; display:grid; gap:var(--ui-space-3); }
+.phase6-settings .settings-module__intro {
+  min-height:82px;
+  display:flex;
+  align-items:center;
+  gap:var(--ui-space-3);
+  padding:14px 16px;
+  border:1px solid var(--crm-border);
+  border-radius:var(--ui-radius-card);
+  background:var(--crm-surface);
+}
+.phase6-settings .settings-module__intro > div { min-width:0; }
+.phase6-settings .settings-module__intro h2 { margin:2px 0 3px; }
+.phase6-settings .settings-module__intro p { margin:0; max-width:880px; }
+.phase6-settings .settings-module__intro-icon {
+  flex:0 0 44px;
+  width:44px;
+  height:44px;
+  display:grid;
+  place-items:center;
+  border-radius:12px;
+}
+.phase6-settings .settings-surface { margin:0; }
+.phase6-settings .settings-surface > header { padding:12px 14px; min-height:64px; }
+.phase6-settings .settings-surface > header h2 { margin:2px 0 0; }
+.phase6-settings .settings-head-copy { margin:0; padding:10px 14px 0; }
+.phase6-settings .settings-catalog-tools {
+  grid-template-columns:minmax(220px,1fr) auto;
+  min-height:66px;
+  padding:10px 14px;
+}
+.phase6-settings .settings-catalog-tools--filters { grid-template-columns:minmax(220px,360px) auto; }
+.phase6-settings .settings-page-size {
+  min-width:0;
+  margin:0;
+  padding:0;
+  border:0;
+}
+.phase6-settings .settings-page-size legend {
+  margin:0 0 5px;
+  color:var(--crm-text-secondary);
+  font-size:var(--ui-text-sm);
+  font-weight:590;
+  line-height:1.2;
+}
+.phase6-settings .settings-page-size > div {
+  display:inline-grid;
+  grid-template-columns:repeat(3,38px);
+  gap:3px;
+  padding:3px;
+  border:1px solid var(--crm-border);
+  border-radius:var(--ui-radius-control);
+  background:var(--crm-surface);
+}
+.phase6-settings .settings-page-size button {
+  min-width:38px;
+  min-height:34px;
+  padding:0 6px;
+  border:0;
+  border-radius:8px;
+  color:var(--crm-text-secondary);
+  background:transparent;
+  font:inherit;
+  font-size:var(--ui-text-sm);
+  font-weight:620;
+  cursor:pointer;
+}
+.phase6-settings .settings-page-size button:hover { color:var(--crm-text); background:var(--crm-surface-hover); }
+.phase6-settings .settings-page-size button.is-active { color:var(--crm-text); background:var(--crm-accent-soft); }
+.phase6-settings .settings-page-size button:focus-visible { outline:0; box-shadow:var(--ui-focus-ring); }
+.phase6-settings .settings-surface table { table-layout:fixed; width:100%; }
+.phase6-settings .settings-surface table th,
+.phase6-settings .settings-surface table td {
+  min-height:40px;
+  padding:8px 12px;
+  vertical-align:middle;
+  line-height:1.28;
+}
+.phase6-settings .settings-surface table td:last-child,
+.phase6-settings .settings-surface table th:last-child { width:112px; text-align:right; }
+.phase6-settings .settings-surface table .button--quiet { min-height:32px; padding:5px 9px; }
+.phase6-settings .settings-pagination { min-height:46px; padding:7px 12px; }
+.phase6-settings .settings-pagination .button { min-height:32px; padding-block:5px; }
+@media (max-width:760px) {
+  .phase6-settings .settings-catalog-tools,
+  .phase6-settings .settings-catalog-tools--filters { grid-template-columns:1fr; }
+  .phase6-settings .settings-page-size > div { width:max-content; }
+  .phase6-settings .settings-surface table { min-width:720px; }
+}
+
+/* Phase 09 owner patch 03 — order status board separation. */
+.phase6-settings .status-directory--grouped { gap:var(--ui-space-3); }
+.phase6-settings .status-directory__group { display:grid; gap:var(--ui-space-2); }
+.phase6-settings .status-directory__group-head {
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:var(--ui-space-3);
+  padding:0 2px;
+}
+.phase6-settings .status-directory__group-head strong { display:block; color:var(--crm-text); font-size:var(--ui-text-md); }
+.phase6-settings .status-directory__group-head small { display:block; margin-top:3px; color:var(--crm-text-secondary); font-size:var(--ui-text-sm); line-height:1.35; }
+.phase6-settings .status-directory__rows { display:grid; gap:8px; }
+.phase6-settings .status-directory__meta { display:flex; align-items:center; justify-content:flex-end; gap:6px; flex-wrap:wrap; }
+
+@media (max-width:620px) {
+  .phase6-settings .status-directory__group-head { align-items:stretch; }
+  .phase6-settings .status-directory__meta { justify-content:flex-start; }
+}
+
+/* User invitation registration flow. */
+.phase6-user-editor__hint {
+  margin:0;
+  padding:10px 12px;
+  border:1px solid var(--crm-border);
+  border-radius:var(--ui-radius-control);
+  color:var(--crm-text-secondary);
+  background:var(--crm-surface-raised);
+  font-size:var(--ui-text-sm);
+  line-height:1.45;
+}
+.phase6-invitations {
+  margin-bottom:var(--ui-space-4);
+  overflow:hidden;
+  border:1px solid var(--crm-border);
+  border-radius:var(--ui-radius-card);
+  background:var(--crm-surface);
+}
+.phase6-invitations > header {
+  min-height:64px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:var(--ui-space-3);
+  padding:10px 14px;
+  border-bottom:1px solid var(--crm-border);
+  background:var(--crm-surface-raised);
+}
+.phase6-invitations > header h2 { margin:2px 0 0; font-size:var(--ui-title-sm); }
+.phase6-invitations__list { display:grid; }
+.phase6-invitations__list article {
+  min-height:64px;
+  display:grid;
+  grid-template-columns:minmax(240px,1fr) minmax(220px,auto) 44px;
+  gap:var(--ui-space-3);
+  align-items:center;
+  padding:9px 12px 9px 14px;
+  border-bottom:1px solid var(--crm-border);
+}
+.phase6-invitations__list article:last-child { border-bottom:0; }
+.phase6-invitations__list article.is-expired { background:var(--crm-surface-raised); }
+.phase6-invitations__identity,.phase6-invitations__status { min-width:0; display:grid; gap:4px; }
+.phase6-invitations__identity strong { overflow:hidden; color:var(--crm-text); font-size:var(--ui-text-sm); text-overflow:ellipsis; white-space:nowrap; }
+.phase6-invitations__identity span,.phase6-invitations__status small { color:var(--crm-text-secondary); font-size:var(--ui-text-xs); }
+.phase6-invitations__status { justify-items:start; }
+.phase6-invite-dialog-backdrop {
+  position:fixed;
+  z-index:var(--z-modal);
+  inset:0;
+  display:grid;
+  place-items:center;
+  padding:var(--ui-space-4);
+  background:color-mix(in srgb,var(--crm-shell) 72%,transparent);
+  backdrop-filter:blur(4px);
+}
+.phase6-invite-dialog {
+  width:min(620px,100%);
+  overflow:hidden;
+  border:1px solid var(--crm-border-strong);
+  border-radius:var(--ui-radius-card);
+  color:var(--crm-text);
+  background:var(--crm-surface);
+  box-shadow:var(--ui-shadow-lg);
+}
+.phase6-invite-dialog > header {
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:var(--ui-space-3);
+  padding:16px 18px;
+  border-bottom:1px solid var(--crm-border);
+  background:var(--crm-surface-raised);
+}
+.phase6-invite-dialog > header h2 { margin:3px 0 0; font-size:var(--ui-title-md); }
+.phase6-invite-dialog__body { display:grid; gap:var(--ui-space-4); padding:18px; }
+.phase6-invite-dialog__body p { margin:0; color:var(--crm-text-secondary); line-height:1.5; }
+.phase6-invite-dialog__body p strong { color:var(--crm-text); }
+.phase6-invite-dialog__body code {
+  display:block;
+  max-width:100%;
+  overflow-wrap:anywhere;
+  padding:12px 14px;
+  border:1px solid color-mix(in srgb,var(--crm-accent) 36%,var(--crm-border));
+  border-radius:var(--ui-radius-control);
+  color:var(--crm-text);
+  background:var(--crm-accent-soft);
+  font-size:var(--ui-text-sm);
+  line-height:1.45;
+}
+.phase6-invite-dialog__meta { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--ui-space-2); }
+.phase6-invite-dialog__meta span { display:grid; gap:3px; padding:10px 12px; border:1px solid var(--crm-border); border-radius:var(--ui-radius-control); color:var(--crm-text); background:var(--crm-surface-raised); font-size:var(--ui-text-sm); }
+.phase6-invite-dialog__meta b { color:var(--crm-text-secondary); font-size:var(--ui-text-xs); font-weight:600; }
+.phase6-invite-dialog__note { font-size:var(--ui-text-sm); }
+.phase6-invite-dialog > footer { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:var(--ui-space-2); padding:12px 18px 18px; }
+
+@media (max-width:620px) {
+  .phase6-invitations__list article { grid-template-columns:1fr 44px; gap:var(--ui-space-2); }
+  .phase6-invitations__status { grid-column:1; grid-row:2; }
+  .phase6-invitations__list article > .action-menu__trigger { grid-column:2; grid-row:1; }
+  .phase6-invite-dialog-backdrop { padding:10px; }
+  .phase6-invite-dialog__meta { grid-template-columns:1fr; }
+  .phase6-invite-dialog > footer .button { flex:1 1 auto; }
+}

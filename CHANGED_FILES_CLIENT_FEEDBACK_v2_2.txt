@@ -1,0 +1,13 @@
+CLIENT_FEEDBACK_TZ_2026-09-14.md
+SELF_IMPLEMENTATION_PROMPT_CLIENT_FEEDBACK_2026-09-14.md
+IMPLEMENTATION_REPORT_CLIENT_FEEDBACK_v2_2.md
+CHANGED_FILES_CLIENT_FEEDBACK_v2_2.txt
+apps/api/app/operations_models.py
+apps/api/app/routers/crm.py
+apps/api/alembic/versions/0016_work_pricing_assignments.py
+apps/api/tests/test_crm.py
+apps/admin-web/src/components/crm-orders.tsx
+apps/admin-web/src/app/theme-system.css
+apps/admin-web/src/app/workspace-rhythm.css
+apps/admin-web/src/app/order-deal-redesign.css
+apps/admin-web/src/app/frontend-resilience.css

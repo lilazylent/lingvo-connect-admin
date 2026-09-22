@@ -1,0 +1,475 @@
+/* Phase 08 — Visual identity, motion and final frontend consolidation.
+   Canonical owner for cross-product visual motion. Geometry stays in owning phase files. */
+
+/* Pictogram family -------------------------------------------------------- */
+.lc-pictogram {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 34px;
+  border-radius: 11px;
+  color: currentColor;
+  background:
+    linear-gradient(145deg, color-mix(in srgb, currentColor 9%, transparent), transparent 62%),
+    color-mix(in srgb, var(--crm-surface-raised) 92%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 16%, var(--crm-border));
+  overflow: hidden;
+  isolation: isolate;
+}
+.lc-pictogram > svg { position: relative; z-index: 2; stroke-width: 1.65; }
+.lc-pictogram__orbit {
+  position: absolute; inset: 6px; border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  border-radius: 50%; opacity: .68; transform: rotate(-14deg) scaleX(1.22);
+}
+.lc-pictogram__dot {
+  position: absolute; right: 5px; top: 5px; width: 4px; height: 4px; border-radius: 50%;
+  background: currentColor; box-shadow: -23px 18px 0 color-mix(in srgb,currentColor 45%,transparent); opacity: .8;
+}
+[data-pictogram="document"] .lc-pictogram__orbit,
+[data-pictogram="applications"] .lc-pictogram__orbit { border-radius: 7px; transform: rotate(8deg) scale(.9); }
+[data-pictogram="clock"] .lc-pictogram__dot,
+[data-pictogram="calendar"] .lc-pictogram__dot { box-shadow: -20px 20px 0 color-mix(in srgb,currentColor 45%,transparent); }
+[data-pictogram="wallet"] .lc-pictogram__orbit,
+[data-pictogram="folder"] .lc-pictogram__orbit { transform: rotate(-8deg) scaleX(1.28) scaleY(.82); }
+[data-pictogram="shield"] .lc-pictogram__orbit { transform: rotate(0) scale(.9); border-radius: 45% 45% 58% 58%; }
+[data-pictogram="executors"] .lc-pictogram__orbit,
+[data-pictogram="users"] .lc-pictogram__orbit,
+[data-pictogram="clients"] .lc-pictogram__orbit { transform: translateX(-3px) scale(.82); }
+
+/* Metric cards — Phase 08 owner patch 02.
+   Dashboard cards use restrained smoked glass; list-page summaries use the
+   same clean content hierarchy without turning operational surfaces into glass. */
+:is(.lc-metric-card,.lc-module-metric) {
+  position: relative;
+  overflow: hidden;
+  transform: none;
+}
+:is(.lc-metric-card,.lc-module-metric)::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  inset: 0 auto 0 -48%;
+  width: 34%;
+  pointer-events: none;
+  background: linear-gradient(105deg,transparent,color-mix(in srgb,var(--crm-text) 10%,transparent),transparent);
+  transform: skewX(-18deg);
+  opacity: 0;
+}
+.lc-dashboard .lc-metric-card {
+  min-height: 118px;
+  grid-template-columns: 42px minmax(0,1fr);
+  grid-template-rows: auto auto minmax(26px,1fr);
+  align-content: stretch;
+  column-gap: 11px;
+  padding: 14px;
+  border-color: color-mix(in srgb,var(--crm-text) 9%,var(--crm-border));
+  background:
+    radial-gradient(circle at 14% 0%,color-mix(in srgb,var(--metric-color) 13%,transparent),transparent 46%),
+    linear-gradient(145deg,color-mix(in srgb,var(--crm-text) 5%,transparent),transparent 44%),
+    color-mix(in srgb,var(--crm-surface) 84%,transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(125%);
+  backdrop-filter: blur(14px) saturate(125%);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb,var(--crm-text) 8%,transparent),
+    0 10px 28px color-mix(in srgb,var(--crm-shell) 36%,transparent);
+}
+.lc-dashboard .lc-metric-card::after {
+  content:"";
+  position:absolute;
+  z-index:0;
+  left:12px; right:12px; top:0;
+  height:1px;
+  background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--crm-text) 20%,transparent),transparent);
+  opacity:.55;
+  pointer-events:none;
+}
+.lc-dashboard .lc-metric-card__icon { grid-row:1 / 3; align-self:center; }
+.lc-dashboard .lc-metric-card__value { align-self:end; }
+.lc-dashboard .lc-metric-card__label { align-self:start; margin-top:5px; }
+.lc-dashboard .lc-metric-card small { display:none; }
+.lc-dashboard .lc-circle-arrow {
+  position:relative;
+  grid-column:1 / -1;
+  grid-row:3;
+  justify-self:end;
+  align-self:end;
+  right:auto;
+  bottom:auto;
+  margin-top:7px;
+  width:26px;
+  height:26px;
+  color:var(--metric-color);
+  border-color:color-mix(in srgb,var(--metric-color) 24%,var(--crm-border));
+  background:color-mix(in srgb,var(--crm-surface-raised) 82%,transparent);
+  box-shadow:inset 0 1px 0 color-mix(in srgb,var(--crm-text) 5%,transparent);
+}
+
+.lc-module-metric {
+  min-height: 96px;
+  grid-template-rows: auto auto;
+  align-content:center;
+  background:
+    linear-gradient(145deg,color-mix(in srgb,var(--metric-color) 5%,transparent),transparent 44%),
+    color-mix(in srgb,var(--crm-surface) 96%,transparent);
+  box-shadow:inset 0 1px 0 color-mix(in srgb,var(--crm-text) 4%,transparent),var(--ui-shadow-xs);
+}
+.lc-module-metric:not(button) { cursor:default; }
+.lc-module-metric > span:first-child { grid-row:1 / 3; align-self:center; }
+.lc-module-metric > small { display:none; }
+.lc-module-metric.is-navigable { padding-right:48px; }
+.lc-module-metric > i { right:10px; bottom:8px; width:26px; height:26px; }
+
+:is(.lc-metric-card,.lc-module-metric):hover,
+:is(.lc-metric-card,.lc-module-metric):focus-visible {
+  transform: none;
+  border-color: color-mix(in srgb,var(--metric-color) 28%,var(--crm-border-strong));
+  box-shadow: inset 0 1px 0 color-mix(in srgb,var(--crm-text) 8%,transparent),var(--ui-shadow-sm);
+}
+:is(.lc-metric-card,.lc-module-metric):hover::before,
+:is(.lc-metric-card,.lc-module-metric):focus-visible::before {
+  animation: lc-gloss-sweep 520ms var(--motion-ease-out) both;
+}
+:is(.lc-metric-card,.lc-module-metric) > * { position: relative; z-index: 1; }
+:is(.lc-metric-card,.lc-module-metric):hover .lc-pictogram {
+  border-color: color-mix(in srgb,currentColor 30%,var(--crm-border));
+  box-shadow:0 0 18px color-mix(in srgb,currentColor 13%,transparent);
+}
+
+/* One PageHeader -> summary-row rhythm across Applications, Orders, Clients,
+   Executors and Users. Dashboard receives the same breathing interval. */
+.page-head + .lc-module-metrics,
+.lc-page-hero + .lc-metric-grid { margin-top:var(--ui-page-section-gap); }
+.phase4-directory__head { margin-bottom:0; }
+
+@keyframes lc-gloss-sweep {
+  0% { left: -48%; opacity: 0; }
+  18% { opacity: .8; }
+  100% { left: 118%; opacity: 0; }
+}
+
+/* Dashboard finance glyphs animate internally without moving layout. */
+.lc-finance-bars { transform-origin: bottom; }
+.lc-finance-bars b { transform-origin: bottom; transform: scaleY(.74); transition: transform 300ms var(--motion-ease-out), opacity 180ms ease; }
+.lc-finance-strip > div:hover .lc-finance-bars b:nth-child(1), .lc-finance-strip > div:focus-within .lc-finance-bars b:nth-child(1) { transform: scaleY(.9); }
+.lc-finance-strip > div:hover .lc-finance-bars b:nth-child(2), .lc-finance-strip > div:focus-within .lc-finance-bars b:nth-child(2) { transform: scaleY(1.03); }
+.lc-finance-strip > div:hover .lc-finance-bars b:nth-child(3), .lc-finance-strip > div:focus-within .lc-finance-bars b:nth-child(3) { transform: scaleY(1.14); }
+.lc-finance-strip > div:hover .lc-finance-bars b:nth-child(4), .lc-finance-strip > div:focus-within .lc-finance-bars b:nth-child(4) { transform: scaleY(1.24); }
+
+/* Global CTA accent is wine/burgundy, not bright pink. */
+.button--primary,
+.lc-quick-action--primary,
+.page-head .button--primary,
+.lc-page-hero .button--primary {
+  background: var(--crm-accent); border-color: var(--crm-accent); color: var(--crm-on-accent);
+}
+.button--primary:hover:not(:disabled), .lc-quick-action--primary:hover { background: var(--crm-accent-hover); border-color: var(--crm-accent-hover); }
+
+/* Search and shared focus geometry: one rounded outer ring only. */
+.lc-global-search { border-radius: var(--ui-radius-card); }
+.lc-global-search:focus-within { outline: 0; box-shadow: 0 0 0 3px color-mix(in srgb,var(--crm-accent) 24%,transparent); }
+.lc-global-search input:focus,
+.lc-global-search input:focus-visible { outline: 0; box-shadow: none; border: 0; }
+:is(.input,.select-trigger,.crm-combobox__input,.table-select):focus-visible { border-radius: var(--ui-radius-control); }
+
+/* Decorative Lingvo translation artwork — CSS/HTML, no fake interactive affordance. */
+html[data-crm-theme] body .lc-sidebar-promo { background: color-mix(in srgb,var(--crm-accent-soft) 22%,var(--crm-surface)); }
+html[data-crm-theme] body .lc-sidebar-promo::before { background: linear-gradient(135deg,var(--crm-surface) 0%,color-mix(in srgb,var(--crm-surface) 88%,transparent) 58%,transparent 100%); }
+.lc-sidebar-promo__art { position:absolute; right:-12px; bottom:-4px; width:106px; height:106px; opacity:.78; transform:rotate(-8deg); }
+.lc-sidebar-promo__art::before,.lc-sidebar-promo__art::after { content:""; position:absolute; border:1px solid color-mix(in srgb,var(--crm-accent) 35%,var(--crm-border)); border-radius:14px; background:color-mix(in srgb,var(--crm-surface-raised) 75%,transparent); }
+.lc-sidebar-promo__art::before { width:54px; height:72px; right:8px; bottom:10px; transform:rotate(8deg); }
+.lc-sidebar-promo__art::after { width:46px; height:62px; right:38px; bottom:21px; transform:rotate(-8deg); }
+.lc-sidebar-promo__art b { position:absolute; z-index:2; color:var(--crm-accent); font-size:18px; font-weight:620; }
+.lc-sidebar-promo__art b:nth-of-type(1){right:24px;bottom:36px}.lc-sidebar-promo__art b:nth-of-type(2){right:55px;bottom:45px}
+.lc-sidebar-promo__art i { position:absolute; z-index:3; height:1px; background:color-mix(in srgb,var(--crm-accent) 42%,transparent); transform-origin:left center; }
+.lc-sidebar-promo__art i:nth-child(1){width:48px;right:22px;bottom:22px;transform:rotate(-30deg)}
+.lc-sidebar-promo__art i:nth-child(2){width:38px;right:15px;bottom:67px;transform:rotate(25deg)}
+
+.lc-hero-banner { background: linear-gradient(135deg,color-mix(in srgb,var(--crm-accent-soft) 22%,var(--crm-surface)),var(--crm-surface)); }
+.lc-hero-banner::before { background: radial-gradient(circle at 70% 45%,color-mix(in srgb,var(--crm-accent) 12%,transparent),transparent 25%), linear-gradient(90deg,transparent,color-mix(in srgb,var(--crm-surface) 22%,transparent)); opacity:1; filter:none; }
+.lc-translation-art { position:absolute; right:24px; inset-block:12px; width:155px; pointer-events:none; }
+.lc-translation-art b { position:absolute; width:48px; height:48px; display:grid; place-items:center; border:1px solid color-mix(in srgb,var(--crm-accent) 30%,var(--crm-border)); border-radius:14px; color:var(--crm-accent); background:var(--crm-surface-raised); font-size:20px; font-weight:650; box-shadow:var(--ui-shadow-xs); }
+.lc-translation-art b:nth-of-type(1){left:8px;top:14px;transform:rotate(-6deg)}
+.lc-translation-art b:nth-of-type(2){right:5px;bottom:13px;transform:rotate(5deg)}
+.lc-translation-art__line { position:absolute; left:43px; top:57px; width:74px; height:1px; background:linear-gradient(90deg,var(--crm-accent),color-mix(in srgb,var(--crm-accent) 14%,transparent)); transform:rotate(14deg); transform-origin:left center; }
+.lc-translation-art__line::after { content:""; position:absolute; right:-3px; top:-3px; width:7px; height:7px; border-radius:50%; background:var(--crm-accent); }
+.lc-translation-art__page { position:absolute; left:59px; top:19px; width:37px; height:52px; border:1px solid var(--crm-border); border-radius:8px; background:color-mix(in srgb,var(--crm-surface) 86%,transparent); transform:rotate(13deg); opacity:.75; }
+
+/* Order pipeline motion — SVG stroke animation is intentionally used instead
+   of animating a custom CSS property so the 12-o'clock clockwise fill works
+   consistently in Chromium-based browsers. Static geometry is Phase 05-owned. */
+.phase5-order-card .order-stage__dial-progress {
+  transition: stroke var(--motion-state) var(--motion-ease-out), opacity var(--motion-state) var(--motion-ease-out);
+}
+.phase5-order-card .order-stage.is-current .order-stage__dial-progress {
+  stroke-dashoffset: 0;
+  animation: lc-stage-clock-fill 680ms var(--motion-ease-out) both;
+}
+.phase5-order-card .order-stage.is-past .order-stage__dial-progress { stroke-dashoffset:0; animation:none; }
+.phase5-order-card .order-stage:not(.is-current):not(.is-past) .order-stage__dial-progress { opacity:0; stroke-dashoffset:100; }
+@keyframes lc-stage-clock-fill {
+  0% { stroke-dashoffset:100; opacity:.5; }
+  100% { stroke-dashoffset:0; opacity:1; }
+}
+
+/* Finance remains two independent vertical columns. The executor breakdown must not
+   participate in the main-column row sizing, otherwise tall payout content pushes
+   "Экономика заказа" metrics down the page. */
+.phase5-order-card .phase5-finance-workspace.is-active {
+  display:grid;
+  grid-template-columns:minmax(0,1.55fr) minmax(340px,.75fr);
+  align-items:start;
+  gap:var(--ui-space-3);
+  padding:var(--ui-space-4) var(--ui-space-5);
+  border-bottom:1px solid var(--crm-border);
+  background:var(--crm-surface);
+}
+.phase5-order-card .phase5-finance-main-column,
+.phase5-order-card .phase5-finance-side-column { min-width:0; }
+.phase5-order-card .phase5-finance-main-column { grid-column:1; }
+.phase5-order-card .phase5-finance-side-column {
+  grid-column:2;
+  display:grid;
+  align-content:start;
+  gap:var(--ui-space-3);
+}
+.phase5-order-card .phase5-finance-workspace .order-finance-module {
+  margin:0;
+  padding:0;
+  border:0;
+  background:transparent;
+}
+.phase5-order-card .phase5-finance-workspace .order-finance-module > header { margin:0 0 var(--ui-space-3); }
+.phase5-order-card .phase5-finance-workspace .finance-strip { width:100%; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
+.phase5-order-card .phase5-finance-workspace .finance-metric { grid-column:auto; min-height:64px; padding:8px 10px; }
+.phase5-order-card .phase5-finance-workspace .finance-metric--total { grid-column:1 / -1; }
+.phase5-order-card .phase5-finance-workspace .phase5-client-quote {
+  margin:0;
+  padding:0;
+  border:1px solid var(--crm-border);
+  border-radius:var(--ui-radius-card);
+  background:var(--crm-surface-raised);
+  overflow:hidden;
+}
+.phase5-order-card .phase5-finance-workspace .phase5-client-quote > summary { min-height:94px; padding:12px 14px; }
+.phase5-order-card .phase5-finance-workspace .phase5-client-quote__body { padding:0 14px 14px; }
+
+/* Settings navigation — Concept C hybrid module dock. */
+.phase6-settings .settings-module-dock {
+  display:grid;
+  grid-template-columns:repeat(6,minmax(0,1fr));
+  gap:8px;
+  padding:8px;
+  border:1px solid var(--crm-border);
+  border-radius:calc(var(--ui-radius-card) + 2px);
+  background:
+    linear-gradient(145deg,color-mix(in srgb,var(--crm-text) 3%,transparent),transparent 46%),
+    color-mix(in srgb,var(--crm-surface) 94%,transparent);
+  box-shadow:inset 0 1px 0 color-mix(in srgb,var(--crm-text) 4%,transparent);
+}
+.phase6-settings .settings-module-card {
+  position:relative;
+  min-width:0;
+  min-height:76px;
+  display:grid;
+  grid-template-columns:38px minmax(0,1fr);
+  align-items:center;
+  gap:10px;
+  padding:10px 11px;
+  overflow:hidden;
+  border:1px solid transparent;
+  border-radius:12px;
+  color:var(--crm-text-secondary);
+  background:transparent;
+  text-align:left;
+  cursor:pointer;
+  transition:border-color var(--motion-state) var(--motion-ease-out), background-color var(--motion-state) var(--motion-ease-out), color var(--motion-state) var(--motion-ease-out), box-shadow var(--motion-state) var(--motion-ease-out);
+}
+.phase6-settings .settings-module-card::after {
+  content:"";
+  position:absolute;
+  inset:auto 10px 0;
+  height:1px;
+  background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--crm-accent) 0%,transparent),transparent);
+  transition:background var(--motion-state) var(--motion-ease-out);
+}
+.phase6-settings .settings-module-card:hover {
+  color:var(--crm-text);
+  border-color:var(--crm-border);
+  background:var(--crm-surface-hover);
+}
+.phase6-settings .settings-module-card:focus-visible { outline:0; box-shadow:var(--ui-focus-ring); }
+.phase6-settings .settings-module-card.is-active {
+  color:var(--crm-text);
+  border-color:color-mix(in srgb,var(--crm-accent) 30%,var(--crm-border));
+  background:
+    radial-gradient(circle at 15% 0%,color-mix(in srgb,var(--crm-accent) 14%,transparent),transparent 52%),
+    linear-gradient(145deg,color-mix(in srgb,var(--crm-text) 4%,transparent),transparent 58%),
+    color-mix(in srgb,var(--crm-accent-soft) 52%,var(--crm-surface));
+  box-shadow:inset 0 1px 0 color-mix(in srgb,var(--crm-text) 7%,transparent);
+}
+.phase6-settings .settings-module-card.is-active::after { background:linear-gradient(90deg,transparent,var(--crm-accent),transparent); }
+.phase6-settings .settings-module-card__visual {
+  width:38px;
+  height:38px;
+  display:grid;
+  place-items:center;
+  border:1px solid color-mix(in srgb,currentColor 15%,var(--crm-border));
+  border-radius:11px;
+  color:var(--crm-text-muted);
+  background:var(--crm-surface-raised);
+}
+.phase6-settings .settings-module-card.is-active .settings-module-card__visual {
+  color:var(--crm-accent);
+  border-color:color-mix(in srgb,var(--crm-accent) 28%,var(--crm-border));
+  background:color-mix(in srgb,var(--crm-accent-soft) 72%,var(--crm-surface));
+}
+.phase6-settings .settings-module-card__body { min-width:0; display:grid; grid-template-columns:auto minmax(0,1fr); align-items:baseline; gap:7px; }
+.phase6-settings .settings-modules__number {
+  min-width:26px;
+  height:24px;
+  display:inline-grid;
+  place-items:center;
+  padding:0 5px;
+  border:1px solid var(--crm-border);
+  border-radius:999px;
+  color:var(--crm-text-muted);
+  background:color-mix(in srgb,var(--crm-surface-raised) 78%,transparent);
+  font-family:var(--ui-font-mono);
+  font-size:10px;
+  font-weight:650;
+  letter-spacing:.04em;
+}
+.phase6-settings .settings-module-card.is-active .settings-modules__number { color:var(--crm-accent); border-color:color-mix(in srgb,var(--crm-accent) 30%,var(--crm-border)); }
+.phase6-settings .settings-module-select { display:none; }
+.phase6-settings .settings-module-card strong { min-width:0; overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; color:inherit; font-size:12.5px; font-weight:620; line-height:1.22; }
+.phase6-settings .settings-module__intro-icon {
+  color:var(--crm-accent);
+  border:1px solid color-mix(in srgb,var(--crm-accent) 22%,var(--crm-border));
+  background:color-mix(in srgb,var(--crm-accent-soft) 50%,var(--crm-surface-raised));
+}
+
+/* Files source badges are one semantic family with fixed geometry. */
+.phase6-files .files-source { width:70px; min-width:70px; height:28px; display:inline-grid; place-items:center; padding:0 8px; border:1px solid var(--crm-border); border-radius:var(--ui-radius-round); text-align:center; white-space:nowrap; }
+.phase6-files .files-row__source { display:grid; grid-template-columns:70px minmax(0,1fr); align-items:center; gap:9px; }
+
+/* Generic popup/page entrance motion with practical restraint. */
+.lc-search-results,.action-menu__popover,.row-menu > div,.settings-dialog { transform-origin:top center; animation:lc-pop-in var(--motion-popup) var(--motion-ease-out) both; }
+@keyframes lc-pop-in { from { opacity:0; transform:translateY(-4px) scale(.992); } to { opacity:1; transform:none; } }
+
+@media (max-width:1024px) {
+  .phase5-order-card .phase5-finance-workspace.is-active { grid-template-columns:1fr; }
+  .phase5-order-card .phase5-finance-main-column,
+  .phase5-order-card .phase5-finance-side-column { grid-column:1; }
+  .phase6-settings .settings-module-dock { grid-template-columns:repeat(3,minmax(0,1fr)); }
+}
+@media (max-width:700px) {
+  .phase6-settings .settings-module-dock { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .lc-translation-art { right:8px; opacity:.7; }
+}
+@media (max-width:520px) {
+  .phase6-settings .settings-module-dock { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .phase6-settings .settings-module-card { min-height:68px; grid-template-columns:34px minmax(0,1fr); padding:8px; }
+  .phase6-settings .settings-module-card__visual { width:34px; height:34px; }
+  .phase5-order-card .phase5-finance-workspace.is-active { padding-inline:var(--ui-space-3); }
+  .phase5-order-card .phase5-finance-workspace .finance-strip { grid-template-columns:1fr; }
+  .phase5-order-card .phase5-finance-workspace .finance-metric--total { grid-column:auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.lc-metric-card,.lc-module-metric)::before { display:none; }
+  .lc-finance-bars b { transition:none; transform:none; }
+  .phase5-order-card .order-stage.is-current .order-stage__dial-progress { stroke-dashoffset:0; animation:none; }
+  .lc-search-results,.action-menu__popover,.row-menu > div,.settings-dialog { animation:none; }
+}
+
+/* Metric icon containers delegate visual identity to lc-pictogram. */
+.lc-metric-card__icon,
+.lc-module-metric > span:first-child {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  color: var(--metric-color);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.lc-metric-card__icon .lc-pictogram,
+.lc-module-metric > span:first-child .lc-pictogram { color: var(--metric-color); }
+
+/* Keep page-level primary actions inside the visual grid. */
+.page-head > .button,
+.page-head__actions,
+.lc-page-hero > .button { margin-inline-end: 2px; }
+
+/* Dashboard semantic glass tints — restrained reflections, never full-color cards. */
+.lc-dashboard .lc-metric-card--wine  { --metric-color: var(--crm-accent); }
+.lc-dashboard .lc-metric-card--slate { --metric-color: var(--crm-info); }
+.lc-dashboard .lc-metric-card--amber { --metric-color: var(--crm-warning); }
+.lc-dashboard .lc-metric-card--red   { --metric-color: var(--crm-danger); }
+.lc-dashboard .lc-metric-card--teal  { --metric-color: var(--crm-success); }
+.lc-dashboard .lc-metric-card--gold  { --metric-color: color-mix(in srgb,var(--crm-warning) 72%,var(--crm-accent)); }
+
+
+/* Phase 08 final polish — shared graphite fade hero for internal CRM pages. */
+.content .page-head.page-head--compact {
+  position:relative;
+  isolation:isolate;
+  min-height:138px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:24px;
+  margin-bottom:0;
+  padding:20px 20px 22px;
+  overflow:hidden;
+  border:0;
+  border-radius:18px;
+  background:
+    radial-gradient(ellipse at 100% 18%,color-mix(in srgb,var(--crm-surface-raised) 68%,transparent) 0%,transparent 48%),
+    radial-gradient(ellipse at 4% 0%,color-mix(in srgb,var(--crm-accent) 6%,transparent) 0%,transparent 42%),
+    linear-gradient(118deg,color-mix(in srgb,var(--crm-surface-raised) 62%,var(--crm-bg)) 0%,color-mix(in srgb,var(--crm-surface) 44%,var(--crm-bg)) 48%,var(--crm-bg) 100%);
+  box-shadow:inset 0 1px 0 color-mix(in srgb,var(--crm-text) 4%,transparent);
+}
+.content .page-head.page-head--compact::before {
+  content:"";
+  position:absolute;
+  z-index:0;
+  inset:0;
+  pointer-events:none;
+  background:
+    linear-gradient(90deg,var(--crm-bg),transparent 6%,transparent 94%,var(--crm-bg)),
+    linear-gradient(180deg,var(--crm-bg),transparent 12%,transparent 84%,var(--crm-bg));
+  opacity:.72;
+}
+.content .page-head.page-head--compact::after {
+  left:20px;
+  right:20px;
+  bottom:10px;
+  height:1px;
+  background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--crm-accent) 44%,transparent) 18%,color-mix(in srgb,var(--crm-info) 14%,transparent) 58%,transparent 92%);
+  opacity:.65;
+}
+.content .page-head.page-head--compact > * { position:relative; z-index:1; }
+.content .page-head.page-head--compact > div { max-width:min(820px,72%); }
+.content .page-head.page-head--compact > .button { align-self:flex-end; margin:0 0 4px; }
+.content .page-head.page-head--compact h1 { margin-block:4px 5px; }
+.content .page-head.page-head--compact p { margin:0; }
+.phase6-settings .page-head.page-head--compact { margin-bottom:var(--ui-space-3); }
+
+@media (max-width:1024px) {
+  .content .page-head.page-head--compact { min-height:128px; }
+  .content .page-head.page-head--compact > div { max-width:68%; }
+}
+@media (max-width:760px) {
+  .content .page-head.page-head--compact { min-height:0; align-items:flex-start; flex-direction:column; padding:16px; border-radius:14px; }
+  .content .page-head.page-head--compact > div { max-width:100%; }
+  .content .page-head.page-head--compact > .button,
+  .content .page-head.page-head--compact > .text-link { align-self:flex-start; margin:0; }
+}
+@media (max-width:520px) {
+  .phase6-settings .settings-module-dock { display:none; }
+  .phase6-settings .settings-module-select { display:block; }
+}

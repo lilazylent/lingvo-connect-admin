@@ -12,7 +12,7 @@ from app.audit import record_event
 from app.config import Settings, get_settings
 from app.db import get_db
 from app.dependencies import SessionContext, get_session_context, require_csrf
-from app.models import AuthStage, RecoveryCode, User, UserSession
+from app.models import AuthStage, RecoveryCode, Role, User, UserInvitation, UserSession
 from app.schemas import (
     AuthState,
     LoginRequest,
@@ -22,6 +22,8 @@ from app.schemas import (
     RecoveryRequest,
     TotpCodeRequest,
     TotpSetupView,
+    UserInvitationAcceptRequest,
+    UserInvitationPublicView,
 )
 from app.security import (
     create_session_values,
@@ -75,6 +77,93 @@ def check_login_limit(key: str, settings: Settings) -> None:
     if len(values) >= settings.login_max_attempts:
         raise HTTPException(status_code=429, detail="Слишком много попыток. Попробуйте позже")
     values.append(now)
+
+
+def _as_utc(value: datetime) -> datetime:
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+
+
+def _get_valid_invitation(token: str, db: Session, settings: Settings) -> UserInvitation:
+    invitation = db.scalar(
+        select(UserInvitation).where(
+            UserInvitation.token_hash == token_hash(token, settings.session_secret)
+        )
+    )
+    if not invitation:
+        raise HTTPException(status_code=404, detail="Приглашение не найдено")
+    if invitation.cancelled_at is not None:
+        raise HTTPException(status_code=410, detail="Приглашение отменено")
+    if invitation.accepted_at is not None:
+        raise HTTPException(status_code=410, detail="Приглашение уже использовано")
+    if _as_utc(invitation.expires_at) <= datetime.now(UTC):
+        raise HTTPException(status_code=410, detail="Срок действия приглашения истёк")
+    return invitation
+
+
+@router.get("/invitations/{token}", response_model=UserInvitationPublicView)
+def get_user_invitation(
+    token: str,
+    db: Annotated[Session, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> UserInvitationPublicView:
+    invitation = _get_valid_invitation(token, db, settings)
+    return UserInvitationPublicView(
+        email=invitation.email,
+        role=Role(invitation.role),
+        expires_at=invitation.expires_at,
+    )
+
+
+@router.post("/invitations/{token}/accept", response_model=AuthState)
+def accept_user_invitation(
+    token: str,
+    payload: UserInvitationAcceptRequest,
+    request: Request,
+    response: Response,
+    db: Annotated[Session, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> AuthState:
+    invitation = _get_valid_invitation(token, db, settings)
+    if db.scalar(select(User).where(User.email == invitation.email)):
+        raise HTTPException(status_code=409, detail="Учётная запись для этого email уже существует")
+    try:
+        validate_password(payload.password)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+    display_name = payload.display_name.strip() or invitation.email.split("@", 1)[0]
+    user = User(
+        email=invitation.email,
+        display_name=display_name,
+        role=invitation.role,
+        password_hash=hash_password(payload.password),
+        is_active=True,
+        must_change_password=False,
+        two_factor_enabled=False,
+    )
+    db.add(user)
+    db.flush()
+    invitation.accepted_at = datetime.now(UTC)
+    invitation.accepted_user_id = user.id
+
+    session, raw_token, csrf_token = create_session_values(user, settings)
+    session.user_agent = request.headers.get("user-agent", "")[:500]
+    db.add(session)
+    record_event(
+        db,
+        request,
+        "user_invitation_accepted",
+        target_user_id=user.id,
+        details={
+            "invitation_id": invitation.id,
+            "email": invitation.email,
+            "role": invitation.role,
+        },
+    )
+    db.commit()
+    db.refresh(user)
+    set_auth_cookies(response, raw_token, csrf_token, settings)
+    return AuthState(stage=AuthStage(session.auth_stage), user=user)
 
 
 @router.post("/login", response_model=AuthState)

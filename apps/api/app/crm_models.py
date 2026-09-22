@@ -24,12 +24,31 @@ class ServiceType(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class LanguageCatalog(Base):
+    """Canonical language dictionary shared by tariffs, orders and executors.
+
+    Existing operational rows still store the human-readable language name.  Phase 06
+    centralises which names may be selected without inventing ISO codes that were not
+    provided by the business.
+    """
+
+    __tablename__ = "language_catalog"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    name: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=100)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class OrderStatusOption(Base):
     __tablename__ = "order_status_options"
 
     code: Mapped[str] = mapped_column(String(32), primary_key=True)
     name: Mapped[str] = mapped_column(String(80))
     color: Mapped[str] = mapped_column(String(20), default="slate")
+    board: Mapped[str] = mapped_column(String(20), default="MAIN", index=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=100)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

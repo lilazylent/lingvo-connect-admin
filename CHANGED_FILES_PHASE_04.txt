@@ -1,0 +1,15 @@
+Phase 04 — Clients + Executors
+
+Modified:
+- apps/admin-web/src/components/crm-directory.tsx
+- apps/admin-web/src/app/layout.tsx
+- apps/admin-web/AGENTS.md
+- docs/CRM_MVP_MASTER_SPEC.md
+- docs/OWNER_FEEDBACK_PHASE_MAP_2026-09-15.md
+
+Added:
+- apps/admin-web/src/app/phase4-directories.css
+- apps/admin-web/e2e/phase4-clients-executors.spec.ts
+- docs/phases/PHASE_04_CLIENTS_EXECUTORS.md
+- docs/phases/PHASE_04_IMPLEMENTATION_REPORT.md
+- CHANGED_FILES_PHASE_04.txt

@@ -1,0 +1,14 @@
+apps/admin-web/AGENTS.md
+apps/admin-web/package.json
+apps/admin-web/scripts/audit-frontend-foundation.mjs
+apps/admin-web/src/app/crm-foundation.css
+apps/admin-web/src/app/layout.tsx
+apps/admin-web/src/app/master-reference.css  (comments only)
+apps/admin-web/src/app/motion-system.css     (comments only)
+apps/admin-web/src/app/theme-system.css      (comments only)
+docs/CRM_MVP_MASTER_SPEC.md
+docs/FRONTEND_FOUNDATION_AUDIT.md
+docs/phases/PHASE_00_FOUNDATION.md
+docs/phases/PHASE_00_INTERNAL_PROMPT.md
+PHASE_00_IMPLEMENTATION_REPORT.md
+CHANGED_FILES_PHASE_00.txt

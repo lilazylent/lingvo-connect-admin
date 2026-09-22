@@ -1,0 +1,6 @@
+apps/admin-web/src/app/admin/applications/page.tsx
+apps/admin-web/src/components/admin-shell.tsx
+apps/admin-web/src/components/crm-files.tsx
+apps/admin-web/src/components/crm-orders.tsx
+PHASE_05_LINT_ARCHITECTURE_FIX_REPORT.md
+CHANGED_FILES_PHASE_05_LINT_ARCHITECTURE_FIX.txt

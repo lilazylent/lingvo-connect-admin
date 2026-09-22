@@ -1,28 +1,102 @@
-from datetime import UTC, datetime
+import secrets
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from app.audit import record_event
-from app.db import get_db
+from app.config import Settings, get_settings
+from app.db import Base, get_db
 from app.dependencies import SessionContext, require_admin, require_admin_write
 from app.dependencies import require_authenticated, require_authenticated_write
-from app.models import RecoveryCode, Role, User, UserSession
+from app.models import RecoveryCode, Role, User, UserInvitation, UserSession
 from app.schemas import (
     MessageView,
     TemporaryPasswordView,
     UserCreateRequest,
     UserCreateView,
+    UserInvitationCreateRequest,
+    UserInvitationCreateView,
+    UserInvitationView,
     UserUpdateRequest,
     UserPreferencesUpdate,
     UserPreferencesView,
     UserView,
 )
-from app.security import generate_temporary_password, hash_password
+from app.security import generate_temporary_password, hash_password, token_hash
 
 router = APIRouter(prefix="/api/admin/users", tags=["users"])
+
+
+def _active_admin_count(db: Session, *, exclude_user_id: str | None = None) -> int:
+    statement = select(func.count()).select_from(User).where(
+        User.role == Role.ADMIN.value,
+        User.is_active.is_(True),
+    )
+    if exclude_user_id is not None:
+        statement = statement.where(User.id != exclude_user_id)
+    return int(db.scalar(statement) or 0)
+
+
+def _would_remove_last_active_admin(
+    db: Session,
+    user: User,
+    *,
+    next_role: Role | None = None,
+    next_is_active: bool | None = None,
+) -> bool:
+    if user.role != Role.ADMIN.value or not user.is_active:
+        return False
+    resulting_role = next_role.value if next_role is not None else user.role
+    resulting_active = next_is_active if next_is_active is not None else user.is_active
+    if resulting_role == Role.ADMIN.value and resulting_active:
+        return False
+    return _active_admin_count(db, exclude_user_id=user.id) == 0
+
+
+def _as_utc(value: datetime) -> datetime:
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+
+
+def _invitation_view(invitation: UserInvitation) -> UserInvitationView:
+    status = "EXPIRED" if _as_utc(invitation.expires_at) <= datetime.now(UTC) else "PENDING"
+    return UserInvitationView(
+        id=invitation.id,
+        email=invitation.email,
+        role=Role(invitation.role),
+        expires_at=invitation.expires_at,
+        created_at=invitation.created_at,
+        status=status,
+    )
+
+
+def _registration_url(settings: Settings, token: str) -> str:
+    return f"{settings.admin_web_origin.rstrip('/')}/register/{token}"
+
+
+def _new_invitation_token(settings: Settings) -> tuple[str, str]:
+    raw_token = secrets.token_urlsafe(48)
+    return raw_token, token_hash(raw_token, settings.session_secret)
+
+
+def _restricted_user_reference(db: Session, user_id: str) -> str | None:
+    """Return a table name that prevents hard deletion, if any.
+
+    The check is metadata-driven so new RESTRICT user references cannot silently
+    turn the Users UI into a database integrity error later.
+    """
+    for table in Base.metadata.tables.values():
+        for column in table.columns:
+            for foreign_key in column.foreign_keys:
+                if foreign_key.target_fullname != "users.id":
+                    continue
+                if (foreign_key.ondelete or "").upper() != "RESTRICT":
+                    continue
+                if db.execute(select(column).where(column == user_id).limit(1)).first():
+                    return table.name
+    return None
 
 
 @router.get("/me/preferences", response_model=UserPreferencesView)
@@ -58,6 +132,141 @@ def list_users(
     db: Annotated[Session, Depends(get_db)],
 ) -> list[User]:
     return list(db.scalars(select(User).order_by(User.created_at.desc())).all())
+
+
+@router.get("/invitations", response_model=list[UserInvitationView])
+def list_user_invitations(
+    _: Annotated[SessionContext, Depends(require_admin)],
+    db: Annotated[Session, Depends(get_db)],
+) -> list[UserInvitationView]:
+    invitations = db.scalars(
+        select(UserInvitation)
+        .where(
+            UserInvitation.accepted_at.is_(None),
+            UserInvitation.cancelled_at.is_(None),
+        )
+        .order_by(UserInvitation.created_at.desc())
+    ).all()
+    return [_invitation_view(invitation) for invitation in invitations]
+
+
+@router.post("/invitations", response_model=UserInvitationCreateView, status_code=201)
+def create_user_invitation(
+    payload: UserInvitationCreateRequest,
+    request: Request,
+    context: Annotated[SessionContext, Depends(require_admin_write)],
+    db: Annotated[Session, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> UserInvitationCreateView:
+    email = str(payload.email).lower()
+    if db.scalar(select(User).where(User.email == email)):
+        raise HTTPException(status_code=409, detail="Пользователь с таким email уже существует")
+
+    now = datetime.now(UTC)
+    existing = db.scalar(
+        select(UserInvitation)
+        .where(
+            UserInvitation.email == email,
+            UserInvitation.accepted_at.is_(None),
+            UserInvitation.cancelled_at.is_(None),
+        )
+        .order_by(UserInvitation.created_at.desc())
+    )
+    if existing and _as_utc(existing.expires_at) > now:
+        raise HTTPException(
+            status_code=409,
+            detail="Для этого email уже создано действующее приглашение",
+        )
+    if existing:
+        existing.cancelled_at = now
+
+    raw_token, digest = _new_invitation_token(settings)
+    invitation = UserInvitation(
+        email=email,
+        role=payload.role.value,
+        token_hash=digest,
+        created_by_user_id=context.user.id,
+        expires_at=now + timedelta(days=settings.user_invitation_days),
+    )
+    db.add(invitation)
+    db.flush()
+    record_event(
+        db,
+        request,
+        "user_invited",
+        actor_user_id=context.user.id,
+        details={
+            "invitation_id": invitation.id,
+            "email": email,
+            "role": invitation.role,
+            "expires_at": invitation.expires_at.isoformat(),
+        },
+    )
+    db.commit()
+    db.refresh(invitation)
+    return UserInvitationCreateView(
+        invitation=_invitation_view(invitation),
+        registration_url=_registration_url(settings, raw_token),
+    )
+
+
+@router.post("/invitations/{invitation_id}/new-link", response_model=UserInvitationCreateView)
+def renew_user_invitation(
+    invitation_id: str,
+    request: Request,
+    context: Annotated[SessionContext, Depends(require_admin_write)],
+    db: Annotated[Session, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> UserInvitationCreateView:
+    invitation = db.get(UserInvitation, invitation_id)
+    if not invitation or invitation.accepted_at is not None or invitation.cancelled_at is not None:
+        raise HTTPException(status_code=404, detail="Приглашение не найдено")
+    if db.scalar(select(User).where(User.email == invitation.email)):
+        raise HTTPException(status_code=409, detail="Пользователь с таким email уже зарегистрирован")
+
+    raw_token, digest = _new_invitation_token(settings)
+    invitation.token_hash = digest
+    invitation.expires_at = datetime.now(UTC) + timedelta(days=settings.user_invitation_days)
+    record_event(
+        db,
+        request,
+        "user_invitation_renewed",
+        actor_user_id=context.user.id,
+        details={
+            "invitation_id": invitation.id,
+            "email": invitation.email,
+            "role": invitation.role,
+            "expires_at": invitation.expires_at.isoformat(),
+        },
+    )
+    db.commit()
+    db.refresh(invitation)
+    return UserInvitationCreateView(
+        invitation=_invitation_view(invitation),
+        registration_url=_registration_url(settings, raw_token),
+    )
+
+
+@router.delete("/invitations/{invitation_id}", response_model=MessageView)
+def cancel_user_invitation(
+    invitation_id: str,
+    request: Request,
+    context: Annotated[SessionContext, Depends(require_admin_write)],
+    db: Annotated[Session, Depends(get_db)],
+) -> MessageView:
+    invitation = db.get(UserInvitation, invitation_id)
+    if not invitation or invitation.accepted_at is not None or invitation.cancelled_at is not None:
+        raise HTTPException(status_code=404, detail="Приглашение не найдено")
+    invitation.cancelled_at = datetime.now(UTC)
+    record_event(
+        db,
+        request,
+        "user_invitation_cancelled",
+        actor_user_id=context.user.id,
+        details={"invitation_id": invitation.id, "email": invitation.email},
+    )
+    db.commit()
+    return MessageView(message="Приглашение отменено")
 
 
 @router.post("", response_model=UserCreateView, status_code=201)
@@ -110,6 +319,16 @@ def update_user(
         raise HTTPException(status_code=404, detail="Пользователь не найден")
     if user.id == context.user.id and payload.is_active is False:
         raise HTTPException(status_code=400, detail="Нельзя деактивировать текущую учетную запись")
+    if _would_remove_last_active_admin(
+        db,
+        user,
+        next_role=payload.role,
+        next_is_active=payload.is_active,
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="В CRM должен оставаться хотя бы один активный администратор",
+        )
     changes: dict[str, object] = {}
     if payload.display_name is not None:
         changes["display_name"] = payload.display_name or user.email.split("@", 1)[0]
@@ -216,3 +435,48 @@ def reset_two_factor(
     )
     db.commit()
     return MessageView(message="2FA сброшена. При следующем входе потребуется новая настройка.")
+
+
+@router.delete("/{user_id}", response_model=MessageView)
+def delete_user(
+    user_id: str,
+    request: Request,
+    context: Annotated[SessionContext, Depends(require_admin_write)],
+    db: Annotated[Session, Depends(get_db)],
+) -> MessageView:
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    if user.id == context.user.id:
+        raise HTTPException(status_code=400, detail="Нельзя удалить текущую учетную запись")
+    if _would_remove_last_active_admin(db, user, next_is_active=False):
+        raise HTTPException(
+            status_code=400,
+            detail="В CRM должен оставаться хотя бы один активный администратор",
+        )
+
+    restricted_table = _restricted_user_reference(db, user.id)
+    if restricted_table:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Пользователь уже связан с рабочей историей CRM. "
+                "Чтобы сохранить историю, отключите ему доступ вместо удаления."
+            ),
+        )
+
+    # Authentication-only records are safe to remove together with an unused account.
+    db.execute(delete(RecoveryCode).where(RecoveryCode.user_id == user.id))
+    db.execute(delete(UserSession).where(UserSession.user_id == user.id))
+    record_event(
+        db,
+        request,
+        "user_deleted",
+        actor_user_id=context.user.id,
+        target_user_id=user.id,
+        details={"email": user.email, "role": user.role},
+    )
+    db.delete(user)
+    db.commit()
+    return MessageView(message="Пользователь удалён")
+

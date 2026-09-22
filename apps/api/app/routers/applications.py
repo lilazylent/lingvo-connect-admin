@@ -827,6 +827,37 @@ def download_application_file(
     )
 
 
+@admin_router.get("/{application_id}/files/{file_id}/preview")
+def preview_application_file(
+    application_id: str,
+    file_id: str,
+    _: Annotated[SessionContext, Depends(require_authenticated)],
+    db: Annotated[Session, Depends(get_db)],
+    settings_value: Annotated[Settings, Depends(get_settings)],
+) -> FileResponse:
+    item = db.get(ApplicationFile, file_id)
+    if not item or item.application_id != application_id:
+        raise HTTPException(status_code=404, detail="Файл не найден")
+    mime_type = (item.mime_type or "").lower()
+    if not (mime_type == "application/pdf" or mime_type.startswith("image/") or mime_type.startswith("text/")):
+        raise HTTPException(status_code=415, detail="Предпросмотр этого формата не поддерживается")
+    storage = storage_from_settings(
+        settings_value.application_storage_path,
+        settings_value.application_file_max_bytes,
+    )
+    try:
+        path = storage.resolve(item.storage_key)
+    except UnsafeFileError as error:
+        raise HTTPException(status_code=404, detail="Файл не найден") from error
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Файл не найден")
+    return FileResponse(
+        path,
+        media_type=item.mime_type,
+        headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
+    )
+
+
 @admin_router.get("/{application_id}/activity", response_model=list[ApplicationActivityView])
 def get_activity(
     application_id: str,

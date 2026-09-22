@@ -1,0 +1,37 @@
+Phase 10.6 — Finance Integration
+Baseline: Lingvo_Connect_Admin_Phase_10_5_Route_Stages_Rate_v1.zip
+Build ID: phase10-finance-integration-20260918-r1
+
+Business/backend
+- apps/api/app/routers/crm.py
+- apps/api/tests/test_crm.py
+
+Frontend
+- apps/admin-web/src/components/crm-orders.tsx
+- apps/admin-web/src/app/phase5-orders.css
+- apps/admin-web/src/app/layout.tsx
+- apps/admin-web/package.json
+- apps/admin-web/scripts/audit-phase10-finance.mjs
+
+Current-build regression provenance updated
+- apps/admin-web/scripts/audit-css-ownership.mjs
+- apps/admin-web/scripts/audit-phase8-owner-patch.mjs
+- apps/admin-web/scripts/audit-phase9-release-candidate.mjs
+- apps/admin-web/scripts/audit-phase10-availability.mjs
+- apps/admin-web/scripts/audit-phase10-matching-ui.mjs
+- apps/admin-web/scripts/audit-phase10-routing.mjs
+- apps/admin-web/scripts/audit-phase10-client-demo.mjs
+- apps/admin-web/scripts/audit-phase10-route-stages.mjs
+- apps/admin-web/e2e/phase8-owner-patch02.spec.ts
+- apps/admin-web/e2e/phase8-visual-motion.spec.ts
+- apps/admin-web/e2e/phase9-release-candidate.spec.ts
+
+Protocol/docs
+- apps/admin-web/AGENTS.md
+- PHASE_10_6_FINANCE_INTEGRATION_TZ.md
+- PHASE_10_6_MASTER_PROMPT.md
+- PHASE_10_6_IMPLEMENTATION_REPORT.md
+- CHANGED_FILES_PHASE_10_6.txt
+
+No database migration was added.
+Alembic head remains 0020_executor_route_metadata.

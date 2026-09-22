@@ -1,0 +1,16 @@
+Build ID: phase13-internal-works-20260919-r1
+
+apps/admin-web/src/components/crm-orders.tsx
+apps/admin-web/src/app/phase5-orders.css
+apps/admin-web/src/app/layout.tsx
+apps/admin-web/scripts/audit-phase12-assignment-calculator.mjs
+apps/admin-web/scripts/audit-*.mjs (build provenance only)
+apps/admin-web/e2e/phase8-owner-patch02.spec.ts (build provenance only)
+apps/admin-web/e2e/phase8-visual-motion.spec.ts (build provenance only)
+apps/admin-web/e2e/phase9-release-candidate.spec.ts (build provenance only)
+apps/api/app/routers/crm.py
+apps/api/tests/test_crm.py
+PHASE_12_OWNER_PATCH_02_ASSIGNMENT_CALCULATOR_TZ.md
+PHASE_12_OWNER_PATCH_02_MASTER_PROMPT.md
+PHASE_12_OWNER_PATCH_02_IMPLEMENTATION_REPORT.md
+CHANGED_FILES_PHASE_12_OWNER_PATCH_02.txt
