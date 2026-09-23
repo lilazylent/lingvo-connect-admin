@@ -39,7 +39,6 @@ ALIASES = {
     "telegram": ["телеграм"],
     "company": ["компания", "организация"],
     "client_id": ["id клиента"],
-    "title": ["название заказа", "заказ"],
     "deadline": ["срок", "дедлайн"],
     "manager_id": ["id менеджера"],
     "status": ["статус"],
@@ -202,14 +201,9 @@ def duplicate(db, entity, row):
             )
             is not None
         )
-    return (
-        db.scalar(
-            select(Order.id)
-            .where(Order.client_id == row["client_id"], Order.title == row["title"])
-            .limit(1)
-        )
-        is not None
-    )
+    # Orders have no user-entered title or other stable import key.
+    # Batch confirmation itself is idempotent, so cross-batch guessing would risk false duplicates.
+    return False
 
 
 def batch_view(batch):
@@ -253,12 +247,10 @@ def preview(
     mapped = [c for c in columns if c]
     if len(mapped) != len(set(mapped)):
         raise HTTPException(422, "Два столбца сопоставлены одному полю CRM")
-    required = "title" if entity == "orders" else "name"
-    if required not in columns:
-        raise HTTPException(
-            422,
-            f"Не найден столбец {'Название заказа' if entity == 'orders' else 'Имя / название'}",
-        )
+    if entity != "orders" and "name" not in columns:
+        raise HTTPException(422, "Не найден столбец Имя / название")
+    if entity == "orders" and not any(field in columns for field in ("client_id", "company")):
+        raise HTTPException(422, "Для заказа укажите Компания или ID клиента")
     valid, errors, seen = [], [], set()
     for number, cells in enumerate(source, 2):
         if not any(cells):
@@ -348,7 +340,9 @@ def apply_batch(batch_id, payload, db, context):
             model = OrderFields.model_validate(values)
             validate_order(db, model)
             number = next_order_number(db, execution_year=model.deadline.year if model.deadline else None)
-            row = Order(number=number, **model.model_dump())
+            data = model.model_dump()
+            data["title"] = number
+            row = Order(number=number, **data)
         db.add(row)
         db.flush()
         if batch.entity in {"clients", "contacts"}:

@@ -128,7 +128,7 @@ class TariffPayload(BaseModel):
     unit: BillingUnit = "CONDITIONAL_PAGE"
     amount: Decimal = Field(ge=0, max_digits=14, decimal_places=2)
     min_quantity: Decimal = Field(default=Decimal("0"), ge=0, max_digits=14, decimal_places=4)
-    urgency_multiplier: Decimal = Field(default=Decimal("1.50"), ge=1, max_digits=8, decimal_places=4)
+    urgency_multiplier: Decimal = Field(default=Decimal("1.00"), ge=1, max_digits=8, decimal_places=4)
     native_multiplier: Decimal = Field(default=Decimal("1.00"), ge=1, max_digits=8, decimal_places=4)
     active_from: date | None = None
     active_to: date | None = None
@@ -172,7 +172,7 @@ class PricingRequest(BaseModel):
     document_count: int | None = Field(default=None, ge=0)
     hour_count: Decimal | None = Field(default=None, ge=0)
     urgent: bool = False
-    urgency_multiplier: Decimal = Field(default=Decimal("1.50"), ge=1, le=10)
+    urgency_multiplier: Decimal = Field(default=Decimal("1.00"), ge=1, le=10)
     native_speaker: bool = False
     native_multiplier: Decimal = Field(default=Decimal("1.00"), ge=1)
     min_quantity: Decimal = Field(default=Decimal("0"), ge=0)
@@ -313,8 +313,8 @@ def _quote_from_tariffs(payload: QuoteRequest, tariffs: list[Tariff], resolution
     if any(t.unit != unit for t in tariffs):
         raise HTTPException(422, "Выбранные тарифы используют разные единицы расчёта")
     rate = money(sum((Decimal(str(t.amount)) for t in tariffs), Decimal("0")))
-    tariff_urgency_multiplier = max((Decimal(str(t.urgency_multiplier)) for t in tariffs), default=Decimal("1"))
-    urgency_multiplier = payload.urgency_multiplier or tariff_urgency_multiplier
+    # Base urgency is always x1. A higher coefficient belongs to the work, not the tariff.
+    urgency_multiplier = payload.urgency_multiplier or Decimal("1")
     native_multiplier = max((Decimal(str(t.native_multiplier)) for t in tariffs), default=Decimal("1"))
     priced = calculate(PricingRequest(
         unit=unit, rate=rate, character_count=payload.character_count, page_count=payload.page_count,
@@ -359,7 +359,7 @@ class WizardWork(BaseModel):
     target_language: str = Field(default="", max_length=80)
     topic: str = Field(default="", max_length=160)
     urgent: bool = False
-    urgency_multiplier: Decimal = Field(default=Decimal("1.50"), ge=1, le=10)
+    urgency_multiplier: Decimal = Field(default=Decimal("1.00"), ge=1, le=10)
     native_speaker: bool = False
     discount_percent: Decimal | None = Field(default=None, ge=0, le=100)
     tariff_ids: list[str] = Field(default_factory=list, max_length=2)
@@ -392,7 +392,7 @@ class WizardWork(BaseModel):
 
 class WizardPayment(BaseModel):
     amount_paid: Decimal = Field(default=Decimal("0"), ge=0)
-    payment_method: str = Field(default="", max_length=64)
+    payment_method: Literal["", "cash", "cashless", "deposit"] = ""
     invoice_number: str = Field(default="", max_length=80)
     invoice_date: date | None = None
     paid_at: date | None = None
@@ -443,7 +443,7 @@ class ExecutorPaymentEdit(BaseModel):
 class PaymentEdit(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
     amount_paid: Decimal = Field(ge=0)
-    payment_method: str = Field(default="", max_length=64)
+    payment_method: Literal["", "cash", "cashless", "deposit"] = ""
     invoice_number: str = Field(default="", max_length=80)
     invoice_date: date | None = None
     paid_at: date | None = None
@@ -1418,7 +1418,6 @@ def crm_orders(
         filters.append(
             or_(
                 Order.number.icontains(q, autoescape=True),
-                Order.title.icontains(q, autoescape=True),
                 Order.client_id.in_(matching_clients),
                 Order.contact_id.in_(matching_contacts),
                 Order.id.in_(matching_executor_orders),
@@ -1526,7 +1525,7 @@ def create_order_wizard(payload: WizardOrder, db: DB, context: Write):
     order_deadline = max(deadlines) if deadlines else None
     number = next_order_number(db, execution_year=order_deadline.year if order_deadline else None)
     order = Order(
-        number=number, title=payload.title, client_id=payload.client_id,
+        number=number, title=number, client_id=payload.client_id,
         contact_id=payload.contact_id, manager_id=payload.manager_id,
         application_id=payload.application_id, deadline=order_deadline,
         status=payload.status, notes=payload.notes,
@@ -1646,7 +1645,7 @@ def edit_order_core(order_id: str, payload: OrderCoreEdit, db: DB, context: Writ
             db.delete(link)
 
     changed = []
-    for field in ("title", "client_id", "contact_id", "manager_id", "notes"):
+    for field in ("client_id", "contact_id", "manager_id", "notes"):
         value = getattr(payload, field)
         if getattr(order, field) != value:
             setattr(order, field, value)
@@ -1952,11 +1951,15 @@ def update_client_payment(order_id: str, payload: PaymentEdit, db: DB, context: 
 @router.post("/files/analyze-preview")
 def analyze_preview(upload: UploadFile, context: Write):
     suffix = Path(upload.filename or "").suffix
-    with NamedTemporaryFile(suffix=suffix, delete=True) as tmp:
+    with NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         while chunk := upload.file.read(1024 * 1024):
             tmp.write(chunk)
         tmp.flush()
-        return analyze_document(Path(tmp.name), upload.filename or "")
+        temp_path = Path(tmp.name)
+    try:
+        return analyze_document(temp_path, upload.filename or "")
+    finally:
+        temp_path.unlink(missing_ok=True)
 
 
 @router.post("/orders/{order_id}/files/analyze", status_code=201)
@@ -2007,9 +2010,29 @@ def crm_dashboard(db: DB, context: Read):
             ClientPayment.amount_paid < ClientPayment.amount_due,
         )
     ) or 0
-    recent = db.scalars(select(Order).where(Order.archived.is_(False)).order_by(Order.created_at.desc()).limit(8)).all()
+    recent = db.execute(
+        select(Order, Company.name)
+        .outerjoin(Company, Order.client_id == Company.id)
+        .where(Order.archived.is_(False))
+        .order_by(Order.created_at.desc())
+        .limit(8)
+    ).all()
     new_leads = db.scalar(select(func.count()).select_from(Application).where(Application.status_code == "NEW")) or 0
-    return {"new_leads": new_leads, "active_orders": active_orders, "due_today": due_today, "overdue": overdue, "unassigned": unassigned, "awaiting_payment": unpaid, "revenue": revenue, "executor_cost": costs, "profit": money(revenue-costs), "recent_orders": [view(r) for r in recent]}
+    return {
+        "new_leads": new_leads,
+        "active_orders": active_orders,
+        "due_today": due_today,
+        "overdue": overdue,
+        "unassigned": unassigned,
+        "awaiting_payment": unpaid,
+        "revenue": revenue,
+        "executor_cost": costs,
+        "profit": money(revenue-costs),
+        "recent_orders": [
+            {**view(order), "client_name": client_name}
+            for order, client_name in recent
+        ],
+    }
 
 
 @router.get("/clients/{client_id}/summary")

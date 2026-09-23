@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
 from app.db import get_db
-from app.models import AuthStage, Role, User, UserSession
+from app.models import AuthStage, User, UserSession
+from app.rbac import enforce_request_permission, has_permission
 from app.security import token_hash
 
 
@@ -71,32 +72,48 @@ def require_csrf(
 
 
 def require_authenticated(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
     context: Annotated[SessionContext, Depends(get_session_context)],
 ) -> SessionContext:
     if context.session.auth_stage != AuthStage.AUTHENTICATED.value:
         raise HTTPException(status_code=403, detail="Завершите обязательные этапы входа")
+    enforce_request_permission(db, context.user, request, write=False)
     return context
 
 
 def require_authenticated_write(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
     context: Annotated[SessionContext, Depends(require_csrf)],
 ) -> SessionContext:
     if context.session.auth_stage != AuthStage.AUTHENTICATED.value:
         raise HTTPException(status_code=403, detail="Завершите обязательные этапы входа")
+    enforce_request_permission(db, context.user, request, write=True)
     return context
 
 
 def require_admin(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
     context: Annotated[SessionContext, Depends(require_authenticated)],
 ) -> SessionContext:
-    if context.user.role != Role.ADMIN.value:
-        raise HTTPException(status_code=403, detail="Требуются права администратора")
+    permission = "USERS_MANAGE" if request.url.path.startswith("/api/admin/users") else (
+        "IMPORTS_MANAGE" if request.url.path.startswith("/api/admin/imports") else "SETTINGS_MANAGE"
+    )
+    if not has_permission(db, context.user, permission):
+        raise HTTPException(status_code=403, detail="Недостаточно прав администратора")
     return context
 
 
 def require_admin_write(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
     context: Annotated[SessionContext, Depends(require_authenticated_write)],
 ) -> SessionContext:
-    if context.user.role != Role.ADMIN.value:
-        raise HTTPException(status_code=403, detail="Требуются права администратора")
+    permission = "USERS_MANAGE" if request.url.path.startswith("/api/admin/users") else (
+        "IMPORTS_MANAGE" if request.url.path.startswith("/api/admin/imports") else "SETTINGS_MANAGE"
+    )
+    if not has_permission(db, context.user, permission):
+        raise HTTPException(status_code=403, detail="Недостаточно прав администратора")
     return context

@@ -1,0 +1,30 @@
+# Beget VPS override for the CRM. Keeps the public-site stack isolated while
+# exposing only the CRM API/web containers to the existing production Caddy network.
+services:
+  postgres:
+    networks:
+      default:
+        aliases:
+          - crm-postgres
+
+  backend:
+    networks:
+      default: {}
+      edge:
+        aliases:
+          - admin-api
+
+  frontend:
+    environment:
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
+    networks:
+      default: {}
+      edge:
+        aliases:
+          - admin-web
+
+networks:
+  edge:
+    external: true
+    name: lingvo-connect-production_default

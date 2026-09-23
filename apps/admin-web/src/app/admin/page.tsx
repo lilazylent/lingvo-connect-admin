@@ -23,6 +23,7 @@ type Summary = {
     id: string;
     number: string;
     title: string;
+    client_name: string | null;
     deadline: string | null;
     status: string;
   }[];
@@ -110,11 +111,11 @@ export default function DashboardPage() {
           <section className="lc-surface lc-table-card">
             <div className="lc-card-title"><span><Icon name="orders" />Последние заказы</span><Link href="/admin/orders">Открыть все <Icon name="arrow-right" size={15} /></Link></div>
             <div className="lc-compact-table lc-orders-table">
-              <div className="lc-compact-table__head"><span>№</span><span>Название</span><span>Срок</span><span>Статус</span><span /></div>
+              <div className="lc-compact-table__head"><span>№</span><span>Клиент</span><span>Срок</span><span>Статус</span><span /></div>
               {summary.recent_orders.slice(0, 4).map((order) => (
                 <Link href={`/admin/orders?open=${order.id}`} className="lc-compact-table__row" key={order.id}>
                   <span>{order.number}</span>
-                  <strong>{order.title || "Заказ без названия"}</strong>
+                  <strong>{order.client_name || "Клиент не указан"}</strong>
                   <span>{order.deadline || "—"}</span>
                   <Badge tone={order.status === "COMPLETED" ? "success" : order.status === "CANCELLED" ? "warning" : "neutral"}>{orderStatus[order.status] || order.status}</Badge>
                   <span className="lc-more" aria-hidden="true"><Icon name="arrow-right" size={15} /></span>

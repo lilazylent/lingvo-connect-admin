@@ -51,7 +51,7 @@ export function useAuth() {
   return value;
 }
 
-export function AuthGate({ children, adminOnly = false }: { children: React.ReactNode; adminOnly?: boolean }) {
+export function AuthGate({ children, adminOnly = false, permission }: { children: React.ReactNode; adminOnly?: boolean; permission?: string }) {
   const { state, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -60,10 +60,12 @@ export function AuthGate({ children, adminOnly = false }: { children: React.Reac
     if (loading) return;
     if (!state) router.replace(`/login?expired=1&returnTo=${encodeURIComponent(pathname)}`);
     else if (state.stage !== "AUTHENTICATED") router.replace(stageRoute[state.stage]);
-    else if (adminOnly && state.user.role !== "ADMIN") router.replace("/admin/access-denied");
-  }, [adminOnly, loading, pathname, router, state]);
+    else if (adminOnly && state.user.role !== "ADMIN" && !state.user.permissions.includes("USERS_MANAGE")) router.replace("/admin/access-denied");
+    else if (permission && state.user.role !== "ADMIN" && !state.user.permissions.includes(permission)) router.replace("/admin/access-denied");
+  }, [adminOnly, loading, pathname, permission, router, state]);
 
   if (loading || !state || state.stage !== "AUTHENTICATED") return <LoadingState label="Проверяем защищённую сессию" />;
-  if (adminOnly && state.user.role !== "ADMIN") return null;
+  if (adminOnly && state.user.role !== "ADMIN" && !state.user.permissions.includes("USERS_MANAGE")) return null;
+  if (permission && state.user.role !== "ADMIN" && !state.user.permissions.includes(permission)) return null;
   return children;
 }

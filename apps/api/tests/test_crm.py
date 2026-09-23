@@ -48,7 +48,7 @@ def test_crm_wizard_multi_work_finance_and_dashboard(client, create_user):
     )
     assert priced.status_code == 200, priced.text
     assert Decimal(str(priced.json()["quantity"])) == Decimal("2.00")
-    assert Decimal(str(priced.json()["amount"])) == Decimal("1620.00")
+    assert Decimal(str(priced.json()["amount"])) == Decimal("1080.00")
 
     payload = {
         "title": "Договор RU → EN + нотариат",
@@ -77,12 +77,12 @@ def test_crm_wizard_multi_work_finance_and_dashboard(client, create_user):
                 "price": "900",
             },
         ],
-        "payment": {"amount_paid": "500", "payment_method": "invoice"},
+        "payment": {"amount_paid": "500", "payment_method": "cashless"},
     }
     created = client.post("/api/admin/crm/orders/wizard", headers=headers, json=payload)
     assert created.status_code == 201, created.text
     order = created.json()
-    assert order["number"] == "26-0-0001"
+    assert order["number"] == "26-0001"
     assert len(order["works"]) == 2
     assert Decimal(str(order["financial"]["revenue"])) == Decimal("1980.00")
     assert Decimal(str(order["financial"]["executor_cost"])) == Decimal("600.00")
@@ -119,8 +119,8 @@ def test_wizard_order_number_uses_overall_execution_year(client, create_user):
     headers = setup(client, create_user)
     first_preview = client.get("/api/admin/crm/orders/number-preview?execution_year=2027").json()
     second_preview = client.get("/api/admin/crm/orders/number-preview?execution_year=2027").json()
-    assert first_preview["number"] == "27-0-0001"
-    assert second_preview["number"] == "27-0-0001"
+    assert first_preview["number"] == "27-0001"
+    assert second_preview["number"] == "27-0001"
     assert first_preview["reserved"] is False
     created = client.post(
         "/api/admin/crm/orders/wizard",
@@ -134,10 +134,10 @@ def test_wizard_order_number_uses_overall_execution_year(client, create_user):
     )
     assert created.status_code == 201, created.text
     payload = created.json()
-    assert payload["number"] == "27-0-0001"
+    assert payload["number"] == "27-0001"
     assert payload["created_at"]
     next_preview = client.get("/api/admin/crm/orders/number-preview?execution_year=2027").json()
-    assert next_preview["number"] == "27-0-0002"
+    assert next_preview["number"] == "27-0002"
 
 def test_document_preview_and_order_file_analysis(client, create_user):
     headers = setup(client, create_user)
@@ -248,7 +248,7 @@ def test_fast_crm_drafts_can_be_created_and_completed_later(client, create_user)
     draft = client.post("/api/admin/crm/orders/wizard", headers=headers, json={})
     assert draft.status_code == 201, draft.text
     order = draft.json()
-    assert order["title"] == ""
+    assert order["title"] == order["number"]
     assert order["client_id"] is None
     assert order["manager_id"] is None
     assert order["works"] == []
@@ -266,7 +266,7 @@ def test_fast_crm_drafts_can_be_created_and_completed_later(client, create_user)
         f"/api/admin/crm/orders/{order['id']}",
         headers=headers,
         json={
-            "title": "Уточнённый заказ",
+            "title": "Устаревшее название должно игнорироваться",
             "client_id": company.json()["id"],
             "contact_id": None,
             "manager_id": manager_id,
@@ -275,7 +275,7 @@ def test_fast_crm_drafts_can_be_created_and_completed_later(client, create_user)
         },
     )
     assert completed.status_code == 200, completed.text
-    assert completed.json()["title"] == "Уточнённый заказ"
+    assert completed.json()["title"] == order["number"]
     assert completed.json()["client_id"] == company.json()["id"]
     assert completed.json()["manager_id"] == manager_id
 
@@ -346,7 +346,7 @@ def test_wizard_search_languages_and_tariff_selection(client, create_user):
             json={
                 "service_code": "written_translation", "source_language": source,
                 "target_language": target, "direction": direction, "unit": "CONDITIONAL_PAGE",
-                "amount": str(amount), "min_quantity": "1", "urgency_multiplier": "1.5",
+                "amount": str(amount), "min_quantity": "1", "urgency_multiplier": "1",
                 "native_multiplier": "1", "active": True,
             },
         )
@@ -371,7 +371,7 @@ def test_wizard_search_languages_and_tariff_selection(client, create_user):
     assert options.status_code == 200, options.text
     auto = next(row for row in options.json()["options"] if row["is_auto"])
     assert auto["tariff_ids"] == [english["id"]]
-    assert Decimal(str(auto["amount"])) == Decimal("885.00")
+    assert Decimal(str(auto["amount"])) == Decimal("590.00")
 
     native_options = client.post(
         "/api/admin/crm/pricing/options", headers=headers,
@@ -384,7 +384,7 @@ def test_wizard_search_languages_and_tariff_selection(client, create_user):
     assert native_options.status_code == 200, native_options.text
     assert len(native_options.json()["options"]) == 1
     assert native_options.json()["options"][0]["tariff_ids"] == [native_english["id"]]
-    assert Decimal(str(native_options.json()["options"][0]["amount"])) == Decimal("3300.00")
+    assert Decimal(str(native_options.json()["options"][0]["amount"])) == Decimal("2200.00")
 
     german_options = client.post(
         "/api/admin/crm/pricing/options", headers=headers,
@@ -413,7 +413,7 @@ def test_wizard_search_languages_and_tariff_selection(client, create_user):
     work = created.json()["works"][0]
     assert work["tariff_ids"] == english["id"]
     assert Decimal(str(work["client_rate"])) == Decimal("590.00")
-    assert Decimal(str(work["price"])) == Decimal("885.00")
+    assert Decimal(str(work["price"])) == Decimal("590.00")
 
     wrong_tariff = client.post(
         "/api/admin/crm/orders/wizard", headers=headers,
@@ -439,7 +439,7 @@ def test_exact_2026_translation_pricing_rules(client, create_user):
             json={
                 "service_code": "written_translation", "source_language": source,
                 "target_language": target, "direction": direction, "unit": "CONDITIONAL_PAGE",
-                "amount": str(amount), "min_quantity": "1", "urgency_multiplier": "1.5",
+                "amount": str(amount), "min_quantity": "1", "urgency_multiplier": "1",
                 "native_multiplier": "1", "active": True,
             },
         )
@@ -477,15 +477,29 @@ def test_exact_2026_translation_pricing_rules(client, create_user):
     assert Decimal(str(small.json()["quantity"])) == Decimal("1")
     assert Decimal(str(small.json()["amount"])) == Decimal("590.00")
 
-    # Urgency uses the documented base +50% multiplier from the tariff row.
+    # Base urgency is x1; an uplift only applies when the work explicitly sets a coefficient.
     urgent = client.post(
         "/api/admin/crm/pricing/quote", headers=headers,
         json={"service_code": "written_translation", "source_language": "Английский", "target_language": "Русский", "character_count": 1800, "urgent": True},
     )
     assert urgent.status_code == 200, urgent.text
     assert urgent.json()["tariff_ids"] == [en_to_ru["id"]]
-    assert Decimal(str(urgent.json()["amount"])) == Decimal("810.00")
+    assert Decimal(str(urgent.json()["amount"])) == Decimal("540.00")
     assert urgent.json()["formula"].startswith("540.00 ₽ × 1")
+
+    explicit_urgent = client.post(
+        "/api/admin/crm/pricing/quote", headers=headers,
+        json={
+            "service_code": "written_translation",
+            "source_language": "Английский",
+            "target_language": "Русский",
+            "character_count": 1800,
+            "urgent": True,
+            "urgency_multiplier": "1.5",
+        },
+    )
+    assert explicit_urgent.status_code == 200, explicit_urgent.text
+    assert Decimal(str(explicit_urgent.json()["amount"])) == Decimal("810.00")
 
     direct_to_russian = client.post(
         "/api/admin/crm/pricing/quote", headers=headers,
@@ -500,7 +514,7 @@ def test_exact_2026_translation_pricing_rules(client, create_user):
         json={"service_code": "written_translation", "source_language": "Русский", "target_language": "Английский", "character_count": 1800, "urgent": True},
     )
     assert urgent_from_russian.status_code == 200, urgent_from_russian.text
-    assert Decimal(str(urgent_from_russian.json()["amount"])) == Decimal("885.00")
+    assert Decimal(str(urgent_from_russian.json()["amount"])) == Decimal("590.00")
 
     # Foreign-to-foreign falls back to the sum of two directions through Russian.
     foreign = client.post(

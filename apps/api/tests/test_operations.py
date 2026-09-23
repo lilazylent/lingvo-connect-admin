@@ -24,12 +24,12 @@ def setup(client, create_user, role=Role.ADMIN):
 
 def test_order_numbering_resets_each_year_and_is_stable_format():
     with SessionLocal() as db:
-        assert peek_next_order_number(db, execution_year=2026) == "26-0-0001"
-        assert peek_next_order_number(db, execution_year=2026) == "26-0-0001"
-        assert next_order_number(db, execution_year=2026) == "26-0-0001"
-        assert next_order_number(db, execution_year=2026) == "26-0-0002"
-        assert next_order_number(db, execution_year=2027) == "27-0-0001"
-        assert next_order_number(db, now=datetime(2028, 1, 2, tzinfo=UTC)) == "28-0-0001"
+        assert peek_next_order_number(db, execution_year=2026) == "26-0001"
+        assert peek_next_order_number(db, execution_year=2026) == "26-0001"
+        assert next_order_number(db, execution_year=2026) == "26-0001"
+        assert next_order_number(db, execution_year=2026) == "26-0002"
+        assert next_order_number(db, execution_year=2027) == "27-0001"
+        assert next_order_number(db, now=datetime(2028, 1, 2, tzinfo=UTC)) == "28-0001"
 
 def test_request_order_work_lifecycle(client, create_user):
     headers = setup(client, create_user)
@@ -69,7 +69,7 @@ def test_request_order_work_lifecycle(client, create_user):
     result = client.post("/api/admin/orders", headers=headers, json=payload)
     assert result.status_code == 201, result.text
     order = result.json()
-    assert order["number"] == "26-0-0001"
+    assert order["number"] == "26-0001"
     assert order["created_at"]
     assert client.post("/api/admin/orders", headers=headers, json=payload).status_code == 409
     assert client.get(f"/api/admin/applications/{lead['id']}").status_code == 200

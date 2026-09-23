@@ -11,7 +11,7 @@ from app.config import Settings, get_settings
 from app.db import Base, get_db
 from app.dependencies import SessionContext, require_admin, require_admin_write
 from app.dependencies import require_authenticated, require_authenticated_write
-from app.models import RecoveryCode, Role, User, UserInvitation, UserSession
+from app.models import RecoveryCode, Role, RoleDefinition, User, UserInvitation, UserSession
 from app.schemas import (
     MessageView,
     TemporaryPasswordView,
@@ -24,7 +24,12 @@ from app.schemas import (
     UserPreferencesUpdate,
     UserPreferencesView,
     UserView,
+    RoleDefinitionCreate,
+    RoleDefinitionUpdate,
+    RoleDefinitionView,
+    PermissionCatalogItem,
 )
+from app.rbac import PERMISSION_LABELS, PERMISSIONS, normalize_permissions, permissions_for_user, role_name_for_user
 from app.security import generate_temporary_password, hash_password, token_hash
 
 router = APIRouter(prefix="/api/admin/users", tags=["users"])
@@ -44,12 +49,12 @@ def _would_remove_last_active_admin(
     db: Session,
     user: User,
     *,
-    next_role: Role | None = None,
+    next_role: str | None = None,
     next_is_active: bool | None = None,
 ) -> bool:
     if user.role != Role.ADMIN.value or not user.is_active:
         return False
-    resulting_role = next_role.value if next_role is not None else user.role
+    resulting_role = next_role if next_role is not None else user.role
     resulting_active = next_is_active if next_is_active is not None else user.is_active
     if resulting_role == Role.ADMIN.value and resulting_active:
         return False
@@ -60,16 +65,36 @@ def _as_utc(value: datetime) -> datetime:
     return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
 
 
-def _invitation_view(invitation: UserInvitation) -> UserInvitationView:
+def _invitation_view(db: Session, invitation: UserInvitation) -> UserInvitationView:
     status = "EXPIRED" if _as_utc(invitation.expires_at) <= datetime.now(UTC) else "PENDING"
+    role = db.get(RoleDefinition, invitation.role)
     return UserInvitationView(
         id=invitation.id,
         email=invitation.email,
-        role=Role(invitation.role),
+        role=invitation.role,
+        role_name=role.name if role else invitation.role,
         expires_at=invitation.expires_at,
         created_at=invitation.created_at,
         status=status,
     )
+
+
+def _user_view(db: Session, user: User) -> UserView:
+    return UserView.model_validate(user).model_copy(update={
+        "role_name": role_name_for_user(db, user),
+        "permissions": permissions_for_user(db, user),
+    })
+
+
+def _role_or_422(db: Session, code: str) -> RoleDefinition | None:
+    role = db.get(RoleDefinition, code)
+    if role and role.is_active:
+        return role
+    # create_all based tests and legacy pre-migration databases still know the two
+    # built-in roles even before role_definitions is seeded by Alembic.
+    if role is None and code in {Role.ADMIN.value, Role.MANAGER.value}:
+        return None
+    raise HTTPException(status_code=422, detail="Выбранная роль недоступна")
 
 
 def _registration_url(settings: Settings, token: str) -> str:
@@ -130,8 +155,96 @@ def update_preferences(
 def list_users(
     _: Annotated[SessionContext, Depends(require_admin)],
     db: Annotated[Session, Depends(get_db)],
-) -> list[User]:
-    return list(db.scalars(select(User).order_by(User.created_at.desc())).all())
+) -> list[UserView]:
+    users = list(db.scalars(select(User).order_by(User.created_at.desc())).all())
+    return [_user_view(db, user) for user in users]
+
+
+@router.get("/roles/permissions", response_model=list[PermissionCatalogItem])
+def list_permission_catalog(
+    _: Annotated[SessionContext, Depends(require_admin)],
+) -> list[PermissionCatalogItem]:
+    return [PermissionCatalogItem(code=code, label=PERMISSION_LABELS[code]) for code in PERMISSIONS]
+
+
+@router.get("/roles", response_model=list[RoleDefinitionView])
+def list_roles(
+    _: Annotated[SessionContext, Depends(require_admin)],
+    db: Annotated[Session, Depends(get_db)],
+) -> list[RoleDefinition]:
+    return list(db.scalars(select(RoleDefinition).order_by(RoleDefinition.is_system.desc(), RoleDefinition.name)).all())
+
+
+@router.post("/roles", response_model=RoleDefinitionView, status_code=201)
+def create_role(
+    payload: RoleDefinitionCreate,
+    request: Request,
+    context: Annotated[SessionContext, Depends(require_admin_write)],
+    db: Annotated[Session, Depends(get_db)],
+) -> RoleDefinition:
+    code = payload.code.upper()
+    if db.get(RoleDefinition, code):
+        raise HTTPException(status_code=409, detail="Роль с таким кодом уже существует")
+    if db.scalar(select(RoleDefinition).where(func.lower(RoleDefinition.name) == payload.name.lower())):
+        raise HTTPException(status_code=409, detail="Роль с таким названием уже существует")
+    role = RoleDefinition(code=code, name=payload.name, permissions=normalize_permissions(payload.permissions), is_system=False, is_active=True)
+    db.add(role)
+    record_event(db, request, "role_created", actor_user_id=context.user.id, details={"role": code})
+    db.commit(); db.refresh(role)
+    return role
+
+
+@router.patch("/roles/{role_code}", response_model=RoleDefinitionView)
+def update_role_definition(
+    role_code: str,
+    payload: RoleDefinitionUpdate,
+    request: Request,
+    context: Annotated[SessionContext, Depends(require_admin_write)],
+    db: Annotated[Session, Depends(get_db)],
+) -> RoleDefinition:
+    role = db.get(RoleDefinition, role_code)
+    if not role:
+        raise HTTPException(status_code=404, detail="Роль не найдена")
+    if role.code == Role.ADMIN.value:
+        if payload.name is not None or payload.permissions is not None or payload.is_active is False:
+            raise HTTPException(status_code=400, detail="Системная роль администратора защищена")
+        return role
+    if payload.name is not None:
+        duplicate = db.scalar(select(RoleDefinition).where(func.lower(RoleDefinition.name) == payload.name.lower(), RoleDefinition.code != role.code))
+        if duplicate:
+            raise HTTPException(status_code=409, detail="Роль с таким названием уже существует")
+        role.name = payload.name
+    if payload.permissions is not None:
+        role.permissions = normalize_permissions(payload.permissions)
+    if payload.is_active is not None:
+        if role.is_system and payload.is_active is False:
+            raise HTTPException(status_code=400, detail="Системную роль нельзя отключить")
+        role.is_active = payload.is_active
+    record_event(db, request, "role_updated", actor_user_id=context.user.id, details={"role": role.code})
+    db.commit(); db.refresh(role)
+    return role
+
+
+@router.delete("/roles/{role_code}", response_model=MessageView)
+def delete_role_definition(
+    role_code: str,
+    request: Request,
+    context: Annotated[SessionContext, Depends(require_admin_write)],
+    db: Annotated[Session, Depends(get_db)],
+) -> MessageView:
+    role = db.get(RoleDefinition, role_code)
+    if not role:
+        raise HTTPException(status_code=404, detail="Роль не найдена")
+    if role.is_system:
+        raise HTTPException(status_code=400, detail="Системную роль нельзя удалить")
+    if db.scalar(select(func.count()).select_from(User).where(User.role == role.code)):
+        raise HTTPException(status_code=409, detail="Роль назначена пользователям. Сначала смените им роль.")
+    if db.scalar(select(func.count()).select_from(UserInvitation).where(UserInvitation.role == role.code, UserInvitation.accepted_at.is_(None), UserInvitation.cancelled_at.is_(None))):
+        raise HTTPException(status_code=409, detail="Роль используется в активных приглашениях")
+    db.delete(role)
+    record_event(db, request, "role_deleted", actor_user_id=context.user.id, details={"role": role.code})
+    db.commit()
+    return MessageView(message="Роль удалена")
 
 
 @router.get("/invitations", response_model=list[UserInvitationView])
@@ -147,7 +260,7 @@ def list_user_invitations(
         )
         .order_by(UserInvitation.created_at.desc())
     ).all()
-    return [_invitation_view(invitation) for invitation in invitations]
+    return [_invitation_view(db, invitation) for invitation in invitations]
 
 
 @router.post("/invitations", response_model=UserInvitationCreateView, status_code=201)
@@ -159,6 +272,7 @@ def create_user_invitation(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> UserInvitationCreateView:
     email = str(payload.email).lower()
+    _role_or_422(db, payload.role)
     if db.scalar(select(User).where(User.email == email)):
         raise HTTPException(status_code=409, detail="Пользователь с таким email уже существует")
 
@@ -183,7 +297,7 @@ def create_user_invitation(
     raw_token, digest = _new_invitation_token(settings)
     invitation = UserInvitation(
         email=email,
-        role=payload.role.value,
+        role=payload.role,
         token_hash=digest,
         created_by_user_id=context.user.id,
         expires_at=now + timedelta(days=settings.user_invitation_days),
@@ -205,7 +319,7 @@ def create_user_invitation(
     db.commit()
     db.refresh(invitation)
     return UserInvitationCreateView(
-        invitation=_invitation_view(invitation),
+        invitation=_invitation_view(db, invitation),
         registration_url=_registration_url(settings, raw_token),
     )
 
@@ -242,7 +356,7 @@ def renew_user_invitation(
     db.commit()
     db.refresh(invitation)
     return UserInvitationCreateView(
-        invitation=_invitation_view(invitation),
+        invitation=_invitation_view(db, invitation),
         registration_url=_registration_url(settings, raw_token),
     )
 
@@ -277,13 +391,14 @@ def create_user(
     db: Annotated[Session, Depends(get_db)],
 ) -> UserCreateView:
     email = payload.email.lower()
+    _role_or_422(db, payload.role)
     if db.scalar(select(User).where(User.email == email)):
         raise HTTPException(status_code=409, detail="Пользователь с таким email уже существует")
     password = generate_temporary_password()
     user = User(
         email=email,
         display_name=payload.display_name or email.split("@", 1)[0],
-        role=payload.role.value,
+        role=payload.role,
         password_hash=hash_password(password),
         must_change_password=True,
     )
@@ -300,7 +415,7 @@ def create_user(
     db.commit()
     db.refresh(user)
     return UserCreateView(
-        user=user,
+        user=_user_view(db, user),
         temporary_password=password,
         warning="Временный пароль показывается один раз.",
     )
@@ -313,7 +428,7 @@ def update_user(
     request: Request,
     context: Annotated[SessionContext, Depends(require_admin_write)],
     db: Annotated[Session, Depends(get_db)],
-) -> User:
+) -> UserView:
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
@@ -333,11 +448,10 @@ def update_user(
     if payload.display_name is not None:
         changes["display_name"] = payload.display_name or user.email.split("@", 1)[0]
     if payload.role is not None:
-        if user.id == context.user.id and payload.role != Role.ADMIN:
-            raise HTTPException(
-                status_code=400, detail="Нельзя снять собственные права администратора"
-            )
-        changes["role"] = payload.role.value
+        _role_or_422(db, payload.role)
+        if user.id == context.user.id and payload.role != Role.ADMIN.value:
+            raise HTTPException(status_code=400, detail="Нельзя снять собственные права администратора")
+        changes["role"] = payload.role
     if payload.is_active is not None:
         changes["is_active"] = payload.is_active
     if payload.must_change_password is not None:
@@ -373,7 +487,7 @@ def update_user(
         )
     db.commit()
     db.refresh(user)
-    return user
+    return _user_view(db, user)
 
 
 @router.post("/{user_id}/reset-password", response_model=TemporaryPasswordView)

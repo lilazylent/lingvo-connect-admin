@@ -177,7 +177,7 @@ export function CrmFiles() {
         <div className="files-toolbar__search">
           <Input
             label="Поиск"
-            placeholder="Файл, номер заказа или заявки, название…"
+            placeholder="Файл, номер заказа или заявки…"
             value={draftQuery}
             onChange={(event) => setDraftQuery(event.target.value)}
           />
@@ -278,7 +278,7 @@ function FileRow({ item, selected, onSelect }: { item: FileRegistryItem; selecte
         <span className={`files-source files-source--${item.source}`}>{item.source === "order" ? "Заказ" : "Заявка"}</span>
         <Link href={item.entity_path} onClick={(event) => event.stopPropagation()}>
           <strong>{item.entity_number || "Без номера"}</strong>
-          <small>{item.entity_title || "Без названия"}</small>
+          {item.source === "application" && <small>{item.entity_title || "Без названия"}</small>}
         </Link>
       </div>
       <div className="files-row__value" data-label="Размер">

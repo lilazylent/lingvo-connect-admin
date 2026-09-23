@@ -21,11 +21,14 @@ type UserInvitation = {
   id: string;
   email: string;
   role: Role;
+  role_name?: string;
   expires_at: string;
   created_at: string;
   status: InvitationStatus;
 };
 type InviteCreateResult = { invitation: UserInvitation; registration_url: string };
+type RoleDefinition = { code: string; name: string; permissions: string[]; is_system: boolean; is_active: boolean };
+type PermissionItem = { code: string; label: string };
 type EditorState = { mode: "create" } | { mode: "edit"; user: User } | null;
 type UserStatusFilter = "all" | "active" | "inactive" | "2fa";
 
@@ -37,6 +40,8 @@ function UsersContent() {
   const { state } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [invitations, setInvitations] = useState<UserInvitation[]>([]);
+  const [roles, setRoles] = useState<RoleDefinition[]>([]);
+  const [permissionCatalog, setPermissionCatalog] = useState<PermissionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -49,6 +54,8 @@ function UsersContent() {
 
   const fetchUsers = useCallback(() => api<User[]>("/api/admin/users"), []);
   const fetchInvitations = useCallback(() => api<UserInvitation[]>("/api/admin/users/invitations"), []);
+  const fetchRoles = useCallback(() => api<RoleDefinition[]>("/api/admin/users/roles"), []);
+  const fetchPermissions = useCallback(() => api<PermissionItem[]>("/api/admin/users/roles/permissions"), []);
 
   const applyRows = useCallback((rows: User[]) => {
     setUsers(rows);
@@ -57,11 +64,13 @@ function UsersContent() {
 
   useEffect(() => {
     let cancelled = false;
-    void Promise.all([fetchUsers(), fetchInvitations()])
-      .then(([rows, pending]) => {
+    void Promise.all([fetchUsers(), fetchInvitations(), fetchRoles(), fetchPermissions()])
+      .then(([rows, pending, roleRows, permissionRows]) => {
         if (cancelled) return;
         applyRows(rows);
         setInvitations(pending);
+        setRoles(roleRows);
+        setPermissionCatalog(permissionRows);
         setError("");
       })
       .catch((nextError) => {
@@ -72,21 +81,23 @@ function UsersContent() {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [applyRows, fetchInvitations, fetchUsers]);
+  }, [applyRows, fetchInvitations, fetchPermissions, fetchRoles, fetchUsers]);
 
   const reload = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const [rows, pending] = await Promise.all([fetchUsers(), fetchInvitations()]);
+      const [rows, pending, roleRows, permissionRows] = await Promise.all([fetchUsers(), fetchInvitations(), fetchRoles(), fetchPermissions()]);
       applyRows(rows);
       setInvitations(pending);
+      setRoles(roleRows);
+      setPermissionCatalog(permissionRows);
     } catch (nextError) {
       setError(nextError instanceof ApiError ? nextError.message : "Не удалось загрузить пользователей");
     } finally {
       setLoading(false);
     }
-  }, [applyRows, fetchInvitations, fetchUsers]);
+  }, [applyRows, fetchInvitations, fetchPermissions, fetchRoles, fetchUsers]);
 
   async function patch(user: User, changes: Partial<User>) {
     setError("");
@@ -205,6 +216,8 @@ function UsersContent() {
       <button className="close-button" onClick={() => setOneTimeSecret(null)} aria-label="Закрыть">×</button>
     </div>}
 
+    <RolesPanel roles={roles} permissions={permissionCatalog} onChanged={() => void reload()} />
+
     {invitations.length > 0 && <section className="phase6-invitations" aria-label="Ожидают регистрации">
       <header>
         <div><span className="overline">Доступы</span><h2>Ожидают регистрации</h2></div>
@@ -214,7 +227,7 @@ function UsersContent() {
         {invitations.map((invitation) => <article key={invitation.id} className={invitation.status === "EXPIRED" ? "is-expired" : ""}>
           <div className="phase6-invitations__identity">
             <strong>{invitation.email}</strong>
-            <span>{roleLabel(invitation.role)}</span>
+            <span>{invitation.role_name || roleLabel(invitation.role)}</span>
           </div>
           <div className="phase6-invitations__status">
             <Badge tone={invitation.status === "EXPIRED" ? "warning" : "info"}>{invitation.status === "EXPIRED" ? "Срок истёк" : "Ожидает регистрации"}</Badge>
@@ -235,8 +248,7 @@ function UsersContent() {
       <Input label="Поиск" placeholder="Имя или рабочий email" value={query} onChange={(event) => setQuery(event.target.value)} />
       <Select label="Роль" value={roleFilter} onChange={(event) => setRoleFilter(event.target.value as "all" | Role)}>
         <option value="all">Все роли</option>
-        <option value="MANAGER">MANAGER</option>
-        <option value="ADMIN">ADMIN</option>
+        {roles.filter((role) => role.is_active).map((role) => <option key={role.code} value={role.code}>{role.name}</option>)}
       </Select>
       <Select label="Состояние" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as UserStatusFilter)}>
         <option value="all">Все состояния</option>
@@ -270,7 +282,7 @@ function UsersContent() {
               }}
             >
               <td><strong>{user.display_name}</strong><span>{user.email}</span></td>
-              <td><Badge tone={user.role === "ADMIN" ? "accent" : "neutral"}>{user.role}</Badge></td>
+              <td><Badge tone={user.role === "ADMIN" ? "accent" : "neutral"}>{user.role_name || roleLabel(user.role)}</Badge></td>
               <td><Badge tone={user.two_factor_enabled ? "success" : "warning"}>{user.two_factor_enabled ? "Включена" : "Требуется"}</Badge></td>
               <td><Badge tone={user.is_active ? "success" : "warning"}>{user.is_active ? "Активен" : "Отключён"}</Badge>{user.must_change_password && <small>Смена пароля</small>}</td>
               <td>{formatDateTime(user.last_login_at) || "—"}</td>
@@ -295,6 +307,7 @@ function UsersContent() {
         key={editor.mode === "edit" ? editor.user.id : "new-user"}
         state={editor}
         currentUserId={state?.user.id ?? ""}
+        roles={roles}
         onClose={() => setEditor(null)}
         onInvited={(result) => {
           setInviteResult(result);
@@ -317,15 +330,80 @@ function UsersContent() {
   </div>;
 }
 
+function RolesPanel({ roles, permissions, onChanged }: { roles: RoleDefinition[]; permissions: PermissionItem[]; onChanged: () => void }) {
+  const [editing, setEditing] = useState<RoleDefinition | null | "new">(null);
+  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
+  const [selected, setSelected] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  function open(role: RoleDefinition | "new") {
+    setEditing(role);
+    setError("");
+    if (role === "new") {
+      setName(""); setCode(""); setSelected([]);
+    } else {
+      setName(role.name); setCode(role.code); setSelected(role.permissions);
+    }
+  }
+
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    if (!editing) return;
+    setBusy(true); setError("");
+    try {
+      if (editing === "new") {
+        await api("/api/admin/users/roles", { method: "POST", body: JSON.stringify({ code: code.trim().toUpperCase().replace(/[^A-Z0-9_]+/g, "_"), name, permissions: selected }) });
+      } else {
+        await api(`/api/admin/users/roles/${editing.code}`, { method: "PATCH", body: JSON.stringify({ name, permissions: selected }) });
+      }
+      setEditing(null); onChanged();
+    } catch (nextError) {
+      setError(nextError instanceof ApiError ? nextError.message : "Не удалось сохранить роль");
+    } finally { setBusy(false); }
+  }
+
+  async function remove(role: RoleDefinition) {
+    if (role.is_system || !window.confirm(`Удалить роль «${role.name}»?`)) return;
+    try { await api(`/api/admin/users/roles/${role.code}`, { method: "DELETE" }); onChanged(); }
+    catch (nextError) { setError(nextError instanceof ApiError ? nextError.message : "Не удалось удалить роль"); }
+  }
+
+  return <section className="phase16-roles" aria-label="Роли и доступы">
+    <header><div><span className="overline">Доступы</span><h2>Роли и права</h2><p>Создавайте роли и выбирайте, какие разделы сотрудник может просматривать или изменять.</p></div><Button type="button" variant="secondary" onClick={() => open("new")}>Добавить роль</Button></header>
+    {error && !editing && <ErrorState message={error} />}
+    <div className="phase16-roles__list">{roles.map((role) => <article key={role.code}>
+      <div><strong>{role.name}</strong><small>{role.code} · {role.permissions.length} прав</small></div>
+      <Badge tone={role.code === "ADMIN" ? "accent" : role.is_active ? "success" : "neutral"}>{role.code === "ADMIN" ? "Защищена" : role.is_active ? "Активна" : "Отключена"}</Badge>
+      <Button type="button" variant="quiet" onClick={() => open(role)}>Настроить</Button>
+      {!role.is_system && <Button type="button" variant="quiet" onClick={() => void remove(role)}>Удалить</Button>}
+    </article>)}</div>
+    {editing && <form className="phase16-role-editor" onSubmit={save}>
+      <div className="phase16-role-editor__head"><strong>{editing === "new" ? "Новая роль" : `Роль · ${editing.name}`}</strong><button type="button" className="close-button" onClick={() => setEditing(null)}>×</button></div>
+      {error && <ErrorState message={error} />}
+      <div className="phase16-role-editor__identity"><Input label="Название" value={name} onChange={(e) => setName(e.target.value)} required disabled={editing !== "new" && editing.code === "ADMIN"}/>{editing === "new" && <Input label="Код роли" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="SALES_MANAGER" required />}</div>
+      <div className="phase16-permissions">{permissions.map((permission) => {
+        const locked = editing !== "new" && editing.code === "ADMIN";
+        const checked = locked || selected.includes(permission.code);
+        return <label key={permission.code}><input type="checkbox" checked={checked} disabled={locked || busy} onChange={(e) => setSelected((current) => e.target.checked ? [...new Set([...current, permission.code])] : current.filter((item) => item !== permission.code))}/><span><b>{permission.label}</b><small>{permission.code}</small></span></label>;
+      })}</div>
+      <div className="form-actions"><Button disabled={busy || (editing !== "new" && editing.code === "ADMIN")}>{busy ? "Сохраняем…" : "Сохранить роль"}</Button><Button type="button" variant="quiet" onClick={() => setEditing(null)}>Отмена</Button></div>
+    </form>}
+  </section>;
+}
+
 function UserEditorPanel({
   state,
   currentUserId,
+  roles,
   onClose,
   onInvited,
   onSaved,
 }: {
   state: Exclude<EditorState, null>;
   currentUserId: string;
+  roles: RoleDefinition[];
   onClose: () => void;
   onInvited: (result: InviteCreateResult) => void;
   onSaved: () => void;
@@ -374,8 +452,7 @@ function UserEditorPanel({
         {editing && <Input label="Имя" value={name} onChange={(event) => setName(event.target.value)} />}
         <Input label="Рабочий email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required disabled={Boolean(editing)} autoComplete="off" />
         <Select label="Роль" value={role} disabled={editing?.id === currentUserId} onChange={(event) => setRole(event.target.value as Role)}>
-          <option value="MANAGER">Менеджер</option>
-          <option value="ADMIN">Администратор</option>
+          {roles.filter((item) => item.is_active || item.code === role).map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}
         </Select>
       </fieldset>
       <div className="phase6-user-editor__actions">
@@ -402,7 +479,7 @@ function InviteLinkDialog({ result, onClose }: { result: InviteCreateResult; onC
         <p>Отправьте эту ссылку сотруднику <strong>{result.invitation.email}</strong>. Email уже закреплён за приглашением — при регистрации его изменить нельзя.</p>
         <code>{result.registration_url}</code>
         <div className="phase6-invite-dialog__meta">
-          <span><b>Роль</b>{roleLabel(result.invitation.role)}</span>
+          <span><b>Роль</b>{result.invitation.role_name || roleLabel(result.invitation.role)}</span>
           <span><b>Срок действия</b>до {formatDateTime(result.invitation.expires_at, false)}</span>
         </div>
         <p className="phase6-invite-dialog__note">Ссылка одноразовая. После регистрации сотрудник сам задаст пароль и подключит 2FA.</p>
@@ -424,14 +501,16 @@ function UserPreview({ user, isSelf, onClose, onEdit, onResetPassword, onReset2f
   return <aside className="lc-detail-panel lc-user-preview phase6-user-preview">
     <header><div><span>Пользователь</span><h2>{user.display_name}</h2></div><button type="button" onClick={onClose} aria-label="Закрыть"><Icon name="close" size={18}/></button></header>
     <div className="lc-user-preview__identity"><span>{initials}</span><div><strong>{user.display_name}</strong><small>{user.email}</small><Badge tone={user.is_active ? "success" : "warning"}>{user.is_active ? "Активен" : "Отключён"}</Badge></div></div>
-    <section className="lc-detail-data"><div><span>Роль</span><strong>{user.role}</strong></div><div><span>2FA</span><strong>{user.two_factor_enabled ? "Включена" : "Не настроена"}</strong></div><div><span>Последний вход</span><strong>{formatDateTime(user.last_login_at) || "Не входил"}</strong></div><div><span>Создан</span><strong>{formatDateTime(user.created_at, false)}</strong></div></section>
+    <section className="lc-detail-data"><div><span>Роль</span><strong>{user.role_name || roleLabel(user.role)}</strong></div><div><span>2FA</span><strong>{user.two_factor_enabled ? "Включена" : "Не настроена"}</strong></div><div><span>Последний вход</span><strong>{formatDateTime(user.last_login_at) || "Не входил"}</strong></div><div><span>Создан</span><strong>{formatDateTime(user.created_at, false)}</strong></div></section>
     <section><div className="lc-detail-section-title"><Icon name="shield" size={17}/><strong>Безопасность</strong></div><p>{user.must_change_password ? "При следующем входе пользователь должен сменить пароль." : "Обязательная смена пароля не требуется."}</p></section>
     <div className="lc-user-preview__actions"><Button onClick={onEdit}>Редактировать</Button><Button variant="secondary" onClick={onResetPassword}>Сбросить пароль</Button><Button variant="secondary" disabled={!user.two_factor_enabled} onClick={onReset2fa}>Сбросить 2FA</Button><Button variant="danger" disabled={isSelf} onClick={onToggle}>{user.is_active ? "Отключить доступ" : "Включить доступ"}</Button></div>
   </aside>;
 }
 
 function roleLabel(role: Role) {
-  return role === "ADMIN" ? "Администратор" : "Менеджер";
+  if (role === "ADMIN") return "Администратор";
+  if (role === "MANAGER") return "Менеджер";
+  return role;
 }
 
 function formatDateTime(value: string | null, includeTime = true) {

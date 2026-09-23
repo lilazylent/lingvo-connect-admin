@@ -19,7 +19,9 @@ class UserView(BaseModel):
     id: str
     email: EmailStr
     display_name: str
-    role: Role
+    role: str
+    role_name: str = ""
+    permissions: list[str] = Field(default_factory=list)
     is_active: bool
     must_change_password: bool
     two_factor_enabled: bool
@@ -66,7 +68,7 @@ class RecoveryCodesView(BaseModel):
 class UserCreateRequest(BaseModel):
     email: EmailStr
     display_name: str = Field(default="", max_length=160)
-    role: Role
+    role: str = Field(min_length=2, max_length=64, pattern=r"^[A-Z0-9_]+$")
 
 
 class UserCreateView(BaseModel):
@@ -77,13 +79,14 @@ class UserCreateView(BaseModel):
 
 class UserInvitationCreateRequest(BaseModel):
     email: EmailStr
-    role: Role = Role.MANAGER
+    role: str = Field(default=Role.MANAGER.value, min_length=2, max_length=64, pattern=r"^[A-Z0-9_]+$")
 
 
 class UserInvitationView(BaseModel):
     id: str
     email: EmailStr
-    role: Role
+    role: str
+    role_name: str = ""
     expires_at: datetime
     created_at: datetime
     status: Literal["PENDING", "EXPIRED"]
@@ -96,7 +99,8 @@ class UserInvitationCreateView(BaseModel):
 
 class UserInvitationPublicView(BaseModel):
     email: EmailStr
-    role: Role
+    role: str
+    role_name: str = ""
     expires_at: datetime
 
 
@@ -107,9 +111,40 @@ class UserInvitationAcceptRequest(BaseModel):
 
 class UserUpdateRequest(BaseModel):
     display_name: str | None = Field(default=None, max_length=160)
-    role: Role | None = None
+    role: str | None = Field(default=None, min_length=2, max_length=64, pattern=r"^[A-Z0-9_]+$")
     is_active: bool | None = None
     must_change_password: bool | None = None
+
+
+
+
+class RoleDefinitionView(BaseModel):
+    code: str
+    name: str
+    permissions: list[str]
+    is_system: bool
+    is_active: bool
+
+    model_config = {"from_attributes": True}
+
+
+class RoleDefinitionCreate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    code: str = Field(min_length=2, max_length=64, pattern=r"^[A-Z][A-Z0-9_]*$")
+    name: str = Field(min_length=2, max_length=120)
+    permissions: list[str] = Field(default_factory=list, max_length=50)
+
+
+class RoleDefinitionUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    name: str | None = Field(default=None, min_length=2, max_length=120)
+    permissions: list[str] | None = Field(default=None, max_length=50)
+    is_active: bool | None = None
+
+
+class PermissionCatalogItem(BaseModel):
+    code: str
+    label: str
 
 
 class UserPreferencesView(BaseModel):

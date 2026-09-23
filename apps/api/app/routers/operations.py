@@ -493,10 +493,7 @@ def orders(
     filters = [Order.archived == archived]
     if q:
         filters.append(
-            or_(
-                Order.title.icontains(q, autoescape=True),
-                Order.number.icontains(q, autoescape=True),
-            )
+            Order.number.icontains(q, autoescape=True)
         )
     if client_id:
         filters.append(Order.client_id == client_id)
@@ -520,7 +517,9 @@ def create_order(payload: OrderCreate, db: DB, context: Write):
         if existing:
             raise HTTPException(409, f"Для заявки уже создан заказ {existing.number}")
     number = next_order_number(db, execution_year=payload.deadline.year if payload.deadline else None)
-    row = Order(number=number, **payload.model_dump())
+    data = payload.model_dump()
+    data["title"] = number
+    row = Order(number=number, **data)
     db.add(row)
     db.flush()
     record(db, context, "order.created", order_id=row.id)
@@ -680,7 +679,7 @@ def _file_registry_source():
             literal("order").label("source"),
             OrderFile.order_id.label("entity_id"),
             Order.number.label("entity_number"),
-            Order.title.label("entity_title"),
+            Order.number.label("entity_title"),
             OrderFile.original_name.label("original_name"),
             OrderFile.mime_type.label("mime_type"),
             OrderFile.size_bytes.label("size_bytes"),

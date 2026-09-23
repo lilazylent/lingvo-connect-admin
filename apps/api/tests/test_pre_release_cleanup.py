@@ -49,7 +49,7 @@ def test_cleanup_preserves_only_admin_and_reference_catalogs(tmp_path: Path):
         application = Application(sequence_number=1, number="A-1", name="Lead", contact_method="email", contact="lead@example.com", requested_service="translation", message="test", responsible_user_id=manager.id)
         db.add(application)
         db.flush()
-        order = Order(number="26-0-0001", title="Test order", client_id=company.id, manager_id=manager.id, application_id=application.id)
+        order = Order(number="26-0001", title="Test order", client_id=company.id, manager_id=manager.id, application_id=application.id)
         db.add(order)
         db.flush()
         db.add(OrderWork(order_id=order.id, work_type="translation"))

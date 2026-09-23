@@ -12,7 +12,7 @@ from app.audit import record_event
 from app.config import Settings, get_settings
 from app.db import get_db
 from app.dependencies import SessionContext, get_session_context, require_csrf
-from app.models import AuthStage, RecoveryCode, Role, User, UserInvitation, UserSession
+from app.models import AuthStage, RecoveryCode, RoleDefinition, User, UserInvitation, UserSession
 from app.schemas import (
     AuthState,
     LoginRequest,
@@ -24,7 +24,9 @@ from app.schemas import (
     TotpSetupView,
     UserInvitationAcceptRequest,
     UserInvitationPublicView,
+    UserView,
 )
+from app.rbac import permissions_for_user, role_name_for_user
 from app.security import (
     create_session_values,
     decrypt_totp_secret,
@@ -41,6 +43,17 @@ from app.security import (
 
 router = APIRouter(prefix="/api/admin/auth", tags=["auth"])
 attempts: dict[str, deque[float]] = defaultdict(deque)
+
+
+
+
+def _auth_state(db: Session, user: User, stage: AuthStage | str) -> AuthState:
+    stage_value = AuthStage(stage) if isinstance(stage, str) else stage
+    view = UserView.model_validate(user).model_copy(update={
+        "role_name": role_name_for_user(db, user),
+        "permissions": permissions_for_user(db, user),
+    })
+    return AuthState(stage=stage_value, user=view)
 
 
 def set_auth_cookies(response: Response, token: str, csrf: str, settings: Settings) -> None:
@@ -107,9 +120,14 @@ def get_user_invitation(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> UserInvitationPublicView:
     invitation = _get_valid_invitation(token, db, settings)
+    role_name = invitation.role
+    role_row = db.get(RoleDefinition, invitation.role)
+    if role_row:
+        role_name = role_row.name
     return UserInvitationPublicView(
         email=invitation.email,
-        role=Role(invitation.role),
+        role=invitation.role,
+        role_name=role_name,
         expires_at=invitation.expires_at,
     )
 
@@ -163,7 +181,7 @@ def accept_user_invitation(
     db.commit()
     db.refresh(user)
     set_auth_cookies(response, raw_token, csrf_token, settings)
-    return AuthState(stage=AuthStage(session.auth_stage), user=user)
+    return _auth_state(db, user, session.auth_stage)
 
 
 @router.post("/login", response_model=AuthState)
@@ -189,7 +207,7 @@ def login(
     db.commit()
     attempts.pop(key, None)
     set_auth_cookies(response, raw_token, csrf_token, settings)
-    return AuthState(stage=AuthStage(session.auth_stage), user=user)
+    return _auth_state(db, user, session.auth_stage)
 
 
 @router.get("/session", response_model=AuthState)
@@ -198,7 +216,7 @@ def session_state(
     db: Annotated[Session, Depends(get_db)],
 ) -> AuthState:
     db.commit()
-    return AuthState(stage=AuthStage(context.session.auth_stage), user=context.user)
+    return _auth_state(db, context.user, context.session.auth_stage)
 
 
 @router.post("/change-password", response_model=AuthState)
@@ -245,7 +263,7 @@ def change_password(
         target_user_id=context.user.id,
     )
     db.commit()
-    return AuthState(stage=AuthStage(context.session.auth_stage), user=context.user)
+    return _auth_state(db, context.user, context.session.auth_stage)
 
 
 @router.get("/2fa/setup", response_model=TotpSetupView)
@@ -343,7 +361,7 @@ def verify_second_factor(
         db, request, "2fa_verify", actor_user_id=context.user.id, target_user_id=context.user.id
     )
     db.commit()
-    return AuthState(stage=AuthStage.AUTHENTICATED, user=context.user)
+    return _auth_state(db, context.user, AuthStage.AUTHENTICATED)
 
 
 @router.post("/recovery", response_model=AuthState)
@@ -377,7 +395,7 @@ def recover_with_code(
         target_user_id=context.user.id,
     )
     db.commit()
-    return AuthState(stage=AuthStage.AUTHENTICATED, user=context.user)
+    return _auth_state(db, context.user, AuthStage.AUTHENTICATED)
 
 
 @router.post("/logout", response_model=MessageView)

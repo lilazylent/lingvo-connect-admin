@@ -35,6 +35,21 @@ class Role(StrEnum):
     MANAGER = "MANAGER"
 
 
+
+
+class RoleDefinition(Base):
+    __tablename__ = "role_definitions"
+
+    code: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), unique=True)
+    permissions: Mapped[list[str]] = mapped_column(JSON, default=list)
+    is_system: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
 class AuthStage(StrEnum):
     CHANGE_PASSWORD = "CHANGE_PASSWORD"
     TWO_FACTOR_SETUP = "TWO_FACTOR_SETUP"
@@ -61,7 +76,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
     display_name: Mapped[str] = mapped_column(String(160))
     password_hash: Mapped[str] = mapped_column(Text)
-    role: Mapped[str] = mapped_column(String(20), default=Role.MANAGER.value, index=True)
+    role: Mapped[str] = mapped_column(String(64), default=Role.MANAGER.value, index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=True)
     two_factor_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -82,7 +97,7 @@ class UserInvitation(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
     email: Mapped[str] = mapped_column(String(320), index=True)
-    role: Mapped[str] = mapped_column(String(20), default=Role.MANAGER.value, index=True)
+    role: Mapped[str] = mapped_column(String(64), default=Role.MANAGER.value, index=True)
     token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     created_by_user_id: Mapped[str | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True

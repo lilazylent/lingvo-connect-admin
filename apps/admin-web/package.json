@@ -27,7 +27,8 @@
     "audit:phase14-service-forms": "node scripts/audit-phase14-service-driven-forms.mjs",
     "audit:ui-copy": "node scripts/audit-ui-copy-guard.mjs",
     "audit:pre-release-rbac-actions": "node scripts/audit-pre-release-rbac-actions.mjs",
-    "audit:user-invitations": "node scripts/audit-user-invitations.mjs"
+    "audit:user-invitations": "node scripts/audit-user-invitations.mjs",
+    "audit:phase16-owner-feedback": "node scripts/audit-phase16-owner-feedback.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

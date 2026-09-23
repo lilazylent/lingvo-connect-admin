@@ -1,0 +1,14 @@
+Phase 16 Owner Patch 02 — remove order title concept
+
+apps/admin-web/src/components/crm-orders.tsx
+apps/admin-web/src/components/crm-settings.tsx
+apps/admin-web/src/app/admin/page.tsx
+apps/admin-web/src/components/crm-directory.tsx
+apps/admin-web/src/components/crm-files.tsx
+apps/admin-web/src/app/admin/imports/page.tsx
+apps/admin-web/scripts/audit-phase16-owner-feedback.mjs
+apps/api/app/routers/crm.py
+apps/api/app/routers/operations.py
+apps/api/app/routers/imports.py
+PHASE_16_OWNER_FEEDBACK_BATCH_01_TZ.md
+PHASE_16_IMPLEMENTATION_REPORT.md

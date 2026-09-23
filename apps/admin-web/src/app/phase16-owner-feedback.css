@@ -1,0 +1,219 @@
+/* ==========================================================================
+   Phase 16 — Owner feedback batch 01
+   Pattern fixes only: if one layout class is corrected here, all equivalent
+   CRM surfaces inherit the same responsive rule.
+   ========================================================================== */
+
+/* Orders command bar: never let a sixth filter escape the viewport. */
+.phase5-orders-filters {
+  grid-template-columns: minmax(280px, 1.35fr) repeat(5, minmax(145px, 1fr));
+}
+@media (max-width: 1320px) {
+  .phase5-orders-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .phase5-orders-search { grid-column: span 2; }
+}
+@media (max-width: 900px) {
+  .phase5-orders-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .phase5-orders-search { grid-column: 1 / -1; }
+}
+@media (max-width: 620px) {
+  .phase5-orders-filters { grid-template-columns: minmax(0, 1fr); }
+  .phase5-orders-search { grid-column: auto; grid-template-columns: minmax(0,1fr); }
+  .phase5-orders-viewbar { justify-content: flex-start; flex-wrap: wrap; }
+}
+
+/* Written-translation work form follows the owner-specified reading order. */
+.service-driven-grid--written {
+  grid-template-areas:
+    "service chars"
+    "source pages"
+    "target topic"
+    "deadline translator"
+    "deadline-time status";
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-flow: row;
+}
+.service-driven-grid--written > * { grid-column: auto !important; min-width: 0; }
+.service-driven-grid--written > :is(.manual-switch, .pricing-field, .internal-work-switch, .textarea, .service-form-intro) { grid-column: 1 / -1 !important; }
+.service-driven-grid--written > .work-field { min-width: 0; }
+.service-driven-grid--written > .work-field--service { grid-area: service; }
+.service-driven-grid--written > .work-field--chars { grid-area: chars; }
+.service-driven-grid--written > .work-field--source { grid-area: source; }
+.service-driven-grid--written > .work-field--pages { grid-area: pages; }
+.service-driven-grid--written > .work-field--target { grid-area: target; }
+.service-driven-grid--written > .work-field--topic { grid-area: topic; }
+.service-driven-grid--written > .work-field--deadline { grid-area: deadline; }
+.service-driven-grid--written > .work-field--translator { grid-area: translator; }
+.service-driven-grid--written > .work-field--deadline-time { grid-area: deadline-time; }
+.service-driven-grid--written > .work-field--status { grid-area: status; }
+.work-field { min-width: 0; }
+.work-field .field-help {
+  display: block;
+  margin-top: 6px;
+  color: var(--crm-text-muted);
+  font-size: var(--ui-text-xs);
+  line-height: 1.35;
+}
+@media (max-width: 620px) {
+  .service-driven-grid--written {
+    display: grid;
+    grid-template-areas: none;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .service-driven-grid--written > .work-field { grid-area: auto !important; grid-column: 1 !important; }
+}
+
+/* Calculation step: content determines width; labels never become unreadable. */
+.price-row__fields--tariff {
+  grid-template-columns:
+    minmax(230px, 2fr)
+    minmax(180px, 1.35fr)
+    minmax(155px, .95fr)
+    minmax(180px, 1.15fr)
+    minmax(170px, 1.05fr) !important;
+  align-items: stretch;
+}
+.price-row__fields--tariff > * { min-width: 0; }
+.price-row__fields--tariff .calculated-value,
+.price-row__fields--tariff .manual-switch--compact {
+  min-height: 66px;
+  height: 100%;
+}
+.price-row__fields--tariff .calculated-value strong,
+.price-row__fields--tariff .calculated-value small,
+.price-row__fields--tariff .manual-switch--compact small {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1280px) {
+  .price-row__fields--tariff { grid-template-columns: repeat(3, minmax(0,1fr)) !important; }
+  .price-row__fields--tariff > :first-child { grid-column: span 2; }
+}
+@media (max-width: 900px) {
+  .price-row__fields--tariff { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+  .price-row__fields--tariff > :first-child { grid-column: 1 / -1; }
+}
+@media (max-width: 620px) {
+  .price-row__fields--tariff { grid-template-columns: minmax(0,1fr) !important; }
+  .price-row__fields--tariff > :first-child { grid-column: auto; }
+}
+
+/* Roles & permissions. */
+.phase16-roles {
+  margin: 0 0 var(--ui-space-4);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--ui-radius-card);
+  background: var(--crm-surface);
+  overflow: hidden;
+}
+.phase16-roles > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--ui-space-3);
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--crm-border);
+}
+.phase16-roles > header h2 { margin: 3px 0 4px; }
+.phase16-roles > header p { margin: 0; color: var(--crm-text-secondary); max-width: 720px; }
+.phase16-roles__list { display: grid; }
+.phase16-roles__list > article {
+  display: grid;
+  grid-template-columns: minmax(180px,1fr) auto auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--crm-divider);
+}
+.phase16-roles__list > article:last-child { border-bottom: 0; }
+.phase16-roles__list article > div { display: grid; gap: 3px; min-width: 0; }
+.phase16-roles__list small { color: var(--crm-text-muted); }
+.phase16-role-editor { padding: 16px 18px 18px; border-top: 1px solid var(--crm-border); background: var(--crm-surface-raised); }
+.phase16-role-editor__head { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+.phase16-role-editor__identity { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.phase16-permissions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:14px 0; }
+.phase16-permissions label { display:flex; align-items:flex-start; gap:10px; min-width:0; padding:10px 12px; border:1px solid var(--crm-border); border-radius:var(--ui-radius-control); background:var(--crm-surface); }
+.phase16-permissions label > span { display:grid; gap:2px; min-width:0; }
+.phase16-permissions small { color:var(--crm-text-muted); overflow-wrap:anywhere; }
+@media (max-width: 760px) {
+  .phase16-roles > header { flex-direction: column; }
+  .phase16-roles > header .button { width:100%; }
+  .phase16-roles__list > article { grid-template-columns:1fr auto; }
+  .phase16-roles__list > article .button { width:100%; }
+  .phase16-role-editor__identity, .phase16-permissions { grid-template-columns:1fr; }
+}
+
+/* Global mobile hardening. One broken pattern means all equivalent pages are checked. */
+@media (max-width: 800px) {
+  html, body { width:100%; max-width:100%; overflow-x:hidden; }
+  body { min-height:100dvh; }
+
+  .auth-page { display:flex !important; flex-direction:column !important; min-height:100dvh !important; }
+  .auth-brand {
+    flex:0 0 auto !important;
+    min-height:0 !important;
+    height:auto !important;
+    padding:max(18px, env(safe-area-inset-top)) 18px 14px !important;
+  }
+  .auth-brand::before, .auth-brand::after, .auth-brand__copy, .auth-brand__index { display:none !important; }
+  .auth-brand .brand { min-height:34px; gap:10px; }
+  .auth-panel {
+    flex:1 1 auto !important;
+    min-height:0 !important;
+    padding:max(52px, calc(env(safe-area-inset-top) + 24px)) 20px max(24px, env(safe-area-inset-bottom)) !important;
+  }
+  .auth-panel__inner { width:100%; max-width:560px; margin:0 auto 32px !important; }
+  .auth-panel h1 { margin:14px 0 10px !important; font-size:clamp(34px,9vw,44px) !important; line-height:1.02; overflow-wrap:anywhere; }
+  .auth-panel .lead { font-size:14px; line-height:1.55; }
+  .auth-panel input, .auth-panel select, .auth-panel textarea { max-width:100%; font-size:16px !important; }
+  .auth-footer { margin-top:auto; padding-top:18px; flex-wrap:wrap; }
+  .totp-setup { grid-template-columns:1fr !important; gap:16px; padding:16px; }
+  .totp-setup img { width:min(180px,65vw); height:auto; }
+  .recovery-list { grid-template-columns:1fr !important; }
+
+  .admin-layout, .workspace, .lc-workspace, .content, .lc-content, main { min-width:0; max-width:100%; }
+  .content, .lc-content { overflow-x:clip; }
+  .sidebar, .lc-sidebar { max-width:calc(100vw - 20px); }
+  .page-head, .detail-head, .section-head, .crm-section-head, .order-card-head { min-width:0; }
+  .page-head h1, .detail-head h1, .page-head--compact h1 { max-width:100%; overflow-wrap:anywhere; }
+  .table-wrap, .table-surface, .users-table .table-wrap, .phase6-users-table .table-wrap {
+    max-width:100%; overflow-x:auto; overscroll-behavior-x:contain; -webkit-overflow-scrolling:touch;
+  }
+  .select-popup, .crm-combobox__menu, .row-menu > div, .lc-profile__menu, .lc-search-results { max-width:calc(100vw - 20px); }
+  .settings-dialog, .phase6-invite-dialog, .executor-availability-dialog { max-width:calc(100vw - 20px); }
+  img, video, canvas { max-width:100%; }
+}
+@media (max-width: 620px) {
+  :root { --ui-page-pad-x: 12px; }
+  .auth-panel { padding:max(52px, calc(env(safe-area-inset-top) + 24px)) 14px max(24px, env(safe-area-inset-bottom)) !important; }
+  body .lc-topbar.topbar {
+    height:auto;
+    min-height:calc(var(--ui-topbar-height, 64px) + env(safe-area-inset-top));
+    padding-top:env(safe-area-inset-top);
+  }
+  .auth-panel h1 { font-size:clamp(31px,9.5vw,38px) !important; }
+  .auth-footer { display:grid !important; grid-template-columns:1fr; gap:7px; }
+  body .lc-content.content, .content {
+    padding-left:max(12px, env(safe-area-inset-left)) !important;
+    padding-right:max(12px, env(safe-area-inset-right)) !important;
+    padding-bottom:max(34px, env(safe-area-inset-bottom)) !important;
+  }
+  .crm-commandbar, .crm-toolbar, .application-search, .filter-grid, .form-section__grid,
+  .operational-grid, .wizard-grid, .settings-modules, .client-deposit-preview {
+    grid-template-columns:minmax(0,1fr) !important;
+  }
+  .wizard-steps, .detail-sections, .order-section-nav, .settings-tabs, .settings-subtabs {
+    max-width:100%; overflow-x:auto; overscroll-behavior-x:contain; scrollbar-width:none; -webkit-overflow-scrolling:touch;
+  }
+  .wizard-steps::-webkit-scrollbar, .detail-sections::-webkit-scrollbar,
+  .order-section-nav::-webkit-scrollbar, .settings-tabs::-webkit-scrollbar,
+  .settings-subtabs::-webkit-scrollbar { display:none; }
+  .form-actions, .panel-actions { flex-wrap:wrap; }
+  .settings-dialog-backdrop, .phase6-invite-dialog-backdrop, .executor-availability-dialog-backdrop { padding:8px !important; }
+  .settings-dialog, .phase6-invite-dialog, .executor-availability-dialog { width:100% !important; max-width:100% !important; max-height:calc(100dvh - 16px); }
+  code, .manual-key, .phase6-invite-dialog__body code { overflow-wrap:anywhere; word-break:break-word; }
+}
+@media (max-width: 430px) {
+  .auth-panel .button { width:100%; justify-content:center; }
+  .page-head h1, .detail-head h1, .page-head--compact h1 { font-size:clamp(27px,8.5vw,34px) !important; }
+}

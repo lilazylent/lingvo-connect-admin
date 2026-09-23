@@ -668,7 +668,7 @@ const emptyWork = (): DraftWork => ({
   tariff_ids: [],
   topic: "",
   urgent: false,
-  urgency_multiplier: "1.5",
+  urgency_multiplier: "1",
   native_speaker: false,
   manualDiscount: false,
   discount_percent: "0",
@@ -738,7 +738,7 @@ function localPrice(work: DraftWork, executor = false) {
   const rate = Number(executor ? work.executor_rate : work.client_rate) || 0;
   const quantity = numericQuantity(unit, work);
   let result = quantity * rate;
-  if (!executor && work.urgent) result *= Number(work.urgency_multiplier || 1.5);
+  if (!executor && work.urgent) result *= Number(work.urgency_multiplier || 1);
   if (!executor && work.manualDiscount) result *= 1 - Number(work.discount_percent || 0) / 100;
   return Math.round(result * 100) / 100;
 }
@@ -861,7 +861,7 @@ export function CrmOrders() {
               label="Поиск"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="№ заказа, клиент или название"
+              placeholder="№ заказа или клиент"
             />
             <Button variant="secondary">Найти</Button>
           </form>
@@ -1041,7 +1041,7 @@ function OrdersTable({
           <thead>
             <tr>
               <th>Заказ</th>
-              <th>Клиент / название</th>
+              <th>Клиент</th>
               <th>Дедлайн</th>
               <th>Статус</th>
               <th>Оплата</th>
@@ -1062,7 +1062,6 @@ function OrdersTable({
                 </td>
                 <td>
                   <strong>{o.client_name || "Клиент не указан"}</strong>
-                  <span>{o.title || "Без названия"}</span>
                 </td>
                 <td>{o.deadline || "—"}</td>
                 <td>
@@ -1190,8 +1189,7 @@ function OrdersKanban({
                     >
                       <span>{o.number}</span>
                       <small className="order-created-date">Создан {orderCreatedDate(o.created_at)}</small>
-                      <strong>{o.title || "Заказ без названия"}</strong>
-                      {o.client_name && <small>{o.client_name}</small>}
+                      <strong>{o.client_name || "Клиент не указан"}</strong>
                       <small>
                         {o.deadline ? `Срок ${o.deadline}` : "Срок не указан"}
                       </small>
@@ -1241,7 +1239,6 @@ function OrderWizard({
   const [client, setClient] = useState("");
   const [contact, setContact] = useState("");
   const [manager, setManager] = useState("");
-  const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [status, setStatus] = useState("NEW");
   const [works, setWorks] = useState<DraftWork[]>([emptyWork()]);
@@ -1284,7 +1281,6 @@ function OrderWizard({
       responsible_manager: UserSummary | null;
     }>(`/api/admin/applications/${applicationId}`)
       .then((a) => {
-        setTitle(`${a.name} — ${a.number}`);
         setNotes(a.internal_summary || a.message);
         setManager(a.responsible_manager?.id || "");
         if (a.desired_date)
@@ -1303,15 +1299,21 @@ function OrderWizard({
     return years.length ? Math.max(...years) : null;
   }, [works]);
   useEffect(() => {
-    if (!client) {
-      setClientDeposit(null);
-      return;
-    }
-    const controller = new AbortController();
-    api<ClientDepositPreview>(`/api/admin/companies/${client}/deposit?limit=1`, { signal: controller.signal })
-      .then(setClientDeposit)
-      .catch(() => setClientDeposit(null));
-    return () => controller.abort();
+    let controller: AbortController | undefined;
+    const timer = window.setTimeout(() => {
+      if (!client) {
+        setClientDeposit(null);
+        return;
+      }
+      controller = new AbortController();
+      api<ClientDepositPreview>(`/api/admin/companies/${client}/deposit?limit=1`, { signal: controller.signal })
+        .then(setClientDeposit)
+        .catch(() => setClientDeposit(null));
+    }, 0);
+    return () => {
+      window.clearTimeout(timer);
+      controller?.abort();
+    };
   }, [client]);
   useEffect(() => {
     const params = new URLSearchParams();
@@ -1394,7 +1396,7 @@ function OrderWizard({
             hour_count: work.hour_count ? Number(work.hour_count) : null,
             certification_mode: work.certification_mode,
             urgent: work.urgent,
-            urgency_multiplier: Number(work.urgency_multiplier || 1.5),
+            urgency_multiplier: Number(work.urgency_multiplier || 1),
             native_speaker: work.native_speaker,
           }),
         },
@@ -1495,7 +1497,6 @@ function OrderWizard({
     setError("");
     try {
       const payload = {
-        title,
         client_id: client || null,
         contact_id: contact || null,
         manager_id: manager || null,
@@ -1510,7 +1511,7 @@ function OrderWizard({
           tariff_ids: w.tariff_ids,
           topic: w.topic,
           urgent: w.urgent,
-          urgency_multiplier: Number(w.urgency_multiplier || 1.5),
+          urgency_multiplier: Number(w.urgency_multiplier || 1),
           native_speaker: w.native_speaker,
           discount_percent: w.manualDiscount ? Number(w.discount_percent || 0) : null,
           character_count: w.character_count ? Number(w.character_count) : null,
@@ -1674,13 +1675,6 @@ function OrderWizard({
                 </option>
               ))}
             </Select>
-            <Input
-              label="Название заказа"
-              hint="Можно заполнить позже"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Например: договор RU → EN + нотариат"
-            />
             <Select
               label="Статус"
               value={status}
@@ -1994,13 +1988,16 @@ function OrderWizard({
                   setPayment({ ...payment, amount_paid: e.target.value })
                 }
               />
-              <Input
+              <Select
                 label="Способ оплаты"
                 value={payment.payment_method}
-                onChange={(e) =>
-                  setPayment({ ...payment, payment_method: e.target.value })
-                }
-              />
+                onChange={(e) => setPayment({ ...payment, payment_method: e.target.value })}
+              >
+                <option value="">Не выбран</option>
+                <option value="cash">Наличные</option>
+                <option value="cashless">Безналичный расчёт</option>
+                <option value="deposit">Депозит</option>
+              </Select>
               <Input
                 label="№ счёта"
                 value={payment.invoice_number}
@@ -2173,8 +2170,8 @@ function WorkDraft({
         <Button variant="quiet" onClick={remove}>Удалить</Button>
       </header>
 
-      <div className="wizard-grid service-driven-grid">
-        <Select
+      <div className={`wizard-grid service-driven-grid${service?.code === "written_translation" ? " service-driven-grid--written" : ""}`}>
+        <div className="work-field work-field--service"><Select
           label="Услуга"
           value={work.service_code}
           onChange={(e) => {
@@ -2186,7 +2183,7 @@ function WorkDraft({
           {services.map((item) => (
             <option key={item.code} value={item.code}>{item.name}</option>
           ))}
-        </Select>
+        </Select></div>
 
         {!service && (
           <div className="service-form-intro" role="note">
@@ -2218,21 +2215,21 @@ function WorkDraft({
         )}
 
         {service && has("source_language") && (
-          <LanguageCombobox
+          <div className="work-field work-field--source"><LanguageCombobox
             label={definition?.matching_mode === "SOURCE_LANGUAGE" ? "Язык" : "Язык оригинала"}
             value={work.source_language}
             onChange={(value) => patch({ source_language: value, ...resetQuotePatch })}
-          />
+          /></div>
         )}
         {service && has("target_language") && (
-          <LanguageCombobox
+          <div className="work-field work-field--target"><LanguageCombobox
             label="Язык перевода"
             value={work.target_language}
             onChange={(value) => patch({ target_language: value, ...resetQuotePatch })}
-          />
+          /></div>
         )}
         {service && has("character_count") && (
-          <Input
+          <div className="work-field work-field--chars"><Input
             label="Количество знаков"
             hint={pageFromCharacters ? "Страницы рассчитываются автоматически: 1800 знаков = 1 страница" : undefined}
             type="number"
@@ -2245,10 +2242,10 @@ function WorkDraft({
                 page_count: pageFromCharacters && character_count ? conditionalPages(character_count) : work.page_count,
               });
             }}
-          />
+          /></div>
         )}
         {service && has("page_count") && (
-          <Input
+          <div className="work-field work-field--pages"><Input
             label={pageFromCharacters ? "Количество страниц · авто" : "Количество страниц"}
             hint={pageFromCharacters ? "Округление вверх до 0,1; минимум 1 страница" : undefined}
             type="number"
@@ -2257,7 +2254,7 @@ function WorkDraft({
             readOnly={pageFromCharacters}
             value={pageFromCharacters && work.character_count ? conditionalPages(work.character_count) : work.page_count}
             onChange={(e) => !pageFromCharacters && patchQuantity({ page_count: e.target.value })}
-          />
+          /></div>
         )}
         {service && has("document_count") && (
           <Input
@@ -2291,21 +2288,21 @@ function WorkDraft({
           />
         )}
         {service && has("topic") && (
-          <Input
+          <div className="work-field work-field--topic"><Input
             label="Тематика"
             value={work.topic}
             onChange={(e) => patch({ topic: e.target.value })}
-          />
+          /></div>
         )}
         {service && has("translator_type") && (
-          <Select
+          <div className="work-field work-field--translator"><Select
             label="Тип переводчика"
             value={work.native_speaker ? "native" : "regular"}
             onChange={(e) => patch({ native_speaker: e.target.value === "native", ...resetQuotePatch })}
           >
-            <option value="regular">Обычный</option>
+            <option value="regular">Обычный переводчик</option>
             <option value="native">Носитель языка</option>
-          </Select>
+          </Select><small className="field-help">Носитель языка учитывается при подборе исполнителя и расчёте тарифа.</small></div>
         )}
         {service && has("start_date") && (
           <Input
@@ -2324,25 +2321,25 @@ function WorkDraft({
           />
         )}
         {service && has("deadline") && (
-          <Input
+          <div className="work-field work-field--deadline"><Input
             label="Дата окончания"
             type="date"
             value={work.deadline}
             onChange={(e) => patch({ deadline: e.target.value })}
-          />
+          /></div>
         )}
         {service && has("deadline_time") && (
-          <Input
+          <div className="work-field work-field--deadline-time"><Input
             label="Время окончания"
             type="time"
             value={work.deadline_time}
             onChange={(e) => patch({ deadline_time: e.target.value })}
-          />
+          /></div>
         )}
         {service && has("status") && (
-          <Select label="Статус работы" value={work.status} onChange={(e) => patch({ status: e.target.value })}>
+          <div className="work-field work-field--status"><Select label="Статус работы" value={work.status} onChange={(e) => patch({ status: e.target.value })}>
             {workStatuses.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </Select>
+          </Select></div>
         )}
 
         {service && has("markup") && (
@@ -2470,22 +2467,28 @@ function ExecutorAssignmentsEditor({
   const matchingAutoLoad = Boolean(matching?.autoLoad);
   const matchingLockedReason = matching?.lockedReason;
   useEffect(() => {
-    setMatchingOpen(false);
-    setMatchingLoading(false);
-    setMatchingError("");
-    setCandidateData(null);
-    setRouteSelections({});
-    setManualRateOpen({});
-    setRateOverrides({});
+    const timer = window.setTimeout(() => {
+      setMatchingOpen(false);
+      setMatchingLoading(false);
+      setMatchingError("");
+      setCandidateData(null);
+      setRouteSelections({});
+      setManualRateOpen({});
+      setRateOverrides({});
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [matching?.workId]);
   useEffect(() => {
-    const persisted: Record<number, string> = {};
-    assignments.forEach((assignment) => {
-      if (assignment.route_stage_index && assignment.executor_id) {
-        persisted[assignment.route_stage_index] = assignment.executor_id;
-      }
-    });
-    setRouteSelections(persisted);
+    const timer = window.setTimeout(() => {
+      const persisted: Record<number, string> = {};
+      assignments.forEach((assignment) => {
+        if (assignment.route_stage_index && assignment.executor_id) {
+          persisted[assignment.route_stage_index] = assignment.executor_id;
+        }
+      });
+      setRouteSelections(persisted);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [assignments]);
   const patchAssignment = (key: string, patch: Partial<DraftExecutorAssignment>) =>
     onChange(assignments.map((item) => (item.key === key ? { ...item, ...patch } : item)));
@@ -2567,7 +2570,8 @@ function ExecutorAssignmentsEditor({
   }, [matchingWorkId, matchingOrderId, matchingPreview, matchingLockedReason, work.service_code, work.work_type, work.source_language, work.target_language, work.deadline, work.executor_deadline]);
   useEffect(() => {
     if (!matchingAutoLoad || matchingLockedReason) return;
-    void loadCandidates();
+    const timer = window.setTimeout(() => void loadCandidates(), 0);
+    return () => window.clearTimeout(timer);
   }, [matchingAutoLoad, matchingLockedReason, loadCandidates]);
   const selectCandidate = (candidate: ExecutorCandidate) => {
     if (candidate.candidate_state === "UNAVAILABLE") return;
@@ -3108,7 +3112,7 @@ function draftFromWork(work: Work): DraftWork {
     tariff_ids: work.tariff_ids ? work.tariff_ids.split(",").filter(Boolean) : [],
     topic: work.topic,
     urgent: work.urgent,
-    urgency_multiplier: String(work.urgency_multiplier ?? 1.5),
+    urgency_multiplier: String(work.urgency_multiplier ?? 1),
     native_speaker: work.native_speaker,
     manualDiscount: work.discount_overridden,
     discount_percent: String(work.discount_percent ?? 0),
@@ -3210,7 +3214,6 @@ function OrderCard({
   const [managers, setManagers] = useState<UserSummary[]>([]);
   const [detailsEdit, setDetailsEdit] = useState(false);
   const [detailDraft, setDetailDraft] = useState({
-    title: "",
     client_id: "",
     contact_id: "",
     manager_id: "",
@@ -3230,7 +3233,6 @@ function OrderCard({
         notes: detail.payment?.notes ?? "",
       });
       setDetailDraft({
-        title: detail.title ?? "",
         client_id: detail.client_id ?? "",
         contact_id: detail.contact_id ?? "",
         manager_id: detail.manager_id ?? "",
@@ -3347,7 +3349,7 @@ function OrderCard({
       tariff_ids: w.tariff_ids,
       topic: w.topic,
       urgent: w.urgent,
-      urgency_multiplier: Number(w.urgency_multiplier || 1.5),
+      urgency_multiplier: Number(w.urgency_multiplier || 1),
       native_speaker: w.native_speaker,
       discount_percent: w.manualDiscount ? Number(w.discount_percent || 0) : null,
       character_count: w.character_count ? Number(w.character_count) : null,
@@ -3422,7 +3424,6 @@ function OrderCard({
       await api(`/api/admin/crm/orders/${orderId}`, {
         method: "PATCH",
         body: JSON.stringify({
-          title: detailDraft.title,
           client_id: detailDraft.client_id || null,
           contact_id: detailDraft.contact_id || null,
           manager_id: detailDraft.manager_id || null,
@@ -3526,8 +3527,8 @@ function OrderCard({
     <section className="crm-order-card phase5-order-card">
       <header className="order-card-head">
         <div>
-          <span className="overline">Заказ {order.number} · Создан {orderCreatedDate(order.created_at)}</span>
-          <h2>{order.title || "Заказ без названия"}</h2>
+          <span className="overline">Создан {orderCreatedDate(order.created_at)}</span>
+          <h2>Заказ {order.number}</h2>
           <p>
             {order.deadline
               ? `Общий дедлайн ${order.deadline}`
@@ -3674,14 +3675,6 @@ function OrderCard({
               </fieldset>
               <fieldset className="order-edit-group">
                 <legend>Параметры и заметки</legend>
-                <Input
-                  label="Название заказа"
-                  hint="Можно оставить пустым"
-                  value={detailDraft.title}
-                  onChange={(e) =>
-                    setDetailDraft({ ...detailDraft, title: e.target.value })
-                  }
-                />
                 <Textarea
                   label="Внутренний комментарий"
                   value={detailDraft.notes}
@@ -3700,7 +3693,6 @@ function OrderCard({
                 onClick={() => {
                   setDetailsEdit(false);
                   setDetailDraft({
-                    title: order.title ?? "",
                     client_id: order.client_id ?? "",
                     contact_id: order.contact_id ?? "",
                     manager_id: order.manager_id ?? "",
@@ -4217,16 +4209,16 @@ function OrderCard({
                     })
                   }
                 />
-                <Input
+                <Select
                   label="Способ оплаты"
                   value={paymentDraft.payment_method}
-                  onChange={(e) =>
-                    setPaymentDraft({
-                      ...paymentDraft,
-                      payment_method: e.target.value,
-                    })
-                  }
-                />
+                  onChange={(e) => setPaymentDraft({ ...paymentDraft, payment_method: e.target.value })}
+                >
+                  <option value="">Не выбран</option>
+                  <option value="cash">Наличные</option>
+                  <option value="cashless">Безналичный расчёт</option>
+                  <option value="deposit">Депозит</option>
+                </Select>
                 <Input
                   label="№ счёта"
                   value={paymentDraft.invoice_number}

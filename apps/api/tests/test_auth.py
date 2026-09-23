@@ -6,7 +6,7 @@ import pyotp
 from app.config import get_settings
 from app.client_models import Company
 from app.db import SessionLocal
-from app.models import RecoveryCode, Role, SecurityAuditEvent, User, UserInvitation, UserSession
+from app.models import RecoveryCode, Role, RoleDefinition, SecurityAuditEvent, User, UserInvitation, UserSession
 from app.security import decrypt_totp_secret
 from tests.conftest import csrf_headers
 
@@ -147,6 +147,31 @@ def test_manager_is_blocked_from_admin_apis(client, create_user):
     assert client.get("/api/admin/users").status_code == 403
     assert client.get("/api/admin/settings").status_code == 403
     assert client.get("/api/admin/tariffs").status_code == 403
+
+
+
+
+def test_custom_role_permissions_are_enforced_by_backend(client, create_user):
+    complete_first_login(client, create_user, email="operator@example.com", role=Role.MANAGER)
+    with SessionLocal() as db:
+        db.add(RoleDefinition(
+            code="ORDER_READER",
+            name="Просмотр заказов",
+            permissions=["ORDERS_VIEW"],
+            is_system=False,
+            is_active=True,
+        ))
+        user = db.query(User).filter(User.email == "operator@example.com").one()
+        user.role = "ORDER_READER"
+        db.commit()
+
+    session = client.get("/api/admin/auth/session")
+    assert session.status_code == 200
+    assert session.json()["user"]["role"] == "ORDER_READER"
+    assert session.json()["user"]["permissions"] == ["ORDERS_VIEW"]
+    assert client.get("/api/admin/crm/orders?q=&status=&archived=false&page=1&page_size=5").status_code == 200
+    assert client.get("/api/admin/companies?q=&archived=false&page=1&language=&work_type=").status_code == 403
+    assert client.get("/api/admin/users").status_code == 403
 
 
 def test_admin_can_create_manager_with_temporary_password(client, create_user):

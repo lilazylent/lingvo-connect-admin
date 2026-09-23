@@ -44,4 +44,5 @@ Thumbs.db
 apps/admin-web/.next/
 apps/admin-web/.next-qa/
 apps/api/build/
+frontend-build.log
 phase8-build.log

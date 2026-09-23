@@ -17,7 +17,7 @@ def test_xls_contacts_executors_orders(client, create_user):
     fixtures = [
         ("contacts", [["Имя", "ID клиента"], ["Контакт", company["id"]]]),
         ("executors", [["Имя", "Email"], ["Исполнитель", "translator@example.com"]]),
-        ("orders", [["Название заказа", "ID клиента"], ["Архивный заказ", company["id"]]]),
+        ("orders", [["ID клиента"], [company["id"]]]),
     ]
     for entity, rows in fixtures:
         book = xlwt.Workbook()

@@ -1,7 +1,7 @@
 """Synchronize written-translation tariffs with the authoritative 2026 sheet.
 
 Revision ID: 0012_tariffs_2026
-Revises: 0011_order_work_tariffs
+Revises: 0011b_version_len
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "0012_tariffs_2026"
-down_revision = "0011_order_work_tariffs"
+down_revision = "0011b_version_len"
 branch_labels = None
 depends_on = None
 
@@ -110,7 +110,7 @@ def upgrade():
         values = dict(
             amount=amount,
             min_quantity=1,
-            urgency_multiplier=1.5,
+            urgency_multiplier=1,
             native_multiplier=1,
             active_to=None,
             active=True,

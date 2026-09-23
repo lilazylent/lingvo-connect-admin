@@ -1,4 +1,4 @@
-export type Role = "ADMIN" | "MANAGER";
+export type Role = string;
 export type AuthStage =
   | "CHANGE_PASSWORD"
   | "TWO_FACTOR_SETUP"
@@ -10,6 +10,8 @@ export interface User {
   email: string;
   display_name: string;
   role: Role;
+  role_name: string;
+  permissions: string[];
   is_active: boolean;
   must_change_password: boolean;
   two_factor_enabled: boolean;

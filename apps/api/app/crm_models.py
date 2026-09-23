@@ -72,7 +72,7 @@ class Tariff(Base):
     unit: Mapped[str] = mapped_column(String(32), default="CONDITIONAL_PAGE")
     amount: Mapped[Decimal] = mapped_column(Numeric(14, 2))
     min_quantity: Mapped[Decimal] = mapped_column(Numeric(14, 4), default=Decimal("0"))
-    urgency_multiplier: Mapped[Decimal] = mapped_column(Numeric(8, 4), default=Decimal("1.50"))
+    urgency_multiplier: Mapped[Decimal] = mapped_column(Numeric(8, 4), default=Decimal("1.00"))
     native_multiplier: Mapped[Decimal] = mapped_column(Numeric(8, 4), default=Decimal("1.00"))
     active_from: Mapped[date | None] = mapped_column(Date, nullable=True)
     active_to: Mapped[date | None] = mapped_column(Date, nullable=True)

@@ -1,6 +1,6 @@
 """Year-scoped order numbering.
 
-Order numbers are immutable public identifiers in the ``YY-0-NNNN`` format.
+Order numbers are immutable public identifiers in the ``YY-NNNN`` format.
 The numeric sequence resets for each order execution year (overall deadline year). The existing
 ``order_counters`` table is reused with ``id == full year`` (for example 2026)
 and Phase 12 owner-correction migration 0021 aligns historical rows/counters.
@@ -54,13 +54,13 @@ def _ensure_year_counter(db: Session, year: int) -> None:
 def format_order_number(year: int, sequence: int) -> str:
     """Format the immutable public order number required by the owner.
 
-    Example: 2026 / 1 -> ``26-0-0001``.
+    Example: 2026 / 1 -> ``26-0001``.
     """
     if year < 2000 or year > 9999:
         raise HTTPException(422, "Некорректный год исполнения заказа")
     if sequence < 1 or sequence > 9999:
         raise HTTPException(409, f"Некорректный порядковый номер заказа: {sequence}")
-    return f"{year % 100:02d}-0-{sequence:04d}"
+    return f"{year % 100:02d}-{sequence:04d}"
 
 
 def peek_next_order_number(

@@ -336,7 +336,8 @@ export function CrmDirectory({ executor = false }: { executor?: boolean }) {
   }, [archived, listUrl, page, query]);
 
   useEffect(() => {
-    void load();
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   useEffect(() => {
@@ -350,26 +351,32 @@ export function CrmDirectory({ executor = false }: { executor?: boolean }) {
 
   const visibleEntries = data?.items;
   useEffect(() => {
-    if (!executor || executorView !== "calendar" || !visibleEntries?.length) {
-      if (executorView !== "calendar") setCalendarAvailability({});
-      setCalendarLoading(false);
-      return;
-    }
-    const controller = new AbortController();
-    setCalendarLoading(true);
-    void Promise.allSettled(visibleEntries.map(async (entry) => {
-      const result = await api<{ items: ExecutorAvailability[] }>(`/api/admin/executors/${entry.id}/availability`, { signal: controller.signal });
-      return [entry.id, result.items] as const;
-    })).then((results) => {
-      if (controller.signal.aborted) return;
-      const next: Record<string, ExecutorAvailability[]> = {};
-      for (const result of results) {
-        if (result.status === "fulfilled") next[result.value[0]] = result.value[1];
+    let controller: AbortController | undefined;
+    const timer = window.setTimeout(() => {
+      if (!executor || executorView !== "calendar" || !visibleEntries?.length) {
+        if (executorView !== "calendar") setCalendarAvailability({});
+        setCalendarLoading(false);
+        return;
       }
-      setCalendarAvailability(next);
-      setCalendarLoading(false);
-    });
-    return () => controller.abort();
+      controller = new AbortController();
+      setCalendarLoading(true);
+      void Promise.allSettled(visibleEntries.map(async (entry) => {
+        const result = await api<{ items: ExecutorAvailability[] }>(`/api/admin/executors/${entry.id}/availability`, { signal: controller?.signal });
+        return [entry.id, result.items] as const;
+      })).then((results) => {
+        if (controller?.signal.aborted) return;
+        const next: Record<string, ExecutorAvailability[]> = {};
+        for (const result of results) {
+          if (result.status === "fulfilled") next[result.value[0]] = result.value[1];
+        }
+        setCalendarAvailability(next);
+        setCalendarLoading(false);
+      });
+    }, 0);
+    return () => {
+      window.clearTimeout(timer);
+      controller?.abort();
+    };
   }, [executor, executorView, visibleEntries]);
 
   useEffect(() => {
@@ -428,7 +435,7 @@ export function CrmDirectory({ executor = false }: { executor?: boolean }) {
     </section>
 
     <div className="phase4-directory__utility-row">
-      {state?.user.role === "ADMIN" && <Link className="text-link phase4-directory__import" href="/admin/imports"><Icon name="upload" size={15} /> Импортировать XLS / XLSX</Link>}
+      {(state?.user.role === "ADMIN" || state?.user.permissions.includes("IMPORTS_MANAGE")) && <Link className="text-link phase4-directory__import" href="/admin/imports"><Icon name="upload" size={15} /> Импортировать XLS / XLSX</Link>}
       {executor && <div className="view-switch directory-view-switch" role="group" aria-label="Представление исполнителей">
         <button type="button" className={executorView === "list" ? "is-active" : ""} onClick={() => setExecutorView("list")}>Список</button>
         <button type="button" className={executorView === "calendar" ? "is-active" : ""} onClick={() => { setSelected(null); setEditing(false); setExecutorView("calendar"); }}>Календарь</button>
@@ -763,7 +770,10 @@ function ClientDepositPanel({ entry, initialBalance }: { entry: Entry; initialBa
     }
   }, [entry.id]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   async function change(mode: "TOP_UP" | "SET_BALANCE") {
     const numeric = Number(amount);
@@ -879,7 +889,10 @@ function ExecutorAvailabilityPanel({ entry, onOpenCalendar }: { entry: Entry; on
     }
   }, [endpoint]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   return <section className="directory-tab-section executor-availability-summary">
     <header>
@@ -1047,7 +1060,7 @@ function ClientOrdersPanel({ summary }: { summary: SummaryData | undefined }) {
     <header><div><span className="overline">Заказы клиента</span><h3>Последние заказы</h3></div><Badge tone="info">{summary.order_count}</Badge></header>
     {summary.orders.length ? <div className="directory-record-list">
       {summary.orders.slice(0, 20).map((order) => <Link key={order.id} href={`/admin/orders?open=${order.id}`}>
-        <div><span>{order.number}</span><strong>{order.title || "Заказ без названия"}</strong></div>
+        <div><strong>{order.number}</strong></div>
         <div><Badge tone={statusTone(order.status)}>{statusLabel(order.status)}</Badge><small>{shortDate(order.deadline)}</small></div>
         <i aria-hidden="true">→</i>
       </Link>)}

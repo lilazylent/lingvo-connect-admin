@@ -9,13 +9,13 @@ import { useAuth } from "@/components/auth-provider";
 import { CrmThemeLoader } from "@/components/crm-theme-loader";
 import { Icon, type IconName } from "@/components/icons";
 
-const operational: Array<[string, string, IconName]> = [
-  ["Обзор", "/admin", "overview"],
-  ["Заявки", "/admin/applications", "applications"],
-  ["Клиенты", "/admin/clients", "clients"],
-  ["Заказы", "/admin/orders", "orders"],
-  ["Исполнители", "/admin/translators", "executors"],
-  ["Файлы", "/admin/files", "files"],
+const operational: Array<[string, string, IconName, string]> = [
+  ["Обзор", "/admin", "overview", "OVERVIEW_VIEW"],
+  ["Заявки", "/admin/applications", "applications", "APPLICATIONS_VIEW"],
+  ["Клиенты", "/admin/clients", "clients", "CLIENTS_VIEW"],
+  ["Заказы", "/admin/orders", "orders", "ORDERS_VIEW"],
+  ["Исполнители", "/admin/translators", "executors", "EXECUTORS_VIEW"],
+  ["Файлы", "/admin/files", "files", "FILES_VIEW"],
 ];
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
@@ -31,12 +31,17 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const [searchResults, setSearchResults] = useState<Array<{ id: string; label: string; meta: string; href: string; kind: string }>>([]);
 
   const admin = state?.user.role === "ADMIN";
-  const items = useMemo(
-    () => state ? (admin
-      ? [...operational, ["Пользователи", "/admin/users", "users" as IconName] as [string, string, IconName], ["Настройки", "/admin/settings", "settings" as IconName] as [string, string, IconName]]
-      : [...operational, ["Настройки", "/admin/settings", "settings" as IconName] as [string, string, IconName]]) : [],
-    [admin, state],
-  );
+  const permissions = state?.user.permissions ?? [];
+  const allowed = (permission: string) => admin || permissions.includes(permission);
+  const items = useMemo(() => {
+    if (!state) return [];
+    const next: Array<[string, string, IconName]> = operational
+      .filter(([, , , permission]) => admin || state.user.permissions.includes(permission))
+      .map(([label, href, icon]) => [label, href, icon] as [string, string, IconName]);
+    if (admin || state.user.permissions.includes("USERS_MANAGE")) next.push(["Пользователи", "/admin/users", "users"]);
+    if (admin || state.user.permissions.includes("SETTINGS_MANAGE")) next.push(["Настройки", "/admin/settings", "settings"]);
+    return next;
+  }, [admin, state]);
 
   useEffect(() => {
     const query = search.trim();
@@ -193,17 +198,17 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             )}
           </form>
           <div className="lc-topbar-actions">
-            <Link className="lc-icon-button" href="/admin/settings" onClick={closeTransientUi} aria-label="Настройки" title="Настройки"><Icon name="settings" /></Link>
+            {allowed("SETTINGS_MANAGE") && <Link className="lc-icon-button" href="/admin/settings" onClick={closeTransientUi} aria-label="Настройки" title="Настройки"><Icon name="settings" /></Link>}
             <div className="lc-profile" ref={profileRef}>
               <button type="button" className="lc-profile__trigger" onClick={() => setProfileOpen((value) => !value)} aria-expanded={profileOpen}>
                 <span className="lc-profile__avatar">{initials.slice(0, 1)}</span>
-                <span className="lc-profile__copy"><strong>{state.user.role}</strong><small>{admin ? "Администратор" : "Менеджер"}</small></span>
+                <span className="lc-profile__copy"><strong>{state.user.role_name || state.user.role}</strong><small>{admin ? "Администратор" : "Сотрудник"}</small></span>
                 <Icon name="chevron-down" size={16} />
               </button>
               {profileOpen && (
                 <div className="lc-profile__menu">
                   <div><strong>{state.user.display_name}</strong><small>{state.user.email}</small></div>
-                  <Link href="/admin/settings" onClick={closeTransientUi}>Настройки</Link>
+                  {allowed("SETTINGS_MANAGE") && <Link href="/admin/settings" onClick={closeTransientUi}>Настройки</Link>}
                   <button type="button" onClick={logout}>Выйти</button>
                 </div>
               )}

@@ -88,7 +88,7 @@ class OrderWork(RecordMixin, Base):
     target_language: Mapped[str] = mapped_column(String(80), default="")
     topic: Mapped[str] = mapped_column(String(160), default="")
     urgent: Mapped[bool] = mapped_column(Boolean, default=False)
-    urgency_multiplier: Mapped[Decimal] = mapped_column(Numeric(8, 4), default=Decimal("1.50"))
+    urgency_multiplier: Mapped[Decimal] = mapped_column(Numeric(8, 4), default=Decimal("1.00"))
     native_speaker: Mapped[bool] = mapped_column(Boolean, default=False)
     discount_percent: Mapped[Decimal] = mapped_column(Numeric(8, 4), default=Decimal("0"))
     discount_overridden: Mapped[bool] = mapped_column(Boolean, default=False)

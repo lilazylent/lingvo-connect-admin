@@ -119,7 +119,7 @@ def upgrade():
         values = dict(
             amount=amount,
             min_quantity=1,
-            urgency_multiplier=1.5,
+            urgency_multiplier=1,
             native_multiplier=1,
             active_to=None,
             active=True,

@@ -13,6 +13,7 @@ import type { AuthState, Role } from "@/lib/types";
 type Invitation = {
   email: string;
   role: Role;
+  role_name: string;
   expires_at: string;
 };
 
@@ -76,7 +77,7 @@ export default function InvitationRegistrationPage() {
     {!loadingInvite && invitation && <>
       <div className="notice">
         <strong>{invitation.email}</strong>
-        <span>Роль: <Badge tone={invitation.role === "ADMIN" ? "accent" : "neutral"}>{invitation.role === "ADMIN" ? "Администратор" : "Менеджер"}</Badge></span>
+        <span>Роль: <Badge tone={invitation.role === "ADMIN" ? "accent" : "neutral"}>{invitation.role_name || invitation.role}</Badge></span>
       </div>
       <form className="form" onSubmit={submit}>
         <Input label="Рабочий email" type="email" value={invitation.email} disabled readOnly />

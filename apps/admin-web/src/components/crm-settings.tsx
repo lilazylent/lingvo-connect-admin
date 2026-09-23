@@ -22,6 +22,12 @@ import {
   Textarea,
 } from "./ui";
 
+type ServiceDefinition = {
+  fields: string[];
+  billing_unit: string;
+  allowed_billing_units: string[];
+  matching_mode: "LANGUAGE_PAIR" | "SOURCE_LANGUAGE" | "SERVICE_ONLY";
+};
 type Service = {
   id: string;
   code: string;
@@ -30,6 +36,7 @@ type Service = {
   active: boolean;
   sort_order: number;
   notes: string;
+  definition?: ServiceDefinition | null;
 };
 type Tariff = {
   id: string;
@@ -125,7 +132,7 @@ function SettingsModuleGlyph({ module }: { module: SettingsModule }) {
 
 export function CrmSettings() {
   const { state } = useAuth();
-  const admin = state?.user.role === "ADMIN";
+  const admin = state?.user.role === "ADMIN" || Boolean(state?.user.permissions.includes("SETTINGS_MANAGE"));
   const [tab, setTab] = useState<SettingsModule>(
     admin ? "catalogs" : "appearance",
   );
@@ -910,13 +917,12 @@ function Tariffs({
       )}
       <div className="table-wrap">
         <table>
-          <thead><tr><th>Услуга</th><th>Направление</th><th>Единица</th><th>Тариф</th><th>Срочность</th><th>Статус</th><th /></tr></thead>
+          <thead><tr><th>Услуга</th><th>Направление</th><th>Единица</th><th>Тариф</th><th>Статус</th><th /></tr></thead>
           <tbody>{visible.map((tariff) => <tr key={tariff.id}>
             <td>{services.find((item) => item.code === tariff.service_code)?.name || tariff.service_code}</td>
             <td>{[tariff.source_language, tariff.target_language].filter(Boolean).join(" → ") || tariff.direction}</td>
             <td>{units.find(([value]) => value === tariff.unit)?.[1] || tariff.unit}</td>
             <td><strong>{Number(tariff.amount).toLocaleString("ru-RU")} ₽</strong></td>
-            <td>×{Number(tariff.urgency_multiplier)}</td>
             <td><Badge tone={tariff.active ? "success" : "neutral"}>{tariff.active ? "Активен" : "Отключён"}</Badge></td>
             <td><Button variant="quiet" onClick={() => setEditing(tariff)}>Изменить</Button></td>
           </tr>)}</tbody>
@@ -947,7 +953,6 @@ function TariffForm({
     unit: item?.unit || "CONDITIONAL_PAGE",
     amount: String(item?.amount ?? 0),
     min_quantity: String(item?.min_quantity ?? 0),
-    urgency_multiplier: String(item?.urgency_multiplier ?? 1.5),
     native_multiplier: String(item?.native_multiplier ?? 1),
     active_from: item?.active_from || "",
     active_to: item?.active_to || "",
@@ -956,6 +961,33 @@ function TariffForm({
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const selectedService = services.find((service) => service.code === f.service_code);
+  const definition = selectedService?.definition;
+  const languageMode = definition?.matching_mode ?? "LANGUAGE_PAIR";
+  const showSourceLanguage = languageMode === "LANGUAGE_PAIR" || languageMode === "SOURCE_LANGUAGE";
+  const showTargetLanguage = languageMode === "LANGUAGE_PAIR";
+  const showDirection = languageMode === "LANGUAGE_PAIR";
+  const showNativeMultiplier = Boolean(definition?.fields.includes("translator_type"));
+  const allowedUnits = definition?.allowed_billing_units?.length
+    ? definition.allowed_billing_units
+    : units.map(([value]) => value);
+  const unitOptions = units.filter(([value]) => allowedUnits.includes(value));
+
+  function selectService(serviceCode: string) {
+    const nextService = services.find((service) => service.code === serviceCode);
+    const nextDefinition = nextService?.definition;
+    const nextUnit = nextDefinition?.billing_unit || nextService?.billing_mode || f.unit;
+    setF({
+      ...f,
+      service_code: serviceCode,
+      unit: nextUnit,
+      source_language: nextDefinition?.matching_mode === "SERVICE_ONLY" ? "" : f.source_language,
+      target_language: nextDefinition?.matching_mode === "LANGUAGE_PAIR" ? f.target_language : "",
+      direction: nextDefinition?.matching_mode === "LANGUAGE_PAIR" ? f.direction : "ANY",
+      native_multiplier: nextDefinition?.fields.includes("translator_type") ? f.native_multiplier : "1",
+    });
+  }
+
   async function save(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -966,7 +998,7 @@ function TariffForm({
           ...f,
           amount: Number(f.amount),
           min_quantity: Number(f.min_quantity),
-          urgency_multiplier: Number(f.urgency_multiplier),
+          urgency_multiplier: 1,
           native_multiplier: Number(f.native_multiplier),
           active_from: f.active_from || null,
           active_to: f.active_to || null,
@@ -986,7 +1018,7 @@ function TariffForm({
         <Select
           label="Услуга *"
           value={f.service_code}
-          onChange={(e) => setF({ ...f, service_code: e.target.value })}
+          onChange={(e) => selectService(e.target.value)}
         >
           {services.map((s) => (
             <option key={s.code} value={s.code}>
@@ -999,19 +1031,20 @@ function TariffForm({
           value={f.unit}
           onChange={(e) => setF({ ...f, unit: e.target.value })}
         >
-          {units.map(([v, l]) => (
+          {unitOptions.map(([v, l]) => (
             <option key={v} value={v}>
               {l}
             </option>
           ))}
         </Select>
-        <LanguageCombobox label="Язык с" value={f.source_language} disabled={busy} onChange={(value) => setF({ ...f, source_language: value })} />
-        <LanguageCombobox label="Язык на" value={f.target_language} disabled={busy} onChange={(value) => setF({ ...f, target_language: value })} />
-        <Input
-          label="Направление"
-          value={f.direction}
-          onChange={(e) => setF({ ...f, direction: e.target.value })}
-        />
+        {showSourceLanguage && <LanguageCombobox label="Язык с" value={f.source_language} disabled={busy} onChange={(value) => setF({ ...f, source_language: value })} />}
+        {showTargetLanguage && <LanguageCombobox label="Язык на" value={f.target_language} disabled={busy} onChange={(value) => setF({ ...f, target_language: value })} />}
+        {showDirection && <Select label="Направление" value={f.direction} onChange={(e) => setF({ ...f, direction: e.target.value })}>
+          <option value="ANY">Любое / без направления</option>
+          <option value="TO_RUSSIAN">На русский</option>
+          <option value="FROM_RUSSIAN">С русского</option>
+          <option value="NATIVE_SPEAKER">Носитель языка</option>
+        </Select>}
         <Input
           label="Тариф, ₽"
           type="number"
@@ -1028,22 +1061,14 @@ function TariffForm({
           value={f.min_quantity}
           onChange={(e) => setF({ ...f, min_quantity: e.target.value })}
         />
-        <Input
-          label="Коэф. срочности"
-          type="number"
-          min="1"
-          step="0.01"
-          value={f.urgency_multiplier}
-          onChange={(e) => setF({ ...f, urgency_multiplier: e.target.value })}
-        />
-        <Input
+        {showNativeMultiplier && <Input
           label="Коэф. носителя"
           type="number"
           min="1"
           step="0.01"
           value={f.native_multiplier}
           onChange={(e) => setF({ ...f, native_multiplier: e.target.value })}
-        />
+        />}
         <Input
           label="Действует с"
           type="date"

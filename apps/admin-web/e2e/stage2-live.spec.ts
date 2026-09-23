@@ -55,7 +55,7 @@ test("real login, client/contact, executors, request/order, two works and reload
   const lead=await response.json();
   await page.goto(`/admin/applications/${lead.id}`);
   await page.getByRole("link",{name:"Создать заказ →"}).click();
-  await expect(page.getByLabel("Название заказа *")).not.toHaveValue("");
+  await expect(page.getByText(/Новый заказ/)).toBeVisible();
   await page.getByRole("combobox",{name:"Ответственный менеджер *",exact:true}).click();
   await page.getByRole("option",{name:"Проверка этапа 2"}).click();
   await page.getByLabel("Поиск: клиент *",{exact:true}).fill(name);
