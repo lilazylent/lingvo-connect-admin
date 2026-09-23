@@ -28,6 +28,12 @@
   -webkit-line-clamp: unset;
   overflow-wrap: normal;
 }
+@media (max-width: 1360px) {
+  .phase6-settings .settings-module-dock { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) {
+  .phase6-settings .settings-module-dock { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 @media (max-width: 1320px) {
   .phase5-orders-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .phase5-orders-search { grid-column: span 2; }
