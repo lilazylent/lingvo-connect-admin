@@ -8,6 +8,26 @@
 .phase5-orders-filters {
   grid-template-columns: minmax(280px, 1.35fr) repeat(5, minmax(145px, 1fr));
 }
+
+/* Settings dock: give every module title the full text column width. */
+.phase6-settings .settings-module-dock .settings-module-card__body {
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  align-items: start;
+  gap: 4px;
+}
+.phase6-settings .settings-module-dock .settings-modules__number {
+  min-width: 24px;
+  height: 20px;
+  justify-self: start;
+  padding-inline: 4px;
+}
+.phase6-settings .settings-module-dock .settings-module-card strong {
+  display: block;
+  overflow: visible;
+  -webkit-line-clamp: unset;
+  overflow-wrap: normal;
+}
 @media (max-width: 1320px) {
   .phase5-orders-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .phase5-orders-search { grid-column: span 2; }
