@@ -83,6 +83,23 @@ test("work, executor and finance views keep client and executor quantities separ
   await expect(card.locator(".executor-finance-stage")).not.toContainText("1800 знаков");
 });
 
+test("copied client estimate uses compact client units and no executor finance", async ({ page }) => {
+  await fixtures(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/admin/orders");
+  await page.locator(".crm-order-table tbody tr").first().getByRole("button", { name: "26-0665" }).click();
+  const card = page.locator(".phase5-order-card");
+  await card.getByRole("tab", { name: "Финансы" }).click();
+  await card.getByText("Показать", { exact: true }).click();
+  const estimate = card.locator("pre");
+  await expect(estimate).toContainText("Объём: 9 усл. стр.");
+  await expect(estimate).toContainText("Ставка: 500 ₽/усл.стр.");
+  const text = await estimate.innerText();
+  for (const forbidden of ["знаков", "16 115", "230", "1 840", "2 660", "Мария", "исполнител", "Прибыль", "маржа"]) {
+    expect(text, `client estimate must not contain ${forbidden}`).not.toContain(forbidden);
+  }
+});
+
 test("dashboard, orders and Kanban avoid page overflow across target widths and themes", async ({ page }) => {
   test.setTimeout(60_000);
   await fixtures(page);

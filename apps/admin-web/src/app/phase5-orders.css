@@ -65,6 +65,20 @@
 .kanban-navigation > div { display: flex; gap: 6px; }
 .kanban-navigation button { min-width: 38px; min-height: 34px; border: 1px solid var(--crm-border); border-radius: var(--ui-radius-control); color: var(--crm-text); background: var(--crm-surface); cursor: pointer; }
 .kanban-navigation button:hover, .kanban-navigation button:focus-visible { border-color: var(--crm-accent); color: var(--crm-accent); }
+/* Owner feedback: horizontal stage arrows stay reachable while scrolling down the board.
+   The document is the vertical scroller and no ancestor clips overflow, so sticky works;
+   it is bounded by .kanban-workspace and releases when the board ends. */
+.kanban-navigation-sentinel { height: 0; }
+.kanban-navigation {
+  position: sticky;
+  top: calc(var(--ui-topbar-height) + var(--ui-space-2));
+  z-index: var(--z-sticky);
+  margin-bottom: var(--ui-space-2);
+  transition: box-shadow var(--motion-fast, 160ms) ease;
+}
+.kanban-navigation.is-stuck { box-shadow: 0 6px 16px -10px rgba(15, 23, 42, .45); }
+.kanban-navigation button:disabled { opacity: .4; cursor: default; border-color: var(--crm-border); color: var(--crm-text-secondary); }
+@media (prefers-reduced-motion: reduce) { .kanban-navigation { transition: none; } }
 .kanban-column { min-height: 320px; border-color: var(--crm-border); background: var(--crm-surface-raised); }
 .kanban-column > header { background: color-mix(in srgb, var(--crm-surface) 88%, var(--status-color)); }
 .kanban-card { color: var(--crm-text); border-color: var(--crm-border); background: var(--crm-surface); box-shadow: var(--ui-shadow-xs); }

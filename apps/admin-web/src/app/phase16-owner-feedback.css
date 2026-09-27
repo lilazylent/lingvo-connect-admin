@@ -172,7 +172,10 @@
 
 /* Global mobile hardening. One broken pattern means all equivalent pages are checked. */
 @media (max-width: 800px) {
-  html, body { width:100%; max-width:100%; overflow-x:hidden; }
+  /* clip (not hidden) keeps the page horizontally bounded without turning html/body into
+     scroll containers, which would silently disable every position:sticky element
+     (global top bar, Kanban stage navigation). hidden stays as a fallback for old engines. */
+  html, body { width:100%; max-width:100%; overflow-x:hidden; overflow-x:clip; }
   body { min-height:100dvh; }
 
   .auth-page { display:flex !important; flex-direction:column !important; min-height:100dvh !important; }

@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, apiDownloadUrl } from "@/lib/api";
 import { formatCrmDate } from "@/lib/format-date";
+import { formatBillingQuantity, formatRate } from "@/lib/billing-format";
 import type { UserSummary } from "@/lib/types";
 import {
   ActionMenu,
@@ -444,29 +445,11 @@ const rub = (value: Money | null | undefined) =>
 const orderCreatedDate = formatCrmDate;
 const billingUnitLabel = (unit: string) =>
   billingUnits.find(([value]) => value === unit)?.[1] ?? unit;
-const compactRateUnit = (unit: string) => ({
-  CONDITIONAL_PAGE: "₽/усл.стр.", PER_1000_CHARS: "₽/1000 зн.",
-  PER_PAGE: "₽/стр.", PER_DOCUMENT: "₽/док.",
-  PER_SECOND: "₽/сек.", PER_MINUTE: "₽/мин.",
-  HOURLY: "₽/час", FIXED: "₽/услугу", CUSTOM: "₽/ед.",
-} as Record<string, string>)[unit] ?? "₽/ед.";
-const compactRateLabel = (rate: Money, unit: string) =>
-  `${Number(rate || 0).toLocaleString("ru-RU", { maximumFractionDigits: 2 })} ${compactRateUnit(unit)}`;
+const compactRateLabel = (rate: Money, unit: string) => formatRate(rate, unit);
 const paymentStateLabel = (state: Financial["payment_state"]) => ({
   PAID: "Оплачено", UNPAID: "Не оплачено", PARTIAL: "Частично оплачено", DEPOSIT: "Депозит",
 })[state];
-const billingQuantityLabel = (unit: string, quantity: number) => {
-  const formatted = quantity.toLocaleString("ru-RU", { maximumFractionDigits: 2 });
-  if (unit === "CONDITIONAL_PAGE") return `${formatted} усл. стр.`;
-  if (unit === "PER_1000_CHARS") return `${formatted} тыс. знаков`;
-  if (unit === "PER_PAGE") return `${formatted} стр.`;
-  if (unit === "PER_DOCUMENT") return `${formatted} док.`;
-  if (unit === "PER_SECOND") return `${formatted} сек.`;
-  if (unit === "PER_MINUTE") return `${formatted} мин.`;
-  if (unit === "HOURLY") return `${formatted} ч.`;
-  if (unit === "FIXED") return "1 услуга";
-  return formatted;
-};
+const billingQuantityLabel = (unit: string, quantity: number) => formatBillingQuantity(unit, quantity);
 const activeServiceFields = (service: Service | undefined, certificationMode = "") => {
   const definition = service?.definition;
   if (!definition) return new Set<string>();
@@ -507,7 +490,9 @@ const workDirectionLabel = (work: Work) => {
   return "Без языковой пары";
 };
 const workVolumeLabel = (work: Work) => {
-  const quantity = numericQuantity(work.billing_unit, work);
+  const quantity = work.billing_unit === "CONDITIONAL_PAGE" && Number(work.page_count || 0) > 0
+    ? Number(work.page_count)
+    : numericQuantity(work.billing_unit, work);
   if (quantity > 0) return billingQuantityLabel(work.billing_unit, quantity);
   if (work.word_count) return `${Number(work.word_count).toLocaleString("ru-RU")} слов`;
   return "Объём не указан";
@@ -522,16 +507,13 @@ const executorVolumeLabel = (assignment: Pick<FinanceExecutorAssignment, "billin
   const quantity = assignment.billing_unit === "CONDITIONAL_PAGE" && Number(assignment.page_count || 0) > 0
     ? Number(assignment.page_count)
     : numericQuantity(assignment.billing_unit, assignment);
-  if (quantity > 0) return billingQuantityLabel(assignment.billing_unit, Number(quantity.toFixed(1)));
-  if (assignment.character_count) return `${Number(assignment.character_count).toLocaleString("ru-RU")} зн.`;
-  if (assignment.document_count)
-    return `${Number(assignment.document_count).toLocaleString("ru-RU")} док.`;
-  if (assignment.duration_seconds)
-    return `${Number(assignment.duration_seconds).toLocaleString("ru-RU")} сек.`;
-  if (assignment.hour_count)
-    return `${Number(assignment.hour_count).toLocaleString("ru-RU", { maximumFractionDigits: 2 })} ч.`;
-  if (assignment.page_count)
-    return `${Number(assignment.page_count).toLocaleString("ru-RU", { maximumFractionDigits: 2 })} стр.`;
+  if (quantity > 0) return billingQuantityLabel(assignment.billing_unit, quantity);
+  // A non-standard unit without a matching quantity: fall back to whatever volume exists.
+  if (assignment.page_count) return formatBillingQuantity("PER_PAGE", assignment.page_count);
+  if (assignment.document_count) return formatBillingQuantity("PER_DOCUMENT", assignment.document_count);
+  if (assignment.hour_count) return formatBillingQuantity("HOURLY", assignment.hour_count);
+  if (assignment.duration_seconds) return formatBillingQuantity("PER_SECOND", assignment.duration_seconds);
+  if (assignment.character_count) return formatBillingQuantity("CONDITIONAL_PAGE", conditionalPages(assignment.character_count));
   return "Объём не указан";
 };
 const tariffOptionLabel = (service: Service | undefined, option: TariffOption) => {
@@ -549,7 +531,7 @@ const tariffOptionLabel = (service: Service | undefined, option: TariffOption) =
         ? " · носитель"
         : "";
   const recommended = option.is_auto ? " · рекомендован" : "";
-  return `${scope} · ${rub(option.rate)} · ${billingUnits.find(([unit]) => unit === option.unit)?.[1] || option.unit}${resolution}${recommended}`;
+  return `${scope} · ${formatRate(option.rate, option.unit)}${resolution}${recommended}`;
 };
 
 const tariffMessage = (option: TariffOption, automatic = option.is_auto) => {
@@ -568,7 +550,7 @@ const tariffMessage = (option: TariffOption, automatic = option.is_auto) => {
     option.resolution === "via_russian" && option.components?.length
       ? ` · ${option.components.map((item) => `${item.source_language || "Русский"} → ${item.target_language}: ${rub(item.rate)}`).join(" + ")}`
       : "";
-  return `${automatic ? "Тариф подобран CRM" : "Тариф выбран менеджером"}: ${rub(option.rate)} × ${billingQuantityLabel(option.unit, quantity)}${multiplier > 1 ? ` × ${multiplier} срочность` : ""}${discount > 0 ? ` − ${discount}% скидка` : ""} · ${route}${components}`;
+  return `${automatic ? "Тариф подобран CRM" : "Тариф выбран менеджером"}: ${formatRate(option.rate, option.unit)} × ${billingQuantityLabel(option.unit, quantity)}${multiplier > 1 ? ` × ${multiplier} срочность` : ""}${discount > 0 ? ` − ${discount}% скидка` : ""} · ${route}${components}`;
 };
 const newKey = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const conditionalPages = (value: string | number | null | undefined) => {
@@ -1178,6 +1160,43 @@ function OrdersKanban({
     .sort((a, b) => a.sort_order - b.sort_order);
   const [moving, setMoving] = useState("");
   const boardRef = useRef<HTMLDivElement>(null);
+  const stickSentinelRef = useRef<HTMLDivElement>(null);
+  const [stuck, setStuck] = useState(false);
+  const [edges, setEdges] = useState({ start: true, end: false });
+  useEffect(() => {
+    const boardElement = boardRef.current;
+    if (!boardElement) return;
+    const update = () => {
+      const max = boardElement.scrollWidth - boardElement.clientWidth;
+      setEdges({ start: boardElement.scrollLeft <= 1, end: boardElement.scrollLeft >= max - 1 });
+    };
+    update();
+    boardElement.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    return () => {
+      boardElement.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }, [visible.length, orders.length]);
+  useEffect(() => {
+    // The sentinel sits right above the sticky navigation: once it leaves the area
+    // under the global top bar, the navigation is pinned and gets its separator shadow.
+    const sentinel = stickSentinelRef.current;
+    if (!sentinel || typeof IntersectionObserver === "undefined") return;
+    const topbar = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--ui-topbar-height")) || 72;
+    const observer = new IntersectionObserver(
+      ([entry]) => setStuck(!entry.isIntersecting && entry.boundingClientRect.top < topbar + 16),
+      { rootMargin: `-${topbar + 9}px 0px 0px 0px` },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, []);
+  function scrollBoard(direction: 1 | -1) {
+    const boardElement = boardRef.current;
+    if (!boardElement) return;
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    boardElement.scrollBy({ left: direction * 280, behavior: reduceMotion ? "auto" : "smooth" });
+  }
   async function move(id: string, status: string) {
     if (!id || moving) return;
     setMoving(id);
@@ -1193,11 +1212,12 @@ function OrdersKanban({
   }
   return (
     <section className="kanban-workspace" aria-label="Канбан заказов">
-      <div className="kanban-navigation">
+      <div ref={stickSentinelRef} className="kanban-navigation-sentinel" aria-hidden="true" />
+      <div className={`kanban-navigation${stuck ? " is-stuck" : ""}`}>
         <span>Этапы заказов · {visible.length}</span>
         <div>
-          <button type="button" aria-label="Прокрутить этапы влево" onClick={() => boardRef.current?.scrollBy({ left: -280, behavior: "smooth" })}>←</button>
-          <button type="button" aria-label="Прокрутить этапы вправо" onClick={() => boardRef.current?.scrollBy({ left: 280, behavior: "smooth" })}>→</button>
+          <button type="button" aria-label="Прокрутить этапы влево" disabled={edges.start} onClick={() => scrollBoard(-1)}>←</button>
+          <button type="button" aria-label="Прокрутить этапы вправо" disabled={edges.end} onClick={() => scrollBoard(1)}>→</button>
         </div>
       </div>
       <div ref={boardRef} className="kanban-board" style={{ gridTemplateColumns: `repeat(${visible.length}, minmax(245px, 1fr))` }}>
@@ -3538,7 +3558,7 @@ function OrderCard({
         work.service_code === "company_certification"
           ? `Вариант заверения: ${work.certification_mode === "PER_PAGE" ? "Постранично" : "Сшивка"}`
           : "",
-        Number(work.client_rate || 0) > 0 ? `Тариф: ${rub(work.client_rate)} · ${billingUnitLabel(work.billing_unit)}` : "",
+        Number(work.client_rate || 0) > 0 ? `Ставка: ${formatRate(work.client_rate, work.billing_unit)}` : "",
         work.urgent && Number(work.urgency_multiplier || 1) > 1
           ? `Наценка / срочность: ×${Number(work.urgency_multiplier).toLocaleString("ru-RU")}`
           : "",

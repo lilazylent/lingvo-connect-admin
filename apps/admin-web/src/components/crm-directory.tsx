@@ -7,6 +7,7 @@ import { CrmContacts } from "./crm-contacts";
 import { api } from "@/lib/api";
 import { formatActivityDate, operationalActivityLabel } from "@/lib/activity-labels";
 import { formatCrmDate, formatCrmDateTime } from "@/lib/format-date";
+import { formatBillingQuantity, formatRate } from "@/lib/billing-format";
 import { Badge, Button, ErrorState, Input, LoadingState, Select, Textarea, type BadgeTone } from "./ui";
 import { Icon, Pictogram } from "./icons";
 import { LanguageCombobox } from "./language-combobox";
@@ -257,21 +258,17 @@ function pairLabel(direction: Pick<Direction, "source_language" | "target_langua
   return `${source} ↔ ${target}`;
 }
 
-const executorRateUnitLabels: Record<string, string> = {
-  CONDITIONAL_PAGE: "усл. стр.",
-  PER_1000_CHARS: "1000 знаков",
-  PER_PAGE: "страница",
-  PER_DOCUMENT: "документ",
-  PER_MINUTE: "минута",
-  HOURLY: "час",
-  FIXED: "фикс.",
-  CUSTOM: "единица",
-};
-
 function directionRateLabel(direction: Direction) {
   const value = Number(direction.default_rate || 0);
   if (!value) return "Ставка не задана";
-  return `${rub(value)} / ${executorRateUnitLabels[direction.rate_unit || ""] || direction.rate_unit || "ед."}`;
+  return formatRate(value, direction.rate_unit);
+}
+
+function assignmentVolumeLabel(assignment: ExecutorAssignment) {
+  if (assignment.billing_unit === "CONDITIONAL_PAGE" || assignment.billing_unit === "PER_PAGE") {
+    return Number(assignment.page_count || 0) > 0 ? formatBillingQuantity(assignment.billing_unit, assignment.page_count) : "";
+  }
+  return "";
 }
 
 function isExecutorSummary(value: SummaryData | null | undefined): value is ExecutorSummary {
@@ -1079,7 +1076,7 @@ function ExecutorWorksPanel({ summary }: { summary: SummaryData | undefined }) {
           <div>
             <span>{workTypeLabel(work?.service_code || work?.work_type)}</span>
             <strong>{work ? `${work.source_language || "—"} → ${work.target_language || "—"}` : "Работа"}</strong>
-            <small>Ставка {rub(assignment.rate)} · Начислено {rub(assignment.cost)}</small>
+            <small>{[assignmentVolumeLabel(assignment), `Ставка ${formatRate(assignment.rate, assignment.billing_unit)}`, `Начислено ${rub(assignment.cost)}`].filter(Boolean).join(" · ")}</small>
           </div>
           <div><Badge tone={statusTone(assignment.status)}>{statusLabel(assignment.status)}</Badge><small>{shortDate(assignment.deadline || work?.deadline)}</small></div>
           <i aria-hidden="true">→</i>

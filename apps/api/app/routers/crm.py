@@ -57,6 +57,11 @@ BillingUnit = Literal[
 StatusBoard = Literal["MAIN", "ARCHIVE"]
 StatusColor = Literal["slate", "blue", "violet", "amber", "cyan", "green", "rose"]
 
+# Orders the client has accepted. Only these count towards revenue/profit KPIs:
+# "Новый" and "Рассчитан" (ESTIMATING) still await the client's decision and
+# "Отменён" never became revenue. Business status decides, not the archive flag.
+REVENUE_ORDER_STATUSES = ("APPROVED", "IN_PROGRESS", "REVIEW", "READY", "DELIVERED", "COMPLETED")
+
 BUILTIN_ORDER_STATUS_BOARDS = {
     "NEW": "MAIN",
     "ESTIMATING": "MAIN",
@@ -2012,6 +2017,35 @@ def upload_and_analyze(order_id: str, upload: UploadFile, db: DB, context: Write
     return view(row)
 
 
+def accepted_orders_finance(db: Session) -> tuple[Decimal, Decimal]:
+    """Revenue and executor cost of accepted orders, using the same rules as ``finance``.
+
+    Revenue is the client price of billable works; executor cost is the sum of active
+    executor assignments, or the legacy per-work cost when a work has no assignments.
+    """
+    accepted_order_ids = select(Order.id).where(Order.status.in_(REVENUE_ORDER_STATUSES))
+    works = db.scalars(
+        select(OrderWork).where(OrderWork.order_id.in_(accepted_order_ids), OrderWork.archived.is_(False))
+    ).all()
+    assignment_costs: dict[str, Decimal] = {}
+    if works:
+        rows = db.execute(
+            select(ExecutorAssignment.work_id, func.sum(ExecutorAssignment.cost))
+            .where(
+                ExecutorAssignment.work_id.in_([work.id for work in works]),
+                ExecutorAssignment.archived.is_(False),
+            )
+            .group_by(ExecutorAssignment.work_id)
+        ).all()
+        assignment_costs = {work_id: Decimal(str(total or 0)) for work_id, total in rows}
+    revenue = money(sum((Decimal(str(w.price)) for w in works if w.client_billable), Decimal("0")))
+    costs = money(sum(
+        (assignment_costs[w.id] if w.id in assignment_costs else Decimal(str(w.executor_cost)) for w in works),
+        Decimal("0"),
+    ))
+    return revenue, costs
+
+
 @router.get("/dashboard")
 def crm_dashboard(db: DB, context: Read):
     today = date.today()
@@ -2029,13 +2063,7 @@ def crm_dashboard(db: DB, context: Read):
             OrderWork.status.notin_(["COMPLETED", "CANCELLED"]),
         )
     ) or 0
-    works = db.scalars(
-        select(OrderWork).where(
-            OrderWork.order_id.in_(live_order_ids), OrderWork.archived.is_(False)
-        )
-    ).all()
-    revenue = money(sum((Decimal(str(w.price)) for w in works if w.client_billable), Decimal("0")))
-    costs = money(sum((Decimal(str(w.executor_cost)) for w in works), Decimal("0")))
+    revenue, costs = accepted_orders_finance(db)
     unpaid = db.scalar(
         select(func.count()).select_from(ClientPayment).where(
             ClientPayment.order_id.in_(live_order_ids),
