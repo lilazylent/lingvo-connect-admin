@@ -9,6 +9,7 @@ import { stageRoute, useAuth } from "@/components/auth-provider";
 import { Badge, Button, ErrorState, Input, LoadingState } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import type { AuthState, Role } from "@/lib/types";
+import { formatCrmDateTime } from "@/lib/format-date";
 
 type Invitation = {
   email: string;
@@ -85,7 +86,7 @@ export default function InvitationRegistrationPage() {
         <Input label="Повторите пароль" type="password" value={confirm} onChange={(event) => setConfirm(event.target.value)} autoComplete="new-password" required />
         <Button type="submit" disabled={saving}>{saving ? "Создаём аккаунт…" : "Зарегистрироваться →"}</Button>
       </form>
-      <p className="form-note">Ссылка одноразовая и действует до {new Intl.DateTimeFormat("ru-RU", { dateStyle: "medium", timeStyle: "short" }).format(new Date(invitation.expires_at))}.</p>
+      <p className="form-note">Ссылка одноразовая и действует до {formatCrmDateTime(invitation.expires_at)}.</p>
     </>}
     {!loadingInvite && !invitation && <p className="form-note"><Link href="/login">Перейти ко входу</Link></p>}
   </AuthLayout>;

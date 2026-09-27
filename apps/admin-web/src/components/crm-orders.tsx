@@ -2852,7 +2852,7 @@ function ExecutorAssignmentsEditor({
                     {(candidate.availability.start_date || candidate.availability.notes) && (
                       <p className="executor-candidate-card__note">
                         {candidate.availability.start_date && candidate.availability.end_date
-                          ? `${candidate.availability.start_date} — ${candidate.availability.end_date}`
+                          ? `${formatCrmDate(candidate.availability.start_date)} — ${formatCrmDate(candidate.availability.end_date)}`
                           : ""}
                         {candidate.availability.notes ? `${candidate.availability.start_date ? " · " : ""}${candidate.availability.notes}` : ""}
                       </p>

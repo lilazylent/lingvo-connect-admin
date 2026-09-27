@@ -244,8 +244,7 @@ function calendarDayLabel(value: string) {
 }
 
 function calendarRangeLabel(start: string, end: string) {
-  const formatter = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" });
-  return `${formatter.format(dateFromIso(start))} — ${formatter.format(dateFromIso(end))}`;
+  return `${formatCrmDate(start)} — ${formatCrmDate(end)}`;
 }
 
 function availabilityForDay(items: ExecutorAvailability[], day: string) {

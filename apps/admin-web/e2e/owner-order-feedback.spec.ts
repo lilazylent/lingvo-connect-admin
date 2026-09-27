@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { formatCrmDate } from "../src/lib/format-date";
+import { formatCrmDate, formatCrmDateTime } from "../src/lib/format-date";
 
 const user = { id: "owner-qa", display_name: "Тестовый администратор", email: "owner@example.invalid", role: "ADMIN", is_active: true, must_change_password: false, two_factor_enabled: true };
 const statuses = Array.from({ length: 7 }, (_, index) => ({ code: ["NEW", "ESTIMATING", "APPROVED", "IN_PROGRESS", "REVIEW", "READY", "DELIVERED"][index], name: index === 1 ? "В расчёте" : `Этап ${index + 1}`, color: "violet", board: "MAIN", active: true, sort_order: index * 10 }));
@@ -40,7 +40,8 @@ test("order list localizes status, payment and dates without displaying debt", a
   const row = page.locator(".crm-order-table tbody tr").first();
   await expect(row).toContainText("Рассчитан");
   await expect(row).toContainText("Частично оплачено");
-  await expect(row).toContainText("20.09.2026");
+  await expect(row).toContainText("20.09.26");
+  await expect(row).not.toContainText("20.09.2026");
   await expect(row).not.toContainText("500 ₽");
   await expect(page.getByText("Всего заказов").first().locator("..")).toContainText("669");
 });
@@ -57,8 +58,10 @@ test("all Kanban columns are reachable from top controls at narrow widths", asyn
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 });
 
-test("CRM date helper keeps date-only values in DD.MM.YYYY", () => {
-  expect(formatCrmDate("2026-09-20")).toBe("20.09.2026");
+test("CRM date helpers use the owner format DD.MM.YY", () => {
+  expect(formatCrmDate("2026-09-20")).toBe("20.09.26");
+  expect(formatCrmDate("2025-12-25")).toBe("25.12.25");
+  expect(formatCrmDateTime("2026-09-20T09:05:00")).toBe("20.09.26, 09:05");
   expect(formatCrmDate(null, "Не указан")).toBe("Не указан");
 });
 
