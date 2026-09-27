@@ -460,6 +460,19 @@ def money(value: Decimal | int | float | str) -> Decimal:
     return Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
+def client_payment_state(payment: ClientPayment | None, amount_due: Decimal) -> str:
+    """Compact payment state; amounts remain in the order finance view."""
+    paid = money(payment.amount_paid) if payment else Decimal("0")
+    due = money(amount_due)
+    if payment and payment.payment_method == "deposit" and paid > 0:
+        return "DEPOSIT"
+    if due <= 0 or paid >= due:
+        return "PAID"
+    if paid > 0:
+        return "PARTIAL"
+    return "UNPAID"
+
+
 def conditional_page_quantity(character_count: int | Decimal) -> Decimal:
     """Return 1800-character pages rounded upward to one decimal place.
 
@@ -970,6 +983,7 @@ def finance(db: Session, order_id: str) -> dict:
         "margin_percent": margin,
         "client_paid": paid,
         "client_debt": money(max(Decimal("0"), revenue - paid)),
+        "payment_state": client_payment_state(payment, revenue),
         "executor_assignment_count": len(assignments),
         "executor_breakdown": executor_breakdown,
     }
@@ -1052,7 +1066,7 @@ def _default_status_for_board(db: Session, board: str) -> str:
 @router.get("/order-statuses")
 def order_statuses(db: DB, context: Read):
     rows = db.scalars(select(OrderStatusOption).order_by(OrderStatusOption.board, OrderStatusOption.sort_order)).all()
-    return [view(row) for row in rows]
+    return [{**view(row), "name": "Рассчитан" if row.code == "ESTIMATING" and row.name == "В расчёте" else row.name} for row in rows]
 
 
 @router.post("/order-statuses", status_code=201)
@@ -1378,6 +1392,7 @@ def crm_orders(
     deadline_to: date | None = None,
     overdue: bool | None = None,
     paid: bool | None = None,
+    scope: Literal["active", "due_today", "unassigned", "awaiting_payment"] | None = None,
     archived: bool = False,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -1460,7 +1475,7 @@ def crm_orders(
     if deadline_to:
         filters.append(Order.deadline <= deadline_to)
     if overdue is True:
-        filters.extend([Order.deadline < date.today(), Order.status.notin_(["COMPLETED", "CANCELLED"])])
+        filters.extend([Order.deadline < date.today(), Order.status.in_(["NEW", "ESTIMATING", "APPROVED", "IN_PROGRESS", "REVIEW", "READY", "DELIVERED"])])
     elif overdue is False:
         filters.append(or_(Order.deadline.is_(None), Order.deadline >= date.today(), Order.status.in_(["COMPLETED", "CANCELLED"])))
     if paid is not None:
@@ -1470,8 +1485,23 @@ def crm_orders(
             else ClientPayment.amount_paid < ClientPayment.amount_due
         )
         filters.append(Order.id.in_(payment_orders))
+    if scope == "active":
+        filters.append(Order.status.in_(["NEW", "ESTIMATING", "APPROVED", "IN_PROGRESS", "REVIEW", "READY", "DELIVERED"]))
+    elif scope == "due_today":
+        filters.extend([Order.deadline == date.today(), Order.status.in_(["NEW", "ESTIMATING", "APPROVED", "IN_PROGRESS", "REVIEW", "READY", "DELIVERED"])])
+    elif scope == "unassigned":
+        assigned_work_ids = select(ExecutorAssignment.work_id).where(ExecutorAssignment.archived.is_(False))
+        filters.append(Order.id.in_(select(OrderWork.order_id).where(
+            OrderWork.archived.is_(False),
+            OrderWork.status.notin_(["COMPLETED", "CANCELLED"]),
+            OrderWork.executor_id.is_(None),
+            OrderWork.id.notin_(assigned_work_ids),
+        )))
+    elif scope == "awaiting_payment":
+        filters.append(Order.id.in_(select(ClientPayment.order_id).where(ClientPayment.amount_paid < ClientPayment.amount_due)))
 
     total = db.scalar(select(func.count()).select_from(Order).where(*filters)) or 0
+    total_all = db.scalar(select(func.count()).select_from(Order)) or 0
     rows = db.scalars(
         select(Order)
         .where(*filters)
@@ -1495,6 +1525,7 @@ def crm_orders(
     return {
         "items": items,
         "total": total,
+        "total_all": total_all,
         "page": page,
         "pages": max(1, (total + page_size - 1) // page_size),
     }
@@ -1994,6 +2025,7 @@ def crm_dashboard(db: DB, context: Read):
             OrderWork.order_id.in_(live_order_ids),
             OrderWork.archived.is_(False),
             OrderWork.executor_id.is_(None),
+            OrderWork.id.notin_(select(ExecutorAssignment.work_id).where(ExecutorAssignment.archived.is_(False))),
             OrderWork.status.notin_(["COMPLETED", "CANCELLED"]),
         )
     ) or 0
@@ -2019,6 +2051,7 @@ def crm_dashboard(db: DB, context: Read):
     ).all()
     new_leads = db.scalar(select(func.count()).select_from(Application).where(Application.status_code == "NEW")) or 0
     return {
+        "total_orders": db.scalar(select(func.count()).select_from(Order)) or 0,
         "new_leads": new_leads,
         "active_orders": active_orders,
         "due_today": due_today,

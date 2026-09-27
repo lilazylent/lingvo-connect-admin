@@ -227,12 +227,16 @@ html[data-crm-theme] body .lc-sidebar-promo::before { background: linear-gradien
 }
 .phase5-order-card .phase5-finance-main-column,
 .phase5-order-card .phase5-finance-side-column { min-width:0; }
+.phase5-order-card .phase5-finance-workspace__head { grid-column:1 / -1; display:flex; align-items:start; justify-content:space-between; gap:var(--ui-space-3); }
+.phase5-order-card .phase5-finance-workspace__head h3 { margin:4px 0 0; }
+.phase5-order-card .phase5-finance-workspace__head p { max-width:560px; margin:0; color:var(--crm-text-secondary); }
 .phase5-order-card .phase5-finance-main-column { grid-column:1; }
 .phase5-order-card .phase5-finance-side-column {
   grid-column:2;
   display:grid;
   align-content:start;
   gap:var(--ui-space-3);
+  padding-top:10px;
 }
 .phase5-order-card .phase5-finance-workspace .order-finance-module {
   margin:0;
@@ -362,9 +366,12 @@ html[data-crm-theme] body .lc-sidebar-promo::before { background: linear-gradien
   .phase5-order-card .phase5-finance-workspace.is-active { grid-template-columns:1fr; }
   .phase5-order-card .phase5-finance-main-column,
   .phase5-order-card .phase5-finance-side-column { grid-column:1; }
+  .phase5-order-card .phase5-finance-side-column { padding-top:0; }
   .phase6-settings .settings-module-dock { grid-template-columns:repeat(3,minmax(0,1fr)); }
 }
 @media (max-width:700px) {
+  .phase5-order-card .phase5-finance-workspace__head { display:block; }
+  .phase5-order-card .phase5-finance-workspace__head p { margin-top:8px; }
   .phase6-settings .settings-module-dock { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .lc-translation-art { right:8px; opacity:.7; }
 }

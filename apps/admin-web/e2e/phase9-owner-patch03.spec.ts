@@ -147,7 +147,7 @@ test("cancelled orders enter the archive Kanban and archive reasons stay separat
   await expect(card.locator(".order-stage-flow")).toContainText("Отложен");
   await expect(card.locator(".order-stage-flow")).not.toContainText("В работе");
 
-  await page.locator(".archive-toggle input").check();
+  await page.locator(".archive-toggle").click();
   await page.getByRole("button", { name: "Kanban" }).click();
   const board = page.locator(".kanban-board");
   await expect(board).toContainText("Отменён");

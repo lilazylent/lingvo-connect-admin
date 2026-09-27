@@ -13,6 +13,7 @@ import {
   Select,
 } from "./ui";
 import { Icon } from "./icons";
+import { formatCrmDate } from "@/lib/format-date";
 
 type FileSource = "all" | "order" | "application";
 type UploadSource = Exclude<FileSource, "all">;
@@ -416,7 +417,7 @@ function analysisLabel(status: string) {
 }
 
 function formatDate(value: string) {
-  return new Date(value).toLocaleDateString("ru-RU", { day: "2-digit", month: "short", year: "numeric" });
+  return formatCrmDate(value);
 }
 
 function formatTime(value: string) {

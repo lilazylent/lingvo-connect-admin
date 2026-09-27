@@ -8,6 +8,7 @@ import { ActionMenu, Badge, Button, EmptyState, ErrorState, Input, Select, Table
 import { Icon, Pictogram } from "@/components/icons";
 import { api, apiDownloadUrl, ApiError } from "@/lib/api";
 import { formatBytes, formatDate, serviceLabel, serviceOptions, sourceLabels, statusMeta, statusOptions } from "@/lib/applications";
+import { formatCrmDate } from "@/lib/format-date";
 import type { Application, ApplicationDetail, ApplicationList, UserSummary } from "@/lib/types";
 
 export default function ApplicationsPage() {
@@ -158,7 +159,7 @@ function ApplicationPreview({ application, onClose }: { application: Application
 
     {tab === "info" && <div id={tabId("info")} role="tabpanel" aria-labelledby={`${tabId("info")}-tab`}>
       <section><div className="lc-detail-section-title"><Icon name="clients" size={17} /><strong>Клиент</strong><Badge tone={meta.tone}>{meta.label}</Badge></div><h3>{current.company || current.name || "Контакт не указан"}</h3><p>{current.name && current.company ? current.name : current.contact || "Контактные данные не указаны"}</p></section>
-      <section className="lc-detail-data"><div><span>Услуга</span><strong>{serviceLabel(current.requested_service)}</strong></div><div><span>Языки</span><strong>{[current.source_language, current.target_language].filter(Boolean).join(" → ") || "—"}</strong></div><div><span>Получена</span><strong>{formatDate(current.submitted_at)}</strong></div><div><span>Источник</span><strong>{sourceLabels[current.source]}</strong></div><div><span>Желаемый срок</span><strong>{current.desired_date || "Не указан"}</strong></div><div><span>Ответственный</span><strong>{current.responsible_manager?.display_name || "Не назначен"}</strong></div></section>
+      <section className="lc-detail-data"><div><span>Услуга</span><strong>{serviceLabel(current.requested_service)}</strong></div><div><span>Языки</span><strong>{[current.source_language, current.target_language].filter(Boolean).join(" → ") || "—"}</strong></div><div><span>Получена</span><strong>{formatDate(current.submitted_at)}</strong></div><div><span>Источник</span><strong>{sourceLabels[current.source]}</strong></div><div><span>Желаемый срок</span><strong>{formatCrmDate(current.desired_date, "Не указан")}</strong></div><div><span>Ответственный</span><strong>{current.responsible_manager?.display_name || "Не назначен"}</strong></div></section>
       {current.message && <section><div className="lc-detail-section-title"><Icon name="document" size={17} /><strong>Текст обращения</strong></div><p className="lc-detail-message">{current.message}</p></section>}
     </div>}
 

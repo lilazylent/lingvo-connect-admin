@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from app.db import SessionLocal
+from app.crm_models import OrderStatusOption
 from app.models import Role
 from app.operations_models import OrderCounter
 from tests.conftest import csrf_headers
@@ -88,6 +89,14 @@ def test_crm_wizard_multi_work_finance_and_dashboard(client, create_user):
     assert Decimal(str(order["financial"]["executor_cost"])) == Decimal("600.00")
     assert Decimal(str(order["financial"]["profit"])) == Decimal("1380.00")
     assert Decimal(str(order["financial"]["client_debt"])) == Decimal("1480.00")
+    assert order["financial"]["payment_state"] == "PARTIAL"
+    assert client.get("/api/admin/crm/orders").json()["items"][0]["financial"]["payment_state"] == "PARTIAL"
+    assert client.get("/api/admin/crm/orders?scope=active").json()["total"] == 1
+    assert client.get("/api/admin/crm/orders?scope=unassigned").json()["total"] == 1
+    with SessionLocal() as db:
+        db.add(OrderStatusOption(code="ESTIMATING", name="В расчёте", color="violet", board="MAIN"))
+        db.commit()
+    assert any(row["code"] == "ESTIMATING" and row["name"] == "Рассчитан" for row in client.get("/api/admin/crm/order-statuses").json())
 
     detail = client.get(f"/api/admin/crm/orders/{order['id']}")
     assert detail.status_code == 200
@@ -792,7 +801,10 @@ def test_cancelled_order_moves_to_archive_and_archive_reasons_are_configurable(c
     assert client.get("/api/admin/crm/orders?archived=false").json()["total"] == 0
     archive_list = client.get("/api/admin/crm/orders?archived=true").json()
     assert archive_list["total"] == 1
+    assert archive_list["total_all"] == 1
     assert archive_list["items"][0]["status"] == "CANCELLED"
+    assert client.get("/api/admin/crm/orders?archived=false").json()["total_all"] == 1
+    assert client.get("/api/admin/crm/dashboard").json()["total_orders"] == 1
 
     reason = client.post(
         "/api/admin/crm/order-statuses",
@@ -1398,6 +1410,7 @@ def test_phase15_client_deposit_topup_and_order_auto_debit(client, create_user):
     assert Decimal(str(payload["financial"]["revenue"])) == Decimal("5000.00")
     assert Decimal(str(payload["financial"]["client_paid"])) == Decimal("5000.00")
     assert Decimal(str(payload["financial"]["client_debt"])) == Decimal("0.00")
+    assert payload["financial"]["payment_state"] == "DEPOSIT"
 
     deposit = client.get(f"/api/admin/companies/{company['id']}/deposit")
     assert deposit.status_code == 200, deposit.text
@@ -1437,5 +1450,6 @@ def test_phase15_deposit_only_covers_available_balance(client, create_user):
     financial = created.json()["financial"]
     assert Decimal(str(financial["client_paid"])) == Decimal("1000.00")
     assert Decimal(str(financial["client_debt"])) == Decimal("1500.00")
+    assert financial["payment_state"] == "DEPOSIT"
     deposit = client.get(f"/api/admin/companies/{company['id']}/deposit").json()
     assert Decimal(str(deposit["balance"])) == Decimal("0.00")

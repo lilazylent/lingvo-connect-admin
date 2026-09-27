@@ -9,6 +9,7 @@ import { Badge, Button, EmptyState, ErrorState, FilePicker, Input, LoadingState,
 import { useToast } from "@/components/toast";
 import { api, apiDownloadUrl, ApiError } from "@/lib/api";
 import { formatBytes, formatDate, serviceLabel, serviceOptions, sourceLabels, statusMeta, statusOptions } from "@/lib/applications";
+import { formatCrmDate } from "@/lib/format-date";
 import { applicationActivityLabel } from "@/lib/activity-labels";
 import type { ApplicationDetail, ApplicationStatus, UserSummary } from "@/lib/types";
 
@@ -108,7 +109,7 @@ export default function ApplicationDetailPage() {
 
     <div className="detail-overview" id="request">
       <section className="detail-panel detail-panel--contact"><div className="panel-title"><div><h2>Кто обратился</h2><p>{item.source === "website" ? "Контакт получен из формы на сайте" : "Обращение зарегистрировано сотрудником"}</p></div></div><div className="contact-identity"><span aria-hidden="true">{(item.name || "?").slice(0, 1).toUpperCase()}</span><div><h3>{item.name || "Контакт не указан"}</h3><p>{item.company || "Компания не указана"}</p></div></div><dl className="data-list"><div><dt>Связаться</dt><dd>{item.email ? <a href={`mailto:${item.email}`}>{item.email} ↗</a> : item.phone ? <a href={`tel:${item.phone}`}>{item.phone} ↗</a> : item.contact || "Контакт не указан"}</dd></div><div><dt>Источник</dt><dd>{sourceLabels[item.source]}</dd></div></dl><p className="context-note">Это контакт по заявке, а не отдельная карточка клиента. Компания указывается менеджером в рабочих данных ниже.</p></section>
-      <section className="detail-panel detail-panel--request"><div className="panel-title"><div><h2>Исходный запрос</h2><p>Сообщение сохранено в том виде, в котором поступило</p></div></div><p className="request-message">{item.message || "Описание пока не заполнено."}</p><dl className="data-list data-list--inline"><div><dt>Услуга</dt><dd>{serviceLabel(item.requested_service)}</dd></div><div><dt>Языки</dt><dd>{[item.source_language, item.target_language].filter(Boolean).join(" → ") || "Нужно уточнить"}</dd></div><div><dt>Желаемая дата</dt><dd>{item.desired_date ? new Intl.DateTimeFormat("ru-RU", { dateStyle: "long" }).format(new Date(`${item.desired_date}T00:00:00`)) : "Нужно уточнить"}</dd></div></dl></section>
+      <section className="detail-panel detail-panel--request"><div className="panel-title"><div><h2>Исходный запрос</h2><p>Сообщение сохранено в том виде, в котором поступило</p></div></div><p className="request-message">{item.message || "Описание пока не заполнено."}</p><dl className="data-list data-list--inline"><div><dt>Услуга</dt><dd>{serviceLabel(item.requested_service)}</dd></div><div><dt>Языки</dt><dd>{[item.source_language, item.target_language].filter(Boolean).join(" → ") || "Нужно уточнить"}</dd></div><div><dt>Желаемая дата</dt><dd>{formatCrmDate(item.desired_date, "Нужно уточнить")}</dd></div></dl></section>
     </div>
 
     <form id="processing" className="detail-panel operational-form" onSubmit={saveOverview}>

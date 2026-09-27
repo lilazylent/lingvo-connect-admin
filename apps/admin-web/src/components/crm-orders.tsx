@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, apiDownloadUrl } from "@/lib/api";
+import { formatCrmDate } from "@/lib/format-date";
 import type { UserSummary } from "@/lib/types";
 import {
   ActionMenu,
@@ -22,7 +23,7 @@ import { Icon, Pictogram } from "./icons";
 
 type Money = string | number;
 type ClientDepositPreview = { company_id: string; balance: Money; transactions: unknown[] };
-type Page<T> = { items: T[]; total: number; page: number; pages: number };
+type Page<T> = { items: T[]; total: number; total_all: number; page: number; pages: number };
 type ServiceDefinition = {
   category: string;
   fields: string[];
@@ -188,6 +189,7 @@ type Financial = {
   margin_percent: Money;
   client_paid: Money;
   client_debt: Money;
+  payment_state: "PAID" | "UNPAID" | "PARTIAL" | "DEPOSIT";
   executor_assignment_count?: number;
   executor_breakdown?: FinanceWorkBreakdown[];
 };
@@ -377,7 +379,7 @@ export const workTypes = [
 
 const orderStatuses = [
   ["NEW", "Новый"],
-  ["ESTIMATING", "В расчёте"],
+  ["ESTIMATING", "Рассчитан"],
   ["APPROVED", "Согласован"],
   ["IN_PROGRESS", "В работе"],
   ["REVIEW", "На проверке"],
@@ -436,13 +438,23 @@ const billingUnits = [
 const statusLabel = (
   status: string,
   options: StatusOption[] = fallbackStatuses,
-) => options.find((option) => option.code === status)?.name ?? status;
+) => status === "ESTIMATING" ? "Рассчитан" : options.find((option) => option.code === status)?.name ?? status;
 const rub = (value: Money | null | undefined) =>
   `${Number(value ?? 0).toLocaleString("ru-RU", { maximumFractionDigits: 2 })} ₽`;
-const orderCreatedDate = (value: string) =>
-  new Date(value).toLocaleDateString("ru-RU");
+const orderCreatedDate = formatCrmDate;
 const billingUnitLabel = (unit: string) =>
   billingUnits.find(([value]) => value === unit)?.[1] ?? unit;
+const compactRateUnit = (unit: string) => ({
+  CONDITIONAL_PAGE: "₽/усл.стр.", PER_1000_CHARS: "₽/1000 зн.",
+  PER_PAGE: "₽/стр.", PER_DOCUMENT: "₽/док.",
+  PER_SECOND: "₽/сек.", PER_MINUTE: "₽/мин.",
+  HOURLY: "₽/час", FIXED: "₽/услугу", CUSTOM: "₽/ед.",
+} as Record<string, string>)[unit] ?? "₽/ед.";
+const compactRateLabel = (rate: Money, unit: string) =>
+  `${Number(rate || 0).toLocaleString("ru-RU", { maximumFractionDigits: 2 })} ${compactRateUnit(unit)}`;
+const paymentStateLabel = (state: Financial["payment_state"]) => ({
+  PAID: "Оплачено", UNPAID: "Не оплачено", PARTIAL: "Частично оплачено", DEPOSIT: "Депозит",
+})[state];
 const billingQuantityLabel = (unit: string, quantity: number) => {
   const formatted = quantity.toLocaleString("ru-RU", { maximumFractionDigits: 2 });
   if (unit === "CONDITIONAL_PAGE") return `${formatted} усл. стр.`;
@@ -501,14 +513,17 @@ const workVolumeLabel = (work: Work) => {
   return "Объём не указан";
 };
 const workTimingLabel = (work: DraftWork | Work) => {
-  const start = [work.start_date, work.start_time].filter(Boolean).join(" ");
-  const end = [work.deadline, work.deadline_time].filter(Boolean).join(" ");
+  const start = [formatCrmDate(work.start_date, ""), work.start_time].filter(Boolean).join(" ");
+  const end = [formatCrmDate(work.deadline, ""), work.deadline_time].filter(Boolean).join(" ");
   if (start && end) return `${start} → ${end}`;
   return end || start || "Срок не указан";
 };
-const executorVolumeLabel = (assignment: FinanceExecutorAssignment) => {
-  if (assignment.character_count)
-    return `${Number(assignment.character_count).toLocaleString("ru-RU")} зн.`;
+const executorVolumeLabel = (assignment: Pick<FinanceExecutorAssignment, "billing_unit" | "character_count" | "page_count" | "document_count" | "duration_seconds" | "hour_count">) => {
+  const quantity = assignment.billing_unit === "CONDITIONAL_PAGE" && Number(assignment.page_count || 0) > 0
+    ? Number(assignment.page_count)
+    : numericQuantity(assignment.billing_unit, assignment);
+  if (quantity > 0) return billingQuantityLabel(assignment.billing_unit, Number(quantity.toFixed(1)));
+  if (assignment.character_count) return `${Number(assignment.character_count).toLocaleString("ru-RU")} зн.`;
   if (assignment.document_count)
     return `${Number(assignment.document_count).toLocaleString("ru-RU")} док.`;
   if (assignment.duration_seconds)
@@ -746,12 +761,14 @@ function localPrice(work: DraftWork, executor = false) {
 
 export function CrmOrders() {
   const searchParams = useSearchParams();
+  const orderDetailRef = useRef<HTMLDivElement>(null);
   const [data, setData] = useState<Page<Order> | null>(null);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
-  const [archived, setArchived] = useState(false);
-  const [overdue, setOverdue] = useState("");
-  const [paid, setPaid] = useState("");
+  const [archived, setArchived] = useState(searchParams.get("archived") === "true");
+  const [overdue, setOverdue] = useState(searchParams.get("overdue") ?? "");
+  const [paid, setPaid] = useState(searchParams.get("paid") ?? "");
+  const [scope, setScope] = useState(searchParams.get("scope") ?? "");
   const [language, setLanguage] = useState("");
   const [executorId, setExecutorId] = useState("");
   const [page, setPage] = useState(1);
@@ -776,6 +793,7 @@ export function CrmOrders() {
       });
       if (overdue) params.set("overdue", overdue);
       if (paid) params.set("paid", paid);
+      if (scope) params.set("scope", scope);
       if (language) params.set("language", language);
       if (executorId) params.set("executor_id", executorId);
       const metricBase = new URLSearchParams({ archived: "false", page: "1", page_size: "1", q: "" });
@@ -787,12 +805,12 @@ export function CrmOrders() {
         api<Page<Order>>(`/api/admin/crm/orders?${new URLSearchParams({ ...Object.fromEntries(metricBase), overdue: "true" }).toString()}`),
       ]);
       setData(result);
-      setMetrics({ total: result.total, active: activeRows.total, completed: completedRows.total, awaiting: awaitingRows.total, overdue: overdueRows.total });
+      setMetrics({ total: result.total_all ?? result.total, active: activeRows.total, completed: completedRows.total, awaiting: awaitingRows.total, overdue: overdueRows.total });
       setError("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось загрузить заказы");
     }
-  }, [query, status, archived, overdue, paid, language, executorId, page]);
+  }, [query, status, archived, overdue, paid, scope, language, executorId, page]);
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
@@ -812,10 +830,25 @@ export function CrmOrders() {
   }, [applicationId]);
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      if (openId) setSelectedId(openId);
+      setSelectedId(openId || null);
     }, 0);
     return () => window.clearTimeout(timer);
   }, [openId]);
+  useEffect(() => {
+    if (!selectedId) return;
+    const frame = window.requestAnimationFrame(() => {
+      orderDetailRef.current?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        block: "start",
+      });
+      orderDetailRef.current?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [selectedId]);
+  const openOrder = (id: string) => {
+    if (selectedId === id) orderDetailRef.current?.scrollIntoView({ block: "start" });
+    setSelectedId(id);
+  };
 
   const currentBoard = archived ? "ARCHIVE" : "MAIN";
   const boardStatusOptions = statusOptions.filter(
@@ -877,7 +910,7 @@ export function CrmOrders() {
             {boardStatusOptions
               .map((s) => (
                 <option key={s.code} value={s.code}>
-                  {s.name}
+                  {statusLabel(s.code, boardStatusOptions)}
                 </option>
               ))}
           </Select>
@@ -923,6 +956,13 @@ export function CrmOrders() {
             <option value="">Любая оплата</option>
             <option value="true">Оплачено</option>
             <option value="false">Есть долг</option>
+          </Select>
+          <Select label="Подборка" value={scope} onChange={(e) => { setScope(e.target.value); setPage(1); }}>
+            <option value="">Все заказы</option>
+            <option value="active">Активные</option>
+            <option value="due_today">Сдать сегодня</option>
+            <option value="unassigned">Без исполнителя</option>
+            <option value="awaiting_payment">Ждут оплаты</option>
           </Select>
         </div>
         <div className="phase5-orders-viewbar">
@@ -974,13 +1014,13 @@ export function CrmOrders() {
         />
       )}
       {selectedId && (
-        <OrderCard
+        <div ref={orderDetailRef} className="order-detail-anchor" tabIndex={-1}><OrderCard
           key={selectedId}
           orderId={selectedId}
           statuses={statusOptions}
           onClose={() => setSelectedId(null)}
           onChanged={load}
-        />
+        /></div>
       )}
       {!data ? (
         <LoadingState label="Загружаем заказы" />
@@ -990,14 +1030,14 @@ export function CrmOrders() {
           statuses={statusOptions}
           page={page}
           setPage={setPage}
-          select={setSelectedId}
+          select={openOrder}
         />
       ) : (
         <OrdersKanban
           orders={data.items}
           statuses={statusOptions}
           archived={archived}
-          select={setSelectedId}
+          select={openOrder}
           onChanged={load}
         />
       )}
@@ -1035,7 +1075,7 @@ function OrdersTable({
 }) {
   return (
     <section className="table-surface crm-order-table">
-      <div className="table-caption">Всего заказов: {data.total}</div>
+      <div className="table-caption">Заказов в текущей выборке: {data.total}</div>
       <div className="table-wrap">
         <table>
           <thead>
@@ -1063,7 +1103,7 @@ function OrdersTable({
                 <td>
                   <strong>{o.client_name || "Клиент не указан"}</strong>
                 </td>
-                <td>{o.deadline || "—"}</td>
+                <td>{formatCrmDate(o.deadline)}</td>
                 <td>
                   <Badge
                     tone={
@@ -1080,10 +1120,8 @@ function OrdersTable({
                 </td>
                 <td>
                   {o.financial ? (
-                    <span className={Number(o.financial.client_debt) > 0 ? "order-debt is-open" : "order-debt is-paid"}>
-                      {Number(o.financial.client_debt) > 0
-                        ? `Долг ${rub(o.financial.client_debt)}`
-                        : "Оплачено"}
+                    <span className={`order-debt ${o.financial.payment_state === "PAID" ? "is-paid" : "is-open"}`}>
+                      {paymentStateLabel(o.financial.payment_state)}
                     </span>
                   ) : "—"}
                 </td>
@@ -1139,6 +1177,7 @@ function OrdersKanban({
     .filter((status) => status.active && status.board === board)
     .sort((a, b) => a.sort_order - b.sort_order);
   const [moving, setMoving] = useState("");
+  const boardRef = useRef<HTMLDivElement>(null);
   async function move(id: string, status: string) {
     if (!id || moving) return;
     setMoving(id);
@@ -1153,7 +1192,15 @@ function OrdersKanban({
     }
   }
   return (
-    <section className="kanban-board">
+    <section className="kanban-workspace" aria-label="Канбан заказов">
+      <div className="kanban-navigation">
+        <span>Этапы заказов · {visible.length}</span>
+        <div>
+          <button type="button" aria-label="Прокрутить этапы влево" onClick={() => boardRef.current?.scrollBy({ left: -280, behavior: "smooth" })}>←</button>
+          <button type="button" aria-label="Прокрутить этапы вправо" onClick={() => boardRef.current?.scrollBy({ left: 280, behavior: "smooth" })}>→</button>
+        </div>
+      </div>
+      <div ref={boardRef} className="kanban-board" style={{ gridTemplateColumns: `repeat(${visible.length}, minmax(245px, 1fr))` }}>
       {visible.map((status) => {
         const value = status.code;
         return (
@@ -1167,7 +1214,7 @@ function OrdersKanban({
             }}
           >
             <header>
-              <strong>{status.name}</strong>
+              <strong>{statusLabel(status.code, statuses)}</strong>
               <span>{orders.filter((o) => o.status === value).length}</span>
             </header>
             <div className="kanban-stack">
@@ -1191,7 +1238,7 @@ function OrdersKanban({
                       <small className="order-created-date">Создан {orderCreatedDate(o.created_at)}</small>
                       <strong>{o.client_name || "Клиент не указан"}</strong>
                       <small>
-                        {o.deadline ? `Срок ${o.deadline}` : "Срок не указан"}
+                        {o.deadline ? `Срок ${formatCrmDate(o.deadline)}` : "Срок не указан"}
                       </small>
                       {o.financial && Number(o.financial.client_debt) > 0 && (
                         <small className="kanban-card__debt">Долг {rub(o.financial.client_debt)}</small>
@@ -1207,7 +1254,7 @@ function OrdersKanban({
                         .filter((s) => (s.active && s.board === board) || s.code === o.status)
                         .map((s) => (
                           <option key={s.code} value={s.code}>
-                            {s.name}
+                            {statusLabel(s.code, statuses)}
                           </option>
                         ))}
                     </Select>
@@ -1220,6 +1267,7 @@ function OrdersKanban({
           </div>
         );
       })}
+      </div>
     </section>
   );
 }
@@ -2765,11 +2813,11 @@ function ExecutorAssignmentsEditor({
                       </div>
                       <div>
                         <span>Ставка по умолчанию</span>
-                        <strong>{rub(candidate.default_rate)} / {billingUnits.find(([value]) => value === candidate.rate_unit)?.[1] || candidate.rate_unit}</strong>
+                        <strong>{compactRateLabel(candidate.default_rate, candidate.rate_unit)}</strong>
                       </div>
                       <div>
                         <span>Проверка срока</span>
-                        <strong>{candidateData.required_date || "Дата не указана"}</strong>
+                        <strong>{formatCrmDate(candidateData.required_date, "Дата не указана")}</strong>
                       </div>
                     </div>
                     <div className="executor-candidate-rate">
@@ -2874,7 +2922,7 @@ function ExecutorAssignmentsEditor({
                             <div className={`executor-route-candidate is-${candidate.candidate_state.toLowerCase()}`} key={candidate.executor_id}>
                               <div>
                                 <strong>{candidate.executor_name}</strong>
-                                <span>{rub(candidate.default_rate)} / {billingUnits.find(([value]) => value === candidate.rate_unit)?.[1] || candidate.rate_unit}</span>
+                                <span>{compactRateLabel(candidate.default_rate, candidate.rate_unit)}</span>
                                 <button
                                   type="button"
                                   className="executor-rate-toggle"
@@ -3201,7 +3249,7 @@ function OrderCard({
   const [workEditor, setWorkEditor] = useState<WorkEditorState | null>(null);
   const [savingWork, setSavingWork] = useState(false);
   const [copiedClientSummary, setCopiedClientSummary] = useState(false);
-  const [activeTab, setActiveTab] = useState<"core" | "works" | "finance" | "files" | "history">("core");
+  const [activeTab, setActiveTab] = useState<"core" | "works" | "executors" | "finance" | "files" | "history">("core");
   const [paymentEdit, setPaymentEdit] = useState(false);
   const [paymentDraft, setPaymentDraft] = useState({
     amount_paid: "0",
@@ -3522,6 +3570,20 @@ function OrderCard({
   const currentStatusIndex = visibleStatuses.findIndex(
     (status) => status.code === order.status,
   );
+  const executorGroups = new Map<string, { name: string; rows: { work: Work; assignment: ExecutorAssignment | null }[] }>();
+  for (const work of order.works) {
+    for (const assignment of work.executor_assignments) {
+      const key = assignment.executor_id || assignment.executor_name;
+      const group = executorGroups.get(key) || { name: assignment.executor_name || "Исполнитель", rows: [] };
+      group.rows.push({ work, assignment });
+      executorGroups.set(key, group);
+    }
+    if (work.executor_id && !work.executor_assignments.length) {
+      const group = executorGroups.get(work.executor_id) || { name: "", rows: [] };
+      group.rows.push({ work, assignment: null });
+      executorGroups.set(work.executor_id, group);
+    }
+  }
 
   return (
     <section className="crm-order-card phase5-order-card">
@@ -3531,7 +3593,7 @@ function OrderCard({
           <h2>Заказ {order.number}</h2>
           <p>
             {order.deadline
-              ? `Общий дедлайн ${order.deadline}`
+              ? `Общий дедлайн ${formatCrmDate(order.deadline)}`
               : "Общий дедлайн не указан"}
           </p>
         </div>
@@ -3587,7 +3649,7 @@ function OrderCard({
                   index={index + 1}
                   state={isCurrent ? "current" : isPast ? "completed" : "future"}
                 />
-                <span className="order-stage__label">{status.name}</span>
+                <span className="order-stage__label">{statusLabel(status.code, visibleStatuses)}</span>
               </button>
             );
           })}
@@ -3597,6 +3659,7 @@ function OrderCard({
         {([
           ["core", "Основное"],
           ["works", `Работы ${order.works.length}`],
+          ["executors", `Исполнители ${executorGroups.size}`],
           ["finance", "Финансы"],
           ["files", `Файлы ${order.files.length}`],
           ["history", "История"],
@@ -3720,7 +3783,7 @@ function OrderCard({
             </div>
             <div>
               <span>Дедлайн</span>
-              <strong>{order.deadline || "Не указан"}</strong>
+              <strong>{formatCrmDate(order.deadline, "Не указан")}</strong>
             </div>
             <div>
               <span>Создан</span>
@@ -3734,15 +3797,12 @@ function OrderCard({
         )}
       </section>
       <section id="order-finance" role="tabpanel" className={`phase5-finance-workspace phase5-order-panel${activeTab === "finance" ? " is-active" : ""}`}>
+        <header className="phase5-finance-workspace__head">
+          <div><span className="overline">Финансы</span><h3>Экономика заказа</h3></div>
+          <p>Стоимость, выплаты, прибыль, маржинальность и текущий долг клиента.</p>
+        </header>
         <div className="phase5-finance-main-column">
           <div className="order-finance-module">
-            <header>
-              <div>
-                <span className="overline">Финансы</span>
-                <h3>Экономика заказа</h3>
-              </div>
-              <p>Стоимость, выплаты, прибыль, маржинальность и текущий долг клиента.</p>
-            </header>
             <div className="finance-strip">
               <div className="finance-strip__primary finance-metric finance-metric--total">
                 <span>Итоговая стоимость заказа</span>
@@ -3813,8 +3873,7 @@ function OrderCard({
                               </div>
                               <div>
                                 <span>Ставка</span>
-                                <strong>{rub(assignment.rate)}</strong>
-                                <small>{billingUnitLabel(assignment.billing_unit)}</small>
+                                <strong>{compactRateLabel(assignment.rate, assignment.billing_unit)}</strong>
                               </div>
                               <div>
                                 <span>Стоимость</span>
@@ -4033,7 +4092,6 @@ function OrderCard({
                       <strong>{serviceName(w.service_code)}</strong>
                       <div className="order-work-card__meta">
                         <span className="order-work-card__direction">{direction}</span>
-                        <span>{volume}</span>
                         {w.urgent && <span className="work-chip work-chip--urgent">Срочно</span>}
                         {w.native_speaker && <span className="work-chip">Носитель</span>}
                         {w.client_billable === false && <span className="work-chip">Внутренняя работа</span>}
@@ -4043,33 +4101,32 @@ function OrderCard({
                       {statusLabel(w.status)}
                     </Badge>
                   </div>
-                  <div className="order-work-card__grid">
-                    <div>
-                      <span>Исполнитель</span>
-                      <strong>
-                        {w.executor_assignments.length
-                          ? w.executor_assignments.map((assignment) => assignment.executor_name || "Исполнитель").join(", ")
-                          : w.executor_id
-                            ? <ExecutorName id={w.executor_id} />
-                            : "Не назначен"}
-                      </strong>
-                    </div>
-                    <div>
-                      <span>Дедлайн</span>
-                      <strong>{w.deadline || "—"}</strong>
-                    </div>
-                    <div>
-                      <span>Тариф клиенту</span>
-                      <strong>{rub(w.client_rate)}</strong>
-                    </div>
-                    <div>
-                      <span>Стоимость для клиента</span>
-                      <strong>{w.client_billable === false ? "Не учитывается" : rub(w.price)}</strong>
-                    </div>
-                    <div>
-                      <span>Выплата исполнителю</span>
-                      <strong>{rub(w.executor_cost)}</strong>
-                    </div>
+                  <div className="order-work-card__sections">
+                    <section className="order-work-card__segment" aria-label="Условия для клиента">
+                      <h4>Для клиента</h4>
+                      <dl>
+                        <div><dt>Тариф</dt><dd>{compactRateLabel(w.client_rate, w.billing_unit)}</dd></div>
+                        <div><dt>Объём</dt><dd>{volume}</dd></div>
+                        <div><dt>Срочность</dt><dd>{w.urgent ? `Да · ×${Number(w.urgency_multiplier || 1).toLocaleString("ru-RU")}` : "Обычная"}</dd></div>
+                        <div><dt>Скидка</dt><dd>{Number(w.discount_percent || 0).toLocaleString("ru-RU", { maximumFractionDigits: 1 })}%</dd></div>
+                        {w.price_overridden && w.price_override_reason && <div><dt>Причина изменения цены</dt><dd>{w.price_override_reason}</dd></div>}
+                        <div><dt>Стоимость</dt><dd>{w.client_billable === false ? "Не учитывается" : rub(w.price)}</dd></div>
+                        <div><dt>Срок</dt><dd>{formatCrmDate(w.deadline, "Не указан")}</dd></div>
+                      </dl>
+                    </section>
+                    <section className="order-work-card__segment" aria-label="Условия для исполнителей">
+                      <h4>Исполнители</h4>
+                      {w.executor_assignments.length ? w.executor_assignments.map((assignment) => (
+                        <div className="order-work-card__executor" key={assignment.id}>
+                          <strong>{assignment.executor_name || "Исполнитель"}</strong>
+                          <dl>
+                            <div><dt>Объём</dt><dd>{executorVolumeLabel(assignment)}</dd></div>
+                            <div><dt>Ставка</dt><dd>{compactRateLabel(assignment.rate, assignment.billing_unit)}</dd></div>
+                            <div><dt>Стоимость</dt><dd>{rub(assignment.cost)}</dd></div>
+                          </dl>
+                        </div>
+                      )) : w.executor_id ? <div className="order-work-card__executor"><strong><ExecutorName id={w.executor_id} /></strong><dl><div><dt>Объём</dt><dd>{volume}</dd></div><div><dt>Ставка</dt><dd>{compactRateLabel(w.executor_rate, w.executor_billing_unit || w.billing_unit)}</dd></div><div><dt>Стоимость</dt><dd>{rub(w.executor_cost)}</dd></div></dl></div> : <p>Исполнитель пока не назначен.</p>}
+                    </section>
                   </div>
                   <div className="work-row-actions">
                     <Button
@@ -4107,6 +4164,28 @@ function OrderCard({
                 </article>
               )})}
               {!order.works.length && <p className="crm-empty">В заказе пока нет работ.</p>}
+            </div>
+          </section>
+          <section id="order-executors" role="tabpanel" className={`order-card-section phase5-order-panel${activeTab === "executors" ? " is-active" : ""}`}>
+            <header><div><span className="overline">Назначения</span><h3>Исполнители заказа</h3></div></header>
+            <div className="order-executor-groups">
+              {[...executorGroups.entries()].map(([executorId, group]) => (
+                <article className="order-executor-group" key={executorId}>
+                  <h4>{group.name || <ExecutorName id={executorId} />}</h4>
+                  {group.rows.map(({ work, assignment }, index) => (
+                    <div className="order-executor-group__work" key={assignment?.id || `${work.id}-${index}`}>
+                      <strong>{serviceName(work.service_code)}</strong>
+                      <span>{[assignment?.route_source_language || work.source_language, assignment?.route_target_language || work.target_language].filter(Boolean).join(" → ") || "Без языковой пары"}</span>
+                      <dl>
+                        <div><dt>Объём</dt><dd>{assignment ? executorVolumeLabel(assignment) : workVolumeLabel(work)}</dd></div>
+                        <div><dt>Ставка</dt><dd>{compactRateLabel(assignment?.rate ?? work.executor_rate, assignment?.billing_unit || work.executor_billing_unit || work.billing_unit)}</dd></div>
+                        <div><dt>Стоимость</dt><dd>{rub(assignment?.cost ?? work.executor_cost)}</dd></div>
+                      </dl>
+                    </div>
+                  ))}
+                </article>
+              ))}
+              {!executorGroups.size && <p className="crm-empty">Исполнители ещё не назначены. Назначьте их в карточке работы.</p>}
             </div>
           </section>
           <section id="order-files" role="tabpanel" className={`order-card-section phase5-order-panel${activeTab === "files" ? " is-active" : ""}`}>
@@ -4300,7 +4379,7 @@ function OrderCard({
                 </div>
                 <div>
                   <span>Дата оплаты</span>
-                  <strong>{order.payment?.paid_at || "—"}</strong>
+                  <strong>{formatCrmDate(order.payment?.paid_at, "—")}</strong>
                 </div>
               </div>
             )}

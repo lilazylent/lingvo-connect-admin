@@ -60,6 +60,11 @@
   overflow-x: auto;
   overscroll-behavior-inline: contain;
 }
+.kanban-workspace { min-width: 0; max-width: 100%; }
+.kanban-navigation { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; color: var(--crm-text-secondary); border: 1px solid var(--crm-border); border-radius: var(--ui-radius-control); background: var(--crm-surface-raised); }
+.kanban-navigation > div { display: flex; gap: 6px; }
+.kanban-navigation button { min-width: 38px; min-height: 34px; border: 1px solid var(--crm-border); border-radius: var(--ui-radius-control); color: var(--crm-text); background: var(--crm-surface); cursor: pointer; }
+.kanban-navigation button:hover, .kanban-navigation button:focus-visible { border-color: var(--crm-accent); color: var(--crm-accent); }
 .kanban-column { min-height: 320px; border-color: var(--crm-border); background: var(--crm-surface-raised); }
 .kanban-column > header { background: color-mix(in srgb, var(--crm-surface) 88%, var(--status-color)); }
 .kanban-card { color: var(--crm-text); border-color: var(--crm-border); background: var(--crm-surface); box-shadow: var(--ui-shadow-xs); }
@@ -341,7 +346,7 @@
 .phase5-order-card .order-work-table { display: grid; gap: var(--ui-space-2); }
 .phase5-order-card .order-work-card {
   display: grid;
-  grid-template-columns: minmax(250px,1.2fr) minmax(420px,2fr) auto;
+  grid-template-columns: minmax(0,1fr);
   gap: var(--ui-space-3);
   align-items: center;
   padding: 12px;
@@ -378,6 +383,17 @@
   line-height: 1.25;
 }
 .phase5-order-card .order-work-card__meta { margin-top: 3px; }
+.phase5-order-card .order-work-card__sections { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--ui-space-3); min-width: 0; }
+.phase5-order-card .order-work-card__segment, .phase5-order-card .order-executor-group { min-width: 0; padding: var(--ui-space-3); border: 1px solid var(--crm-border); border-radius: var(--ui-radius-control); background: var(--crm-surface); }
+.phase5-order-card .order-work-card__segment h4, .phase5-order-card .order-executor-group h4 { margin: 0 0 10px; color: var(--crm-text); font-size: var(--ui-text-md); }
+.phase5-order-card .order-work-card__segment dl, .phase5-order-card .order-executor-group dl { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px 14px; margin: 0; }
+.phase5-order-card .order-work-card__segment dl > div, .phase5-order-card .order-executor-group dl > div { min-width: 0; }
+.phase5-order-card .order-work-card__segment dt, .phase5-order-card .order-executor-group dt { color: var(--crm-text-secondary); font-size: var(--ui-text-xs); }
+.phase5-order-card .order-work-card__segment dd, .phase5-order-card .order-executor-group dd { margin: 3px 0 0; color: var(--crm-text); font-weight: 650; overflow-wrap: anywhere; }
+.phase5-order-card .order-work-card__executor + .order-work-card__executor, .phase5-order-card .order-executor-group__work + .order-executor-group__work { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--crm-border); }
+.phase5-order-card .order-work-card__executor > strong, .phase5-order-card .order-executor-group__work > strong { display: block; margin-bottom: 10px; color: var(--crm-text); }
+.phase5-order-card .order-executor-groups { display: grid; gap: var(--ui-space-3); }
+.phase5-order-card .order-executor-group__work > span { display: block; margin: -5px 0 10px; color: var(--crm-text-secondary); }
 .phase5-order-card .order-work-card__grid { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: var(--ui-space-2); }
 .phase5-order-card .order-work-card__grid > div { min-width: 0; }
 .phase5-order-card .work-row-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 4px; }
@@ -552,6 +568,7 @@
 }
 
 @media (max-width: 900px) {
+  .phase5-order-card .order-work-card__sections { grid-template-columns: 1fr; }
   :is(.phase5-order-card, .executor-step) .executor-candidate-list { grid-template-columns: 1fr; }
   .phase5-orders-filters { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .phase5-orders-search { grid-column: 1 / -1; }
@@ -565,8 +582,9 @@
   .phase5-order-card .file-metric-row__metric { display: none; }
   .phase5-order-card .payment-edit { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
-
 @media (max-width: 620px) {
+  .phase5-order-card .order-work-card__segment dl,
+  .phase5-order-card .order-executor-group dl { grid-template-columns: 1fr; }
   :is(.phase5-order-card, .executor-step) .executor-assignments__head,
   :is(.phase5-order-card, .executor-step) .executor-matching__head { align-items: stretch; flex-direction: column; }
   :is(.phase5-order-card, .executor-step) .executor-assignments__actions { width: 100%; justify-content: stretch; }

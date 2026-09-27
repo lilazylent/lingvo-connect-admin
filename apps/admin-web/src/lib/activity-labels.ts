@@ -63,13 +63,6 @@ export function applicationActivityLabel(eventType: string | null | undefined) {
 
 export function formatActivityDate(value: string | null | undefined) {
   if (!value) return "Дата не указана";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Дата не указана";
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
+  return formatCrmDateTime(value, "Дата не указана");
 }
+import { formatCrmDateTime } from "@/lib/format-date";

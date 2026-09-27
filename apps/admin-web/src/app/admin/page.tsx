@@ -8,8 +8,10 @@ import { Icon, Pictogram, type IconName } from "@/components/icons";
 import { api } from "@/lib/api";
 import type { ApplicationList } from "@/lib/types";
 import { formatDate, statusMeta } from "@/lib/applications";
+import { formatCrmDate } from "@/lib/format-date";
 
 type Summary = {
+  total_orders: number;
   new_leads: number;
   active_orders: number;
   due_today: number;
@@ -33,7 +35,7 @@ const rub = (value: string | number) => `${Number(value).toLocaleString("ru-RU",
 
 const orderStatus: Record<string, string> = {
   NEW: "Новый",
-  ESTIMATING: "В расчёте",
+  ESTIMATING: "Рассчитан",
   APPROVED: "Согласован",
   IN_PROGRESS: "В работе",
   REVIEW: "На проверке",
@@ -77,11 +79,11 @@ export default function DashboardPage() {
 
   const metrics: Array<{ label: string; value: number; icon: IconName; tone: string; href: string }> = [
     { label: "Новые заявки", value: summary.new_leads, icon: "document", tone: "wine", href: "/admin/applications?status_code=NEW" },
-    { label: "Активные заказы", value: summary.active_orders, icon: "folder", tone: "slate", href: "/admin/orders" },
-    { label: "Сдать сегодня", value: summary.due_today, icon: "clock", tone: "amber", href: "/admin/orders" },
-    { label: "Просрочено", value: summary.overdue, icon: "hourglass", tone: "red", href: "/admin/orders" },
-    { label: "Без исполнителя", value: summary.unassigned, icon: "executors", tone: "teal", href: "/admin/orders" },
-    { label: "Ждут оплаты", value: summary.awaiting_payment, icon: "wallet", tone: "gold", href: "/admin/orders" },
+    { label: "Активные заказы", value: summary.active_orders, icon: "folder", tone: "slate", href: "/admin/orders?scope=active" },
+    { label: "Сдать сегодня", value: summary.due_today, icon: "clock", tone: "amber", href: "/admin/orders?scope=due_today" },
+    { label: "Просрочено", value: summary.overdue, icon: "hourglass", tone: "red", href: "/admin/orders?overdue=true" },
+    { label: "Без исполнителя", value: summary.unassigned, icon: "executors", tone: "teal", href: "/admin/orders?scope=unassigned" },
+    { label: "Ждут оплаты", value: summary.awaiting_payment, icon: "wallet", tone: "gold", href: "/admin/orders?scope=awaiting_payment" },
   ];
 
   return (
@@ -116,7 +118,7 @@ export default function DashboardPage() {
                 <Link href={`/admin/orders?open=${order.id}`} className="lc-compact-table__row" key={order.id}>
                   <span>{order.number}</span>
                   <strong>{order.client_name || "Клиент не указан"}</strong>
-                  <span>{order.deadline || "—"}</span>
+                  <span>{formatCrmDate(order.deadline)}</span>
                   <Badge tone={order.status === "COMPLETED" ? "success" : order.status === "CANCELLED" ? "warning" : "neutral"}>{orderStatus[order.status] || order.status}</Badge>
                   <span className="lc-more" aria-hidden="true"><Icon name="arrow-right" size={15} /></span>
                 </Link>

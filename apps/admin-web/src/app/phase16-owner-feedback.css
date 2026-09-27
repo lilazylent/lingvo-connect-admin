@@ -4,10 +4,11 @@
    CRM surfaces inherit the same responsive rule.
    ========================================================================== */
 
-/* Orders command bar: never let a sixth filter escape the viewport. */
+/* Orders command bar: readable widths take priority over a single dense row. */
 .phase5-orders-filters {
-  grid-template-columns: minmax(280px, 1.35fr) repeat(5, minmax(145px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
+.phase5-orders-search { grid-column: span 2; }
 
 /* Settings dock: give every module title the full text column width. */
 .phase6-settings .settings-module-dock .settings-module-card__body {

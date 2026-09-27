@@ -14,6 +14,7 @@ import {
 import { api, ApiError } from "@/lib/api";
 import type { Role, User } from "@/lib/types";
 import { Icon, Pictogram } from "@/components/icons";
+import { formatCrmDate, formatCrmDateTime } from "@/lib/format-date";
 
 type PasswordResult = { temporary_password: string; warning: string };
 type InvitationStatus = "PENDING" | "EXPIRED";
@@ -515,5 +516,5 @@ function roleLabel(role: Role) {
 
 function formatDateTime(value: string | null, includeTime = true) {
   if (!value) return "";
-  return new Intl.DateTimeFormat("ru-RU", includeTime ? { dateStyle: "medium", timeStyle: "short" } : { dateStyle: "medium" }).format(new Date(value));
+  return includeTime ? formatCrmDateTime(value) : formatCrmDate(value);
 }

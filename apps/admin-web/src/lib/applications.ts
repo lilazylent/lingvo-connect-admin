@@ -1,4 +1,5 @@
 import type { ApplicationSource, ApplicationStatus } from "@/lib/types";
+import { formatCrmDateTime } from "@/lib/format-date";
 
 export const statusOptions: Array<{ value: ApplicationStatus; label: string; tone: "accent" | "warning" | "success" | "neutral" }> = [
   { value: "NEW", label: "Новая", tone: "accent" },
@@ -27,7 +28,7 @@ export function serviceLabel(code: string): string {
 }
 
 export function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("ru-RU", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  return formatCrmDateTime(value);
 }
 
 export function formatBytes(value: number): string {

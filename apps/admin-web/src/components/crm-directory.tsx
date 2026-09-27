@@ -6,6 +6,7 @@ import { useAuth } from "./auth-provider";
 import { CrmContacts } from "./crm-contacts";
 import { api } from "@/lib/api";
 import { formatActivityDate, operationalActivityLabel } from "@/lib/activity-labels";
+import { formatCrmDate, formatCrmDateTime } from "@/lib/format-date";
 import { Badge, Button, ErrorState, Input, LoadingState, Select, Textarea, type BadgeTone } from "./ui";
 import { Icon, Pictogram } from "./icons";
 import { LanguageCombobox } from "./language-combobox";
@@ -143,7 +144,7 @@ type ActivityItem = {
 
 const orderStatusLabels: Record<string, string> = {
   NEW: "Новый",
-  ESTIMATING: "Оценка",
+  ESTIMATING: "Рассчитан",
   APPROVED: "Согласован",
   IN_PROGRESS: "В работе",
   REVIEW: "Проверка",
@@ -210,9 +211,7 @@ function rub(value: string | number | null | undefined) {
 
 function shortDate(value: string | null | undefined) {
   if (!value) return "Без срока";
-  const date = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "2-digit" }).format(date);
+  return formatCrmDate(value, "Без срока");
 }
 
 function isoDate(date: Date) {
@@ -818,7 +817,7 @@ function ClientDepositPanel({ entry, initialBalance }: { entry: Entry; initialBa
       <strong>Последние операции</strong>
       {data?.transactions.length ? data.transactions.map((item) => <div className="client-deposit-operation" key={item.id}>
         <div><b>{depositOperationLabel(item.kind)}</b><span>{item.note || (item.order_id ? "Заказ клиента" : "Ручная операция")}</span></div>
-        <div><b className={Number(item.amount) < 0 ? "is-debit" : "is-credit"}>{Number(item.amount) > 0 ? "+" : ""}{rub(item.amount)}</b><span>{new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(item.created_at))}</span></div>
+        <div><b className={Number(item.amount) < 0 ? "is-debit" : "is-credit"}>{Number(item.amount) > 0 ? "+" : ""}{rub(item.amount)}</b><span>{formatCrmDateTime(item.created_at)}</span></div>
       </div>) : <p className="directory-muted">Операций пока нет.</p>}
     </div>
   </section>;
