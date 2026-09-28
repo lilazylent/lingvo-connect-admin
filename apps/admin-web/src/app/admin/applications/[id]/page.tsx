@@ -5,7 +5,8 @@ import { ApplicationLinks } from "@/components/crm-application-links";
 import { useParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 
-import { Badge, Button, EmptyState, ErrorState, FilePicker, Input, LoadingState, Select, Textarea } from "@/components/ui";
+import { Badge, Button, EmptyState, ErrorState, Input, LoadingState, MultiFilePicker, Select, Textarea } from "@/components/ui";
+import { uploadEach, uploadFailureMessage } from "@/lib/upload-files";
 import { useToast } from "@/components/toast";
 import { api, apiDownloadUrl, ApiError } from "@/lib/api";
 import { formatBytes, formatDate, serviceLabel, serviceOptions, sourceLabels, statusMeta, statusOptions } from "@/lib/applications";
@@ -22,7 +23,7 @@ export default function ApplicationDetailPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [comment, setComment] = useState("");
-  const [uploadDraft, setUploadDraft] = useState<File | null>(null);
+  const [uploadDraft, setUploadDraft] = useState<File[]>([]);
   const [fields, setFields] = useState({ name: "", contact_method: "email", contact: "", requested_service: "not_sure", message: "", company: "", source_language: "", target_language: "", desired_date: "", internal_summary: "", responsible_user_id: "" });
 
   const load = useCallback(async () => {
@@ -80,15 +81,20 @@ export default function ApplicationDetailPage() {
 
   async function uploadFile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!uploadDraft) return;
+    if (!uploadDraft.length) return;
     setSaving(true);
-    const body = new FormData();
-    body.append("upload", uploadDraft);
     try {
-      await api(`/api/admin/applications/${id}/files`, { method: "POST", body });
-      setUploadDraft(null);
+      const result = await uploadEach(uploadDraft, (next) => {
+        const body = new FormData();
+        body.append("upload", next);
+        return api(`/api/admin/applications/${id}/files`, { method: "POST", body });
+      });
+      // Keep only the files that failed so they can be retried; uploaded ones are listed below.
+      setUploadDraft(uploadDraft.filter((next) => !result.uploaded.includes(next)));
       setItem(await api<ApplicationDetail>(`/api/admin/applications/${id}`));
-      notify("Файл загружен");
+      const failure = uploadFailureMessage(result);
+      if (failure) setError(failure);
+      else notify(result.uploaded.length > 1 ? `Загружено файлов: ${result.uploaded.length}` : "Файл загружен");
     } catch (nextError) { setError(nextError instanceof ApiError ? nextError.message : "Не удалось загрузить файл"); }
     finally { setSaving(false); }
   }
@@ -136,7 +142,7 @@ export default function ApplicationDetailPage() {
 
     <div className="collaboration-grid" id="collaboration">
       <section className="detail-panel"><div className="panel-title"><span>04</span><h2>Комментарии</h2></div><form className="comment-form" onSubmit={addComment}><Textarea label="Новый комментарий" rows={3} value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Только для сотрудников" /><Button type="submit" disabled={saving || !comment.trim()}>Добавить</Button></form>{item.comments.length ? <div className="comment-list">{item.comments.map((entry) => <article key={entry.id}><header><strong>{entry.author.display_name}</strong><time>{formatDate(entry.created_at)}</time></header><p>{entry.body}</p>{entry.edited_at && <small>изменено</small>}</article>)}</div> : <EmptyState title="Комментариев пока нет" text="Зафиксируйте договорённость или следующий шаг." />}</section>
-      <section className="detail-panel"><div className="panel-title"><span>05</span><h2>Файлы</h2></div><form className="file-upload file-upload--custom" onSubmit={uploadFile}><FilePicker label="Выбрать файл" hint="PDF, DOCX, XLSX, PPTX, TXT, RTF, PNG, JPG · до 15 МБ" accept=".pdf,.docx,.xlsx,.pptx,.txt,.rtf,.png,.jpg,.jpeg" file={uploadDraft} disabled={saving} onChange={setUploadDraft} onClear={()=>setUploadDraft(null)}/><Button type="submit" variant="secondary" disabled={saving || !uploadDraft}>{saving ? "Загружаем…" : "Загрузить"}</Button></form>{item.files.length ? <div className="file-list">{item.files.map((file) => <a key={file.id} href={apiDownloadUrl(`/api/admin/applications/${id}/files/${file.id}/download`)}><span className="file-mark">DOC</span><span><strong>{file.original_name}</strong><small>{formatBytes(file.size_bytes)} · {file.uploader?.display_name ?? "Прикрепил клиент на сайте"}</small></span><i>Скачать ↓</i></a>)}</div> : <EmptyState title="Файлов пока нет" text="Добавьте исходный материал или техническое задание." />}</section>
+      <section className="detail-panel"><div className="panel-title"><span>05</span><h2>Файлы</h2></div><form className="file-upload file-upload--custom" onSubmit={uploadFile}><MultiFilePicker label="Выбрать файлы" hint="PDF, DOCX, XLSX, PPTX, TXT, RTF, PNG, JPG · до 15 МБ каждый" accept=".pdf,.docx,.xlsx,.pptx,.txt,.rtf,.png,.jpg,.jpeg" files={uploadDraft} disabled={saving} onChange={setUploadDraft}/><Button type="submit" variant="secondary" disabled={saving || !uploadDraft.length}>{saving ? "Загружаем…" : "Загрузить"}</Button></form>{item.files.length ? <div className="file-list">{item.files.map((file) => <a key={file.id} href={apiDownloadUrl(`/api/admin/applications/${id}/files/${file.id}/download`)}><span className="file-mark">DOC</span><span><strong>{file.original_name}</strong><small>{formatBytes(file.size_bytes)} · {file.uploader?.display_name ?? "Прикрепил клиент на сайте"}</small></span><i>Скачать ↓</i></a>)}</div> : <EmptyState title="Файлов пока нет" text="Добавьте исходный материал или техническое задание." />}</section>
       <section className="detail-panel activity-panel"><div className="panel-title"><span>06</span><h2>История</h2></div>{item.activity.length ? <ol className="activity-list">{item.activity.map((event) => <li key={event.id}><span /><div><strong>{applicationActivityLabel(event.event_type)}</strong><small>{event.actor?.display_name ?? "Сайт / система"} · {formatDate(event.created_at)}</small></div></li>)}</ol> : <EmptyState title="История пуста" text="События появятся после изменений заявки." />}</section>
     </div>
   </>;

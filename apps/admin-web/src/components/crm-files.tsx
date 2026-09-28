@@ -7,11 +7,12 @@ import {
   Button,
   EmptyState,
   ErrorState,
-  FilePicker,
   Input,
   LoadingState,
+  MultiFilePicker,
   Select,
 } from "./ui";
+import { uploadEach, uploadFailureMessage } from "@/lib/upload-files";
 import { Icon } from "./icons";
 import { formatCrmDate } from "@/lib/format-date";
 
@@ -237,13 +238,13 @@ export function CrmFiles() {
           </section>
           {uploadOpen ? <FileUploadPanel
             onClose={() => setUploadOpen(false)}
-            onUploaded={() => { setUploadOpen(false); setRefresh((value) => value + 1); }}
+            onUploaded={(close = true) => { if (close) setUploadOpen(false); setRefresh((value) => value + 1); }}
           /> : selected ? <FilePreview item={selected} onClose={() => setSelected(null)} /> : null}
         </div>
       ) : data && !loading ? (
         <div className={`phase6-empty-workspace ${uploadOpen ? "has-panel" : ""}`}>
           <EmptyState title="Файлы не найдены" text="Измените фильтр или загрузите документ в заявку или заказ." />
-          {uploadOpen && <FileUploadPanel onClose={() => setUploadOpen(false)} onUploaded={() => { setUploadOpen(false); setRefresh((value) => value + 1); }} />}
+          {uploadOpen && <FileUploadPanel onClose={() => setUploadOpen(false)} onUploaded={(close = true) => { if (close) setUploadOpen(false); setRefresh((value) => value + 1); }} />}
         </div>
       ) : null}
 
@@ -315,12 +316,12 @@ function FilePreview({ item, onClose }: { item: FileRegistryItem; onClose: () =>
   </aside>;
 }
 
-function FileUploadPanel({ onClose, onUploaded }: { onClose: () => void; onUploaded: () => void }) {
+function FileUploadPanel({ onClose, onUploaded }: { onClose: () => void; onUploaded: (close?: boolean) => void }) {
   const [source, setSource] = useState<UploadSource>("order");
   const [query, setQuery] = useState("");
   const [targets, setTargets] = useState<UploadTarget[]>([]);
   const [target, setTarget] = useState<UploadTarget | null>(null);
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [searching, setSearching] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -359,19 +360,27 @@ function FileUploadPanel({ onClose, onUploaded }: { onClose: () => void; onUploa
 
   async function upload(event: FormEvent) {
     event.preventDefault();
-    if (!target || !file) return;
+    if (!target || !files.length) return;
     setBusy(true);
     setError("");
-    const body = new FormData();
-    body.set("upload", file);
     try {
-      await api(source === "order" ? `/api/admin/orders/${target.id}/files` : `/api/admin/applications/${target.id}/files`, {
-        method: "POST",
-        body,
+      const result = await uploadEach(files, (next) => {
+        const body = new FormData();
+        body.set("upload", next);
+        return api(source === "order" ? `/api/admin/orders/${target.id}/files` : `/api/admin/applications/${target.id}/files`, {
+          method: "POST",
+          body,
+        });
       });
-      onUploaded();
-    } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Не удалось загрузить файл");
+      const failure = uploadFailureMessage(result);
+      if (!failure) {
+        onUploaded();
+        return;
+      }
+      // Keep the panel open with only the failed files; the uploaded ones are already saved.
+      setFiles(files.filter((next) => !result.uploaded.includes(next)));
+      setError(failure);
+      if (result.uploaded.length) onUploaded(false);
     } finally {
       setBusy(false);
     }
@@ -397,8 +406,8 @@ function FileUploadPanel({ onClose, onUploaded }: { onClose: () => void; onUploa
         ><strong>{item.number || "Без номера"} · {item.title}</strong><small>{item.subtitle}</small></button>) : <span className="phase6-upload-targets__state">Ничего не найдено</span>}
       </div>
       {target && <div className="phase6-upload-selected"><span>Выбрано</span><strong>{target.number || "Без номера"} · {target.title}</strong></div>}
-      <FilePicker label="Выбрать документ" hint="Файл будет сохранён в выбранном источнике" file={file} disabled={busy} onChange={setFile} onClear={() => setFile(null)} />
-      <div className="phase6-upload-panel__actions"><Button disabled={busy || !target || !file}>{busy ? "Загружаем…" : "Загрузить файл"}</Button><Button type="button" variant="quiet" onClick={onClose} disabled={busy}>Отмена</Button></div>
+      <MultiFilePicker label="Выбрать документы" hint="Можно выбрать несколько файлов · они будут сохранены в выбранном источнике" files={files} disabled={busy} onChange={setFiles} />
+      <div className="phase6-upload-panel__actions"><Button disabled={busy || !target || !files.length}>{busy ? "Загружаем…" : files.length > 1 ? `Загрузить файлы (${files.length})` : "Загрузить файл"}</Button><Button type="button" variant="quiet" onClick={onClose} disabled={busy}>Отмена</Button></div>
     </form>
   </aside>;
 }

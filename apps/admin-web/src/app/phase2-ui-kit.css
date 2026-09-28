@@ -502,6 +502,33 @@ html[data-crm-theme="dark"] .select-check {
   cursor: pointer;
 }
 .file-picker__clear:hover { color: var(--crm-danger-text); border-color: var(--crm-danger); }
+/* Multi-file selection: every picked file stays listed and can be removed individually. */
+.file-picker__list { display: grid; gap: var(--ui-space-1); margin: var(--ui-space-2) 0 0; padding: 0; list-style: none; }
+.file-picker__list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 30px;
+  align-items: center;
+  gap: var(--ui-space-2);
+  min-width: 0;
+  padding: var(--ui-space-1) var(--ui-space-1) var(--ui-space-1) var(--ui-space-3);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--crm-surface);
+}
+.file-picker__list span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--crm-text); font-size: var(--ui-text-sm); }
+.file-picker__list small { color: var(--crm-text-muted); font-size: var(--ui-text-xs); white-space: nowrap; }
+.file-picker__list button {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  color: var(--crm-text-muted);
+  border: 1px solid var(--crm-border);
+  border-radius: 50%;
+  background: var(--crm-surface);
+  cursor: pointer;
+}
+.file-picker__list button:hover, .file-picker__list button:focus-visible { color: var(--crm-danger-text); border-color: var(--crm-danger); }
 
 /* --- feedback / system states -------------------------------------------- */
 .notice {

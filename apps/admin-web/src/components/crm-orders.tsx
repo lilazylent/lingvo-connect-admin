@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, apiDownloadUrl } from "@/lib/api";
 import { formatCrmDate } from "@/lib/format-date";
 import { formatBillingQuantity, formatRate } from "@/lib/billing-format";
+import { fileKey, mergeFiles, uploadEach, uploadFailureMessage } from "@/lib/upload-files";
 import type { UserSummary } from "@/lib/types";
 import {
   ActionMenu,
@@ -760,6 +761,7 @@ export function CrmOrders() {
   const [wizard, setWizard] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [uploadNotice, setUploadNotice] = useState<{ orderId: string; message: string } | null>(null);
   const [metrics, setMetrics] = useState({ total: 0, active: 0, completed: 0, awaiting: 0, overdue: 0 });
   const applicationId = searchParams.get("application_id") ?? "";
   const openId = searchParams.get("open") ?? "";
@@ -988,15 +990,16 @@ export function CrmOrders() {
           applicationId={applicationId}
           statuses={statusOptions}
           onClose={() => setWizard(false)}
-          onCreated={(id) => {
+          onCreated={(id, uploadError) => {
             setWizard(false);
             setSelectedId(id);
+            setUploadNotice(uploadError ? { orderId: id, message: uploadError } : null);
             void load();
           }}
         />
       )}
       {selectedId && (
-        <div ref={orderDetailRef} className="order-detail-anchor" tabIndex={-1}><OrderCard
+        <div ref={orderDetailRef} className="order-detail-anchor" tabIndex={-1}>{uploadNotice?.orderId === selectedId && <ErrorState message={`Заказ создан. ${uploadNotice.message}. Добавьте эти файлы во вкладке «Файлы».`} />}<OrderCard
           key={selectedId}
           orderId={selectedId}
           statuses={statusOptions}
@@ -1301,7 +1304,7 @@ function OrderWizard({
   applicationId: string;
   statuses: StatusOption[];
   onClose: () => void;
-  onCreated: (id: string) => void;
+  onCreated: (id: string, uploadError?: string) => void;
 }) {
   const [step, setStep] = useState(1);
   const [client, setClient] = useState("");
@@ -1312,8 +1315,8 @@ function OrderWizard({
   const [works, setWorks] = useState<DraftWork[]>([emptyWork()]);
   const [services, setServices] = useState<Service[]>([]);
   const [managers, setManagers] = useState<UserSummary[]>([]);
-  const [file, setFile] = useState<File | null>(null);
-  const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [analyses, setAnalyses] = useState<Record<string, Analysis>>({});
   const [analyzing, setAnalyzing] = useState(false);
   const [payment, setPayment] = useState({
     amount_paid: "0",
@@ -1516,49 +1519,71 @@ function OrderWizard({
       });
     }
   }
-  async function analyze(next: File) {
-    setFile(next);
+  // Volume of the first work = sum over every analysed client document, so adding a
+  // second document never discards the first one's figures.
+  function applyAnalyzedVolume(selected: File[], results: Record<string, Analysis>) {
+    const known = selected.map((item) => results[fileKey(item)]).filter((item): item is Analysis => Boolean(item));
+    if (!known.length) return;
+    const total = (field: "character_count" | "page_count" | "word_count") =>
+      known.some((item) => item[field] != null)
+        ? known.reduce((sum, item) => sum + Number(item[field] ?? 0), 0)
+        : null;
+    const result = { character_count: total("character_count"), page_count: total("page_count"), word_count: total("word_count") };
+    setWorks((ws) =>
+      ws.map((w, i) =>
+        i === 0
+          ? (() => {
+              const service = services.find((item) => item.code === w.service_code);
+              const canUseCharacters = serviceHasField(service, "character_count", w.certification_mode);
+              const canUsePages = serviceHasField(service, "page_count", w.certification_mode);
+              const character_count = canUseCharacters
+                ? result.character_count?.toString() ?? w.character_count
+                : w.character_count;
+              return {
+                ...w,
+                character_count,
+                page_count: canUsePages
+                  ? service?.definition?.page_from_characters && character_count
+                    ? conditionalPages(character_count)
+                    : result.page_count?.toString() ?? w.page_count
+                  : w.page_count,
+                word_count: result.word_count?.toString() ?? w.word_count,
+              };
+            })()
+          : w,
+      ),
+    );
+  }
+  async function addFiles(picked: File[]) {
+    const selected = mergeFiles(files, picked);
+    const added = selected.slice(files.length);
+    setFiles(selected);
+    if (!added.length) return;
     setAnalyzing(true);
     setError("");
-    try {
-      const form = new FormData();
-      form.append("upload", next);
-      const result = await api<Analysis>(
-        "/api/admin/crm/files/analyze-preview",
-        { method: "POST", body: form },
-      );
-      setAnalysis(result);
-      setWorks((ws) =>
-        ws.map((w, i) =>
-          i === 0
-            ? (() => {
-                const service = services.find((item) => item.code === w.service_code);
-                const canUseCharacters = serviceHasField(service, "character_count", w.certification_mode);
-                const canUsePages = serviceHasField(service, "page_count", w.certification_mode);
-                const character_count = canUseCharacters
-                  ? result.character_count?.toString() ?? w.character_count
-                  : w.character_count;
-                return {
-                  ...w,
-                  character_count,
-                  page_count: canUsePages
-                    ? service?.definition?.page_from_characters && character_count
-                      ? conditionalPages(character_count)
-                      : result.page_count?.toString() ?? w.page_count
-                    : w.page_count,
-                  word_count: result.word_count?.toString() ?? w.word_count,
-                };
-              })()
-            : w,
-        ),
-      );
-    } catch (e) {
-      setError(
-        e instanceof Error ? e.message : "Не удалось проанализировать документ",
-      );
-    } finally {
-      setAnalyzing(false);
+    const results = { ...analyses };
+    const failed: string[] = [];
+    for (const next of added) {
+      try {
+        const form = new FormData();
+        form.append("upload", next);
+        results[fileKey(next)] = await api<Analysis>(
+          "/api/admin/crm/files/analyze-preview",
+          { method: "POST", body: form },
+        );
+      } catch (e) {
+        failed.push(`«${next.name}»: ${e instanceof Error ? e.message : "не удалось проанализировать"}`);
+      }
     }
+    setAnalyses(results);
+    applyAnalyzedVolume(selected, results);
+    if (failed.length) setError(`Не удалось проанализировать: ${failed.join("; ")}. Файлы останутся в списке, объём можно указать вручную.`);
+    setAnalyzing(false);
+  }
+  function removeFile(target: File) {
+    const selected = files.filter((item) => fileKey(item) !== fileKey(target));
+    setFiles(selected);
+    applyAnalyzedVolume(selected, analyses);
   }
   async function create() {
     setBusy(true);
@@ -1641,15 +1666,15 @@ function OrderWizard({
         method: "POST",
         body: JSON.stringify(payload),
       });
-      if (file) {
+      const uploads = await uploadEach(files, (next) => {
         const form = new FormData();
-        form.append("upload", file);
-        await api(`/api/admin/crm/orders/${created.id}/files/analyze`, {
+        form.append("upload", next);
+        return api(`/api/admin/crm/orders/${created.id}/files/analyze`, {
           method: "POST",
           body: form,
         });
-      }
-      onCreated(created.id);
+      });
+      onCreated(created.id, uploadFailureMessage(uploads));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось создать заказ");
     } finally {
@@ -1802,38 +1827,47 @@ function OrderWizard({
             <label className="file-drop">
               <input
                 type="file"
+                multiple
                 accept=".pdf,.docx,.txt,.xlsx,.xlsm,image/*"
-                onChange={(e) =>
-                  e.target.files?.[0] && void analyze(e.target.files[0])
-                }
+                onChange={(e) => {
+                  const picked = Array.from(e.target.files ?? []);
+                  e.currentTarget.value = "";
+                  if (picked.length) void addFiles(picked);
+                }}
               />
-              <span>Прикрепить документ клиента</span>
-              <strong>
-                {file?.name || "PDF, DOCX, TXT, XLSX или изображение"}
-              </strong>
+              <span>{files.length ? "Добавить ещё документы" : "Прикрепить документы клиента"}</span>
+              <strong>PDF, DOCX, TXT, XLSX или изображение · можно выбрать несколько файлов</strong>
             </label>
-            {analyzing && <LoadingState label="Анализируем документ" />}
-            {analysis && (
-              <div className="analysis-result">
-                <div>
-                  <span>Страниц</span>
-                  <strong>{analysis.page_count ?? "—"}</strong>
+            {analyzing && <LoadingState label="Анализируем документы" />}
+            {files.map((item) => {
+              const analysis = analyses[fileKey(item)];
+              return (
+                <div className="analysis-result analysis-result--file" key={fileKey(item)}>
+                  <div className="analysis-result__name">
+                    <span>Документ</span>
+                    <strong title={item.name}>{item.name}</strong>
+                  </div>
+                  <div>
+                    <span>Страниц</span>
+                    <strong>{analysis?.page_count ?? "—"}</strong>
+                  </div>
+                  <div>
+                    <span>Знаков</span>
+                    <strong>
+                      {analysis?.character_count?.toLocaleString("ru-RU") ?? "—"}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Слов</span>
+                    <strong>
+                      {analysis?.word_count?.toLocaleString("ru-RU") ?? "—"}
+                    </strong>
+                  </div>
+                  <Button type="button" variant="quiet" onClick={() => removeFile(item)} aria-label={`Убрать документ ${item.name}`}>Убрать</Button>
+                  {analysis?.analysis_note && <p>{analysis.analysis_note}</p>}
                 </div>
-                <div>
-                  <span>Знаков</span>
-                  <strong>
-                    {analysis.character_count?.toLocaleString("ru-RU") ?? "—"}
-                  </strong>
-                </div>
-                <div>
-                  <span>Слов</span>
-                  <strong>
-                    {analysis.word_count?.toLocaleString("ru-RU") ?? "—"}
-                  </strong>
-                </div>
-                <p>{analysis.analysis_note}</p>
-              </div>
-            )}
+              );
+            })}
             <p className="context-note">
               Если значение нельзя определить надёжно, CRM не придумывает его.
               Объём можно вручную исправить в каждой работе.
@@ -2175,10 +2209,11 @@ function OrderWizard({
               ))}
             </div>
             <div className="review-submit-zone">
-              {file && (
+              {files.length > 0 && (
                 <p className="context-note">
-                  Файл «{file.name}» будет загружен и проанализирован после
-                  создания заказа.
+                  {files.length === 1
+                    ? `Файл «${files[0].name}» будет загружен и проанализирован после создания заказа.`
+                    : `Файлы (${files.length}) будут загружены и проанализированы после создания заказа.`}
                 </p>
               )}
               <Button disabled={busy} onClick={() => void create()}>
@@ -3356,20 +3391,34 @@ function OrderCard({
       );
     }
   }
-  async function upload(file: File) {
+  async function upload(picked: File[]) {
     setUploading(true);
+    setError("");
     try {
-      const form = new FormData();
-      form.append("upload", file);
-      await api(`/api/admin/crm/orders/${orderId}/files/analyze`, {
-        method: "POST",
-        body: form,
+      // Each file is appended through the single-file endpoint; existing files stay.
+      const result = await uploadEach(picked, (next) => {
+        const form = new FormData();
+        form.append("upload", next);
+        return api(`/api/admin/crm/orders/${orderId}/files/analyze`, {
+          method: "POST",
+          body: form,
+        });
       });
       await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка загрузки");
+      const failure = uploadFailureMessage(result);
+      if (failure) setError(failure);
     } finally {
       setUploading(false);
+    }
+  }
+  async function deleteFile(fileId: string, name: string) {
+    if (!confirm(`Удалить файл «${name}» из заказа? Остальные файлы останутся.`)) return;
+    setError("");
+    try {
+      await api(`/api/admin/orders/${orderId}/files/${fileId}`, { method: "DELETE" });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось удалить файл");
     }
   }
   async function duplicateWork(workId: string) {
@@ -4214,14 +4263,19 @@ function OrderCard({
                 <span className="overline">Файлы</span>
                 <h3>Документы заказа</h3>
               </div>
-              <label className="compact-upload">
+              <label className="compact-upload" aria-disabled={uploading || order.archived}>
                 <input
                   type="file"
-                  onChange={(e) =>
-                    e.target.files?.[0] && void upload(e.target.files[0])
-                  }
+                  multiple
+                  disabled={uploading || order.archived}
+                  aria-label="Добавить файлы к заказу"
+                  onChange={(e) => {
+                    const picked = Array.from(e.target.files ?? []);
+                    e.currentTarget.value = "";
+                    if (picked.length) void upload(picked);
+                  }}
                 />
-                {uploading ? "Анализ…" : "Добавить файл +"}
+                {uploading ? "Загружаем…" : "Добавить файлы +"}
               </label>
             </header>
             <div className="file-metrics-list">
@@ -4269,6 +4323,7 @@ function OrderCard({
                   <div className="file-metric-row__actions">
                     {/\.(pdf|png|jpe?g|webp|gif|txt|csv)$/i.test(f.original_name) && <a className="button button--quiet" href={apiDownloadUrl(`/api/admin/orders/${order.id}/files/${f.id}/preview`)} target="_blank" rel="noreferrer">Открыть</a>}
                     <a className="button button--secondary" href={apiDownloadUrl(`/api/admin/orders/${order.id}/files/${f.id}/download`)}>Скачать</a>
+                    {!order.archived && <Button type="button" variant="quiet" onClick={() => void deleteFile(f.id, f.original_name)} aria-label={`Удалить файл ${f.original_name}`}>Удалить</Button>}
                   </div>
                 </article>
               ))}

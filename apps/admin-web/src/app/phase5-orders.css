@@ -1034,3 +1034,24 @@
 .client-deposit-preview__remaining strong { color: var(--crm-accent-text); }
 @media (max-width: 900px) { .client-deposit-preview { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media (max-width: 620px) { .client-deposit-preview { grid-template-columns: 1fr; } }
+
+/* Order wizard step 03: every attached client document keeps its own analysis row. */
+.analysis-result--file {
+  grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)) auto;
+  align-items: center;
+  margin-top: var(--ui-space-2);
+}
+.analysis-result--file > .button { margin-inline: var(--ui-space-2); }
+.analysis-result__name { min-width: 0; }
+.analysis-result__name strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.analysis-result--file > p { grid-column: 1 / -1; margin: 0; padding: 0 var(--ui-space-4) var(--ui-space-3); }
+@media (max-width: 620px) {
+  .analysis-result--file { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .analysis-result--file .analysis-result__name { grid-column: 1 / -1; }
+  .analysis-result--file > .button { grid-column: 1 / -1; justify-self: end; margin-block: var(--ui-space-1); }
+}
+@media (max-width: 620px) {
+  /* The row collapses to icon + name; actions get their own full-width line instead of
+     overflowing the 38px icon column. */
+  .phase5-order-card .file-metric-row__actions { grid-column: 1 / -1; justify-content: flex-start; flex-wrap: wrap; white-space: normal; }
+}

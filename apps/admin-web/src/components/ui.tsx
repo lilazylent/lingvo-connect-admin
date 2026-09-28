@@ -13,6 +13,7 @@ import {
   type TextareaHTMLAttributes,
 } from "react";
 import { createPortal } from "react-dom";
+import { fileKey, mergeFiles } from "@/lib/upload-files";
 export { Select } from "./select";
 
 export type ButtonVariant = "primary" | "secondary" | "quiet" | "danger";
@@ -112,6 +113,50 @@ export function FilePicker({
       }}/>
     </label>
     {file && onClear && <button type="button" className="file-picker__clear" onClick={onClear} disabled={disabled} aria-label={`Убрать файл ${file.name}`}>×</button>}
+  </div>;
+}
+
+/** Several files in one pick; new picks append to the selection instead of replacing it. */
+export function MultiFilePicker({
+  label = "Выбрать файлы",
+  hint,
+  files,
+  accept,
+  disabled = false,
+  onChange,
+  className = "",
+}: {
+  label?: string;
+  hint?: string;
+  files: File[];
+  accept?: string;
+  disabled?: boolean;
+  onChange: (files: File[]) => void;
+  className?: string;
+}) {
+  const id = useId();
+  const count = files.length;
+  return <div className={`file-picker file-picker--multiple ${count ? "is-selected" : ""} ${className}`.trim()}>
+    <label htmlFor={id} className="file-picker__surface" aria-disabled={disabled}>
+      <span className="file-picker__icon" aria-hidden="true">↥</span>
+      <span className="file-picker__copy">
+        <strong>{count ? `Выбрано файлов: ${count}` : label}</strong>
+        <small>{hint || "Можно выбрать несколько файлов сразу"}</small>
+      </span>
+      <span className="file-picker__action">{count ? "Добавить ещё" : "Выбрать"}</span>
+      <input id={id} className="sr-only" type="file" multiple accept={accept} disabled={disabled} onChange={(event)=>{
+        const picked = Array.from(event.target.files ?? []);
+        event.currentTarget.value = "";
+        if (picked.length) onChange(mergeFiles(files, picked));
+      }}/>
+    </label>
+    {count > 0 && <ul className="file-picker__list" aria-label="Выбранные файлы">
+      {files.map((file) => <li key={fileKey(file)}>
+        <span title={file.name}>{file.name}</span>
+        <small>{formatFileSize(file.size)}</small>
+        <button type="button" onClick={() => onChange(files.filter((item) => fileKey(item) !== fileKey(file)))} disabled={disabled} aria-label={`Убрать файл ${file.name}`}>×</button>
+      </li>)}
+    </ul>}
   </div>;
 }
 

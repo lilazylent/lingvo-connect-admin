@@ -1032,6 +1032,29 @@ def download_order_file(order_id: str, file_id: str, db: DB, context: Read):
     )
 
 
+@router.delete("/orders/{order_id}/files/{file_id}")
+def delete_order_file(order_id: str, file_id: str, db: DB, context: Write):
+    """Remove exactly one attachment; the order's other files are untouched."""
+    get_record(db, Order, order_id, active=True)
+    file = db.get(OrderFile, file_id)
+    if not file or file.order_id != order_id:
+        raise HTTPException(404, "Файл не найден")
+    storage_key = file.storage_key
+    db.delete(file)
+    record(db, context, "file.deleted", order_id=order_id)
+    db.commit()
+    settings = get_settings()
+    storage = storage_from_settings(
+        settings.application_storage_path, settings.application_file_max_bytes
+    )
+    # The database row is authoritative; a leftover blob is harmless, a missing row is not.
+    try:
+        storage.delete(storage_key)
+    except (OSError, UnsafeFileError):
+        pass
+    return {"id": file_id, "deleted": True}
+
+
 @router.get("/orders/{order_id}/files/{file_id}/preview")
 def preview_order_file(order_id: str, file_id: str, db: DB, context: Read):
     get_record(db, Order, order_id)

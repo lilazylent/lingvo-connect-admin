@@ -33,6 +33,7 @@ const operationalActivityLabels: Record<string, string> = {
   "work.executor_payment_updated": "Изменена оплата исполнителю",
   "file.uploaded": "Добавлен файл",
   "file.analyzed": "Файл загружен и проанализирован",
+  "file.deleted": "Удалён файл",
   "import.created": "Заказ создан импортом",
 };
 

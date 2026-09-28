@@ -3,7 +3,8 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { api, apiDownloadUrl } from "@/lib/api";
 import { formatActivityDate, operationalActivityLabel } from "@/lib/activity-labels";
-import { Button, ErrorState, FilePicker } from "./ui";
+import { Button, ErrorState, MultiFilePicker } from "./ui";
+import { uploadEach, uploadFailureMessage } from "@/lib/upload-files";
 
 type FileItem = { id: string; original_name: string; size_bytes: number };
 type EventItem = { id: string; action: string; created_at: string };
@@ -15,7 +16,7 @@ export function OrderRecords({ id, disabled, showFiles = true }: { id: string; d
   const [pages, setPages] = useState(1);
   const [filePage, setFilePage] = useState(1);
   const [filePages, setFilePages] = useState(1);
-  const [file, setFile] = useState<File | null>(null);
+  const [draft, setDraft] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -44,17 +45,19 @@ export function OrderRecords({ id, disabled, showFiles = true }: { id: string; d
 
   async function upload(event: FormEvent) {
     event.preventDefault();
-    if (!file) return;
+    if (!draft.length) return;
     setBusy(true);
     setError("");
     try {
-      const form = new FormData();
-      form.set("upload", file);
-      await api(`/api/admin/orders/${id}/files`, { method: "POST", body: form });
-      setFile(null);
+      const result = await uploadEach(draft, (next) => {
+        const form = new FormData();
+        form.set("upload", next);
+        return api(`/api/admin/orders/${id}/files`, { method: "POST", body: form });
+      });
+      setDraft(draft.filter((next) => !result.uploaded.includes(next)));
       await load();
-    } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Ошибка загрузки");
+      const failure = uploadFailureMessage(result);
+      if (failure) setError(failure);
     } finally {
       setBusy(false);
     }
@@ -74,16 +77,15 @@ export function OrderRecords({ id, disabled, showFiles = true }: { id: string; d
       </div>
 
       <form className="order-upload-form" onSubmit={upload}>
-        <FilePicker
-          label="Выбрать файл"
-          hint="PDF, документы и изображения · до 15 МБ"
+        <MultiFilePicker
+          label="Выбрать файлы"
+          hint="PDF, документы и изображения · до 15 МБ каждый"
           accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.rtf,.png,.jpg,.jpeg"
-          file={file}
+          files={draft}
           disabled={disabled || busy}
-          onChange={setFile}
-          onClear={() => setFile(null)}
+          onChange={setDraft}
         />
-        <Button className="order-upload-form__submit" disabled={disabled || busy || !file}>
+        <Button className="order-upload-form__submit" disabled={disabled || busy || !draft.length}>
           {busy ? "Загружаем…" : "Прикрепить"}
         </Button>
       </form>
