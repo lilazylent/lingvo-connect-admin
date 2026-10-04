@@ -69,6 +69,14 @@ test("order metric shortcuts replace incompatible filters and reset the list", a
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
       for (const button of await metrics.getByRole("button").all()) {
         expect(await button.locator("b").evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+        await expect(button.locator("i svg")).toBeVisible();
+        expect(await button.evaluate((el) => {
+          const card = el.getBoundingClientRect();
+          const arrow = el.querySelector("i")!.getBoundingClientRect();
+          const label = el.querySelector("b")!.getBoundingClientRect();
+          return arrow.right <= card.right && arrow.bottom <= card.bottom && arrow.left >= label.right &&
+            !getComputedStyle(el).boxShadow.includes("inset 3px");
+        })).toBe(true);
       }
     }
     if (theme !== "system") await page.screenshot({ path: `test-results/order-metrics-${theme}.png` });

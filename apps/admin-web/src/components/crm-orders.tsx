@@ -1052,7 +1052,7 @@ export function CrmOrders() {
 }
 
 function OrderMetric({ icon, tone, value, label, selected, onClick }: { icon: Parameters<typeof Icon>[0]["name"]; tone: string; value: number; label: string; selected: boolean; onClick: () => void }) {
-  return <button type="button" className={`lc-module-metric lc-module-metric--${tone}`} aria-pressed={selected} onClick={onClick}><span><Pictogram name={icon} size={19} /></span><strong>{value}</strong><b>{label}</b></button>;
+  return <button type="button" className={`lc-module-metric lc-module-metric--${tone} is-navigable`} aria-pressed={selected} onClick={onClick}><span><Pictogram name={icon} size={19} /></span><strong>{value}</strong><b>{label}</b><i aria-hidden="true"><Icon name="arrow-right" size={14} /></i></button>;
 }
 
 function OrderStageGlyph({ index, state }: { index: number; state: "current" | "completed" | "future" }) {
