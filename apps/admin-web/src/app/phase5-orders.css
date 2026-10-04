@@ -3,6 +3,12 @@
    Dense operational workspace. Shared controls remain owned by Phase 02.
    ========================================================================== */
 
+.crm-orders-head + .lc-module-metrics button { cursor: pointer; }
+.crm-orders-head + .lc-module-metrics button[aria-pressed="true"] {
+  border-color: var(--crm-accent);
+  box-shadow: inset 3px 0 0 var(--crm-accent);
+}
+
 .phase5-orders-command {
   min-width: 0;
   display: grid;

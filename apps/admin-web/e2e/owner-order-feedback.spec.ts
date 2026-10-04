@@ -34,6 +34,47 @@ test("dashboard shortcut applies the overdue order filter", async ({ page }) => 
   await expect(page.getByText("26-0665").first()).toBeVisible();
 });
 
+test("order metric shortcuts replace incompatible filters and reset the list", async ({ page }) => {
+  await fixtures(page);
+  await page.goto("/admin/orders?scope=unassigned&overdue=true&archived=true");
+  const metrics = page.getByRole("region", { name: "Сводка по заказам" });
+  await expect(page.getByText("Заказов в текущей выборке:")).toBeVisible();
+  for (const [label, key, value] of [
+    ["В работе", "status", "IN_PROGRESS"],
+    ["Завершено", "status", "COMPLETED"],
+    ["Ждут оплаты", "paid", "false"],
+    ["Просрочено", "overdue", "true"],
+    ["Всего заказов", "status", ""],
+  ]) {
+    const request = page.waitForRequest((req) => {
+      const url = new URL(req.url());
+      return url.pathname.endsWith("/crm/orders") && url.searchParams.get("page_size") === "100" &&
+        (url.searchParams.get(key) ?? "") === value;
+    });
+    const button = metrics.getByRole("button", { name: new RegExp(label) });
+    await button.click();
+    const params = new URL((await request).url()).searchParams;
+    expect(params.get("archived")).toBe("false");
+    expect(params.get("page")).toBe("1");
+    expect(params.has("scope")).toBe(false);
+    for (const other of ["status", "paid", "overdue"].filter((item) => item !== key)) {
+      expect(params.get(other) || "").toBe("");
+    }
+    await expect(button).toHaveAttribute("aria-pressed", "true");
+  }
+  for (const theme of ["light", "dark", "system"]) {
+    await page.evaluate((nextTheme) => document.documentElement.setAttribute("data-crm-theme", nextTheme), theme);
+    for (const width of [320, 360, 375, 390, 430, 768, 1024, 1280, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+      for (const button of await metrics.getByRole("button").all()) {
+        expect(await button.locator("b").evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+      }
+    }
+    if (theme !== "system") await page.screenshot({ path: `test-results/order-metrics-${theme}.png` });
+  }
+});
+
 test("order list localizes status, payment and dates without displaying debt", async ({ page }) => {
   await fixtures(page);
   await page.goto("/admin/orders");

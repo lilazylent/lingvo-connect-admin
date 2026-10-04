@@ -834,6 +834,27 @@ export function CrmOrders() {
     setSelectedId(id);
   };
 
+  function applyMetricFilter(filter: "all" | "active" | "completed" | "awaiting" | "overdue") {
+    setStatus(filter === "active" ? "IN_PROGRESS" : filter === "completed" ? "COMPLETED" : "");
+    setPaid(filter === "awaiting" ? "false" : "");
+    setOverdue(filter === "overdue" ? "true" : "");
+    setScope("");
+    setArchived(false);
+    setPage(1);
+    setSelectedId(null);
+    if (filter === "all") {
+      setQuery("");
+      setLanguage("");
+      setExecutorId("");
+    }
+  }
+  const metricSelection = archived || scope ? "" :
+    status === "IN_PROGRESS" && !paid && !overdue ? "active" :
+    status === "COMPLETED" && !paid && !overdue ? "completed" :
+    paid === "false" && !status && !overdue ? "awaiting" :
+    overdue === "true" && !status && !paid ? "overdue" :
+    !status && !paid && !overdue && !query && !language && !executorId ? "all" : "";
+
   const currentBoard = archived ? "ARCHIVE" : "MAIN";
   const boardStatusOptions = statusOptions.filter(
     (option) => option.active && option.board === currentBoard,
@@ -857,11 +878,11 @@ export function CrmOrders() {
         </Button>
       </header>
       <section className="lc-module-metrics lc-module-metrics--5" aria-label="Сводка по заказам">
-        <OrderMetric icon="orders" tone="pink" value={metrics.total} label="Всего заказов" />
-        <OrderMetric icon="clock" tone="blue" value={metrics.active} label="В работе" />
-        <OrderMetric icon="shield" tone="green" value={metrics.completed} label="Завершено" />
-        <OrderMetric icon="wallet" tone="orange" value={metrics.awaiting} label="Ждут оплаты" />
-        <OrderMetric icon="hourglass" tone="violet" value={metrics.overdue} label="Просрочено" />
+        <OrderMetric icon="orders" tone="pink" value={metrics.total} label="Всего заказов" selected={metricSelection === "all"} onClick={() => applyMetricFilter("all")} />
+        <OrderMetric icon="clock" tone="blue" value={metrics.active} label="В работе" selected={metricSelection === "active"} onClick={() => applyMetricFilter("active")} />
+        <OrderMetric icon="shield" tone="green" value={metrics.completed} label="Завершено" selected={metricSelection === "completed"} onClick={() => applyMetricFilter("completed")} />
+        <OrderMetric icon="wallet" tone="orange" value={metrics.awaiting} label="Ждут оплаты" selected={metricSelection === "awaiting"} onClick={() => applyMetricFilter("awaiting")} />
+        <OrderMetric icon="hourglass" tone="violet" value={metrics.overdue} label="Просрочено" selected={metricSelection === "overdue"} onClick={() => applyMetricFilter("overdue")} />
       </section>
       {error && <ErrorState message={error} />}
       <section className="phase5-orders-command" aria-label="Поиск и фильтры заказов">
@@ -1030,8 +1051,8 @@ export function CrmOrders() {
   );
 }
 
-function OrderMetric({ icon, tone, value, label }: { icon: Parameters<typeof Icon>[0]["name"]; tone: string; value: number; label: string }) {
-  return <div className={`lc-module-metric lc-module-metric--${tone}`}><span><Pictogram name={icon} size={19} /></span><strong>{value}</strong><b>{label}</b></div>;
+function OrderMetric({ icon, tone, value, label, selected, onClick }: { icon: Parameters<typeof Icon>[0]["name"]; tone: string; value: number; label: string; selected: boolean; onClick: () => void }) {
+  return <button type="button" className={`lc-module-metric lc-module-metric--${tone}`} aria-pressed={selected} onClick={onClick}><span><Pictogram name={icon} size={19} /></span><strong>{value}</strong><b>{label}</b></button>;
 }
 
 function OrderStageGlyph({ index, state }: { index: number; state: "current" | "completed" | "future" }) {
