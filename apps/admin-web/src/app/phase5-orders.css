@@ -43,6 +43,7 @@
   border-color: var(--crm-border-strong);
   background: var(--crm-surface-raised);
 }
+.phase5-orders-viewbar .phase5-orders-export { order: -1; margin-right: auto; gap: var(--ui-space-2); }
 .phase5-orders-viewbar .view-switch button { color: var(--crm-text-secondary); }
 .phase5-orders-viewbar .view-switch button.is-active { color: var(--crm-text); background: var(--crm-surface); }
 
@@ -1056,4 +1057,32 @@
   /* The row collapses to icon + name; actions get their own full-width line instead of
      overflowing the 38px icon column. */
   .phase5-order-card .file-metric-row__actions { grid-column: 1 / -1; justify-content: flex-start; flex-wrap: wrap; white-space: normal; }
+}
+
+/* Order wizard step 01: editable order number + order date side by side */
+.wizard-number-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ui-space-3); }
+@media (max-width: 620px) { .wizard-number-row { grid-template-columns: 1fr; } }
+
+/* Statistics (owner feedback): reuses the orders command surface, module metrics and shared table */
+.crm-statistics__filter-grid {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
+  gap: var(--ui-space-2);
+  align-items: start;
+}
+.crm-statistics__filters { grid-template-columns: minmax(0, 1fr); }
+.crm-statistics__filter-grid > * { min-width: 0; }
+.crm-statistics__presets { justify-content: space-between; flex-wrap: wrap; }
+.crm-statistics__tiles { margin-top: var(--ui-space-4); }
+.crm-statistics__table { margin-top: var(--ui-space-4); }
+.crm-statistics__caption { flex-wrap: wrap; gap: var(--ui-space-2); }
+.crm-statistics__caption .view-switch { flex-wrap: wrap; }
+.crm-statistics__table table { min-width: 860px; }
+@media (max-width: 620px) {
+  .crm-statistics__caption { flex-direction: column; align-items: stretch; }
+  .crm-statistics__caption .view-switch,
+  .crm-statistics__presets .view-switch { width: 100%; flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; }
+  .crm-statistics__caption .view-switch button,
+  .crm-statistics__presets .view-switch button { flex: 0 0 auto; white-space: nowrap; }
 }

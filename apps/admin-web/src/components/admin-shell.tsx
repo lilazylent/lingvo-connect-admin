@@ -14,6 +14,7 @@ const operational: Array<[string, string, IconName, string]> = [
   ["Заявки", "/admin/applications", "applications", "APPLICATIONS_VIEW"],
   ["Клиенты", "/admin/clients", "clients", "CLIENTS_VIEW"],
   ["Заказы", "/admin/orders", "orders", "ORDERS_VIEW"],
+  ["Статистика", "/admin/statistics", "trend", "ORDERS_VIEW"],
   ["Исполнители", "/admin/translators", "executors", "EXECUTORS_VIEW"],
   ["Файлы", "/admin/files", "files", "FILES_VIEW"],
 ];
@@ -42,6 +43,24 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     if (admin || state.user.permissions.includes("SETTINGS_MANAGE")) next.push(["Настройки", "/admin/settings", "settings"]);
     return next;
   }, [admin, state]);
+
+  // Owner feedback: typing into a numeric field must replace its value (e.g. the default "0")
+  // instead of appending to it. Select the whole value whenever a number field gains focus.
+  useEffect(() => {
+    let justFocused: HTMLInputElement | null = null;
+    const selectNumber = (event: FocusEvent) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement) || target.type !== "number" || target.readOnly) return;
+      justFocused = target;
+      window.setTimeout(() => { if (justFocused === target) justFocused = null; }, 500);
+      window.requestAnimationFrame(() => { try { target.select(); } catch { /* not selectable in this engine */ } });
+    };
+    // a mouse click would otherwise collapse the selection on mouseup right after focusing
+    const keepSelection = (event: MouseEvent) => { if (justFocused && event.target === justFocused) { event.preventDefault(); justFocused = null; } };
+    document.addEventListener("focusin", selectNumber);
+    document.addEventListener("mouseup", keepSelection);
+    return () => { document.removeEventListener("focusin", selectNumber); document.removeEventListener("mouseup", keepSelection); };
+  }, []);
 
   useEffect(() => {
     const query = search.trim();

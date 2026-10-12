@@ -18,7 +18,8 @@
   background: var(--crm-surface);
   box-shadow: var(--ui-shadow-xs);
 }
-.phase4-directory--executor .directory-commandbar { grid-template-columns: minmax(280px,1fr) minmax(170px,.45fr) minmax(190px,.55fr) auto; }
+.phase4-directory--executor .directory-commandbar,
+.phase4-directory--client .directory-commandbar { grid-template-columns: minmax(280px,1fr) minmax(170px,.45fr) minmax(190px,.55fr) auto; }
 .directory-commandbar > * { min-width: 0; }
 .directory-commandbar__actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--ui-space-2); min-height: var(--ui-control-height); }
 .directory-commandbar__actions .archive-toggle { margin: 0; }
@@ -83,8 +84,8 @@
 .directory-detail-tabs button:focus-visible { outline: 2px solid var(--crm-accent); outline-offset: -2px; border-radius: 5px; }
 
 .directory-detail-panel__body { min-height: 0; flex: 1 1 auto; overflow: visible; overscroll-behavior: auto; }
-.directory-detail-panel__footer { flex: 0 0 auto; padding: var(--ui-space-3) var(--ui-space-4); border-top: 1px solid var(--crm-border); background: color-mix(in srgb,var(--crm-surface) 96%,transparent); }
-.directory-detail-panel__primary { width: 100%; }
+.directory-detail-panel__footer { flex: 0 0 auto; display: flex; gap: var(--ui-space-2); padding: var(--ui-space-3) var(--ui-space-4); border-top: 1px solid var(--crm-border); background: color-mix(in srgb,var(--crm-surface) 96%,transparent); }
+.directory-detail-panel__primary { flex: 1 1 auto; }
 
 .directory-detail-section,
 .directory-tab-section { padding: var(--ui-space-4); border-bottom: 1px solid var(--crm-border); }
@@ -170,6 +171,7 @@
 
 @media (max-width: 900px) {
   .phase4-directory--executor .directory-commandbar,
+  .phase4-directory--client .directory-commandbar,
   .directory-commandbar { grid-template-columns: 1fr 1fr; }
   .directory-commandbar > .field:first-child { grid-column: 1 / -1; }
   .directory-commandbar__actions { justify-content: flex-start; }
@@ -183,6 +185,7 @@
   .phase4-directory__head { margin-bottom: var(--ui-space-3); }
   .phase4-directory__utility-row { margin-bottom: var(--ui-space-2); }
   .phase4-directory--executor .directory-commandbar,
+  .phase4-directory--client .directory-commandbar,
   .directory-commandbar { grid-template-columns: 1fr; padding: 10px; }
   .directory-commandbar > .field:first-child { grid-column: auto; }
   .directory-commandbar__actions { justify-content: stretch; }

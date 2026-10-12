@@ -112,7 +112,7 @@ def required_permission_for_request(request: Request, *, write: bool) -> str | N
         return "APPLICATIONS_EDIT" if write else "APPLICATIONS_VIEW"
     if path.startswith(("/api/admin/companies", "/api/admin/crm/clients")):
         return "CLIENTS_EDIT" if write else "CLIENTS_VIEW"
-    if path.startswith(("/api/admin/orders", "/api/admin/crm/orders", "/api/admin/crm/pricing")):
+    if path.startswith(("/api/admin/orders", "/api/admin/crm/orders", "/api/admin/crm/pricing", "/api/admin/crm/statistics")):
         # Order-file endpoints are still guarded by order permission; the Files module
         # below guards the global file registry/export endpoints.
         return "ORDERS_EDIT" if write else "ORDERS_VIEW"

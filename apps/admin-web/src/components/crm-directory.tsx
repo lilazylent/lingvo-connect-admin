@@ -60,6 +60,8 @@ type ClientSummary = {
   order_count: number;
   active_orders: number;
   revenue: string | number;
+  executor_cost?: string | number;
+  profit?: string | number;
   debt: string | number;
   deposit_balance: string | number;
   last_order: ClientOrder | null;
@@ -289,6 +291,8 @@ export function CrmDirectory({ executor = false }: { executor?: boolean }) {
   const [search, setSearch] = useState("");
   const [language, setLanguage] = useState("");
   const [workType, setWorkType] = useState("");
+  const [clientKind, setClientKind] = useState("");
+  const [clientSort, setClientSort] = useState("name:asc");
   const [archived, setArchived] = useState(false);
   const [page, setPage] = useState(1);
   const [totals, setTotals] = useState({ active: 0, archived: 0 });
@@ -310,9 +314,14 @@ export function CrmDirectory({ executor = false }: { executor?: boolean }) {
     if (executor) {
       params.set("language", language);
       params.set("work_type", workType);
+    } else {
+      const [sort, order] = clientSort.split(":");
+      if (clientKind) params.set("kind", clientKind);
+      params.set("sort", sort);
+      params.set("order", order);
     }
     return `${endpoint}?${params.toString()}`;
-  }, [endpoint, executor, language, workType]);
+  }, [clientKind, clientSort, endpoint, executor, language, workType]);
 
   const load = useCallback(async () => {
     try {
@@ -446,6 +455,23 @@ export function CrmDirectory({ executor = false }: { executor?: boolean }) {
         <Select label="Специализация" value={workType} onChange={(event) => { setWorkType(event.target.value); setPage(1); }}>
           <option value="">Все услуги</option>
           {services.map((service) => <option key={service.code} value={service.code}>{service.name}</option>)}
+        </Select>
+      </>}
+      {!executor && <>
+        <Select label="Тип клиента" value={clientKind} onChange={(event) => { setClientKind(event.target.value); setPage(1); }}>
+          <option value="">Все клиенты</option>
+          <option value="company">Компании</option>
+          <option value="individual">Частные лица</option>
+        </Select>
+        <Select label="Сортировка" value={clientSort} onChange={(event) => { setClientSort(event.target.value); setPage(1); }}>
+          <option value="name:asc">По алфавиту, А–Я</option>
+          <option value="name:desc">По алфавиту, Я–А</option>
+          <option value="orders:desc">Больше заказов</option>
+          <option value="orders:asc">Меньше заказов</option>
+          <option value="revenue:desc">Выше выручка</option>
+          <option value="revenue:asc">Ниже выручка</option>
+          <option value="profit:desc">Выше прибыль</option>
+          <option value="profit:asc">Ниже прибыль</option>
         </Select>
       </>}
       <div className="directory-commandbar__actions">
@@ -616,7 +642,7 @@ function ClientOrdersCell({ summary }: { summary: SummaryData | undefined }) {
 function ClientMoneyCell({ summary }: { summary: SummaryData | undefined }) {
   if (!isClientSummary(summary)) return <><strong>—</strong><span>—</span></>;
   const debt = Number(summary.debt || 0);
-  return <><strong>{rub(summary.revenue)}</strong><span>{`Депозит ${rub(summary.deposit_balance)}${debt > 0 ? ` · долг ${rub(debt)}` : ""}`}</span></>;
+  return <><strong>{rub(summary.revenue)}</strong><span>{`Прибыль ${rub(summary.profit ?? 0)}${debt > 0 ? ` · долг ${rub(debt)}` : ""}`}</span></>;
 }
 
 function ExecutorWorkloadCell({ summary }: { summary: SummaryData | undefined }) {
@@ -683,6 +709,7 @@ function DirectoryDetail({ entry, executor, summary, onClose, onEdit, onOpenAvai
     </div>
 
     <footer className="directory-detail-panel__footer">
+      <Link className="button button--secondary" href={`/admin/statistics?${executor ? "executor" : "client"}=${entry.id}`}><Icon name="trend" size={16} /> Статистика</Link>
       <Button className="directory-detail-panel__primary" onClick={onEdit}>Редактировать</Button>
     </footer>
   </aside>;
@@ -730,6 +757,8 @@ function DirectorySummaryCards({ executor, summary }: { executor: boolean; summa
       ["Всего заказов", String(summary.order_count)],
       ["Активные", String(summary.active_orders)],
       ["Выручка", rub(summary.revenue)],
+      ["Прибыль", rub(summary.profit ?? 0)],
+      ["Выплаты исполнителям", rub(summary.executor_cost ?? 0)],
       ["Задолженность", rub(summary.debt)],
     ] : [];
 

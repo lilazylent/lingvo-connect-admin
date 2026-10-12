@@ -127,7 +127,7 @@ test("work, executor and finance views keep client and executor quantities separ
   if (process.env.CAPTURE_OWNER_QA) await page.screenshot({ path: "test-results/owner-work-card.png", fullPage: true });
   await card.getByRole("tab", { name: "Исполнители 1" }).click();
   await expect(card.locator("#order-executors")).toContainText("Мария Переводчик");
-  await card.getByRole("tab", { name: "Финансы" }).click();
+  await card.getByRole("tab", { name: "Расчёт" }).click();
   await expect(card.locator(".executor-finance-stage")).toContainText("230 ₽/усл.стр.");
   await expect(card.locator(".executor-finance-stage")).not.toContainText("1800 знаков");
 });
@@ -138,7 +138,7 @@ test("copied client estimate uses compact client units and no executor finance",
   await page.goto("/admin/orders");
   await page.locator(".crm-order-table tbody tr").first().getByRole("button", { name: "26-0665" }).click();
   const card = page.locator(".phase5-order-card");
-  await card.getByRole("tab", { name: "Финансы" }).click();
+  await card.getByRole("tab", { name: "Расчёт" }).click();
   await card.getByText("Показать", { exact: true }).click();
   const estimate = card.locator("pre");
   await expect(estimate).toContainText("Объём: 9 усл. стр.");

@@ -223,7 +223,7 @@ test("Phase 07 makes Order Finance compact, semantic and readable in Dark", asyn
   await gotoWithCrmTheme(page, `/admin/orders?open=${order.id}`, "dark");
   const card = page.locator(".phase5-order-card");
   await expect(card).toBeVisible();
-  await card.getByRole("tab", { name: "Финансы" }).click();
+  await card.getByRole("tab", { name: "Расчёт" }).click();
 
   const finance = card.locator("#order-finance");
   await expect(finance).toContainText("Итоговая стоимость заказа");

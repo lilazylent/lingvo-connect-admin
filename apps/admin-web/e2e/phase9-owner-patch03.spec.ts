@@ -160,7 +160,7 @@ test("finance client quote aligns with the primary finance row", async ({ page }
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/admin/orders?open=order-patch03");
   const card = page.locator(".phase5-order-card");
-  await card.getByRole("tab", { name: "Финансы" }).click();
+  await card.getByRole("tab", { name: "Расчёт" }).click();
 
   const total = card.locator(".finance-metric--total");
   const quote = card.locator(".phase5-client-quote");

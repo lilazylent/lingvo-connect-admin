@@ -240,7 +240,7 @@ test("Order detail is tabbed instead of rendering one giant vertical document", 
 
   const overview = card.getByRole("tab", { name: "Основное" });
   const works = card.getByRole("tab", { name: /Работы/ });
-  const finance = card.getByRole("tab", { name: "Финансы" });
+  const finance = card.getByRole("tab", { name: "Расчёт" });
   const files = card.getByRole("tab", { name: /Файлы/ });
   const history = card.getByRole("tab", { name: "История" });
 
@@ -328,7 +328,7 @@ test("Owner review: order work identity and finance summary remain compact", asy
   expect(await lead.evaluate((node) => getComputedStyle(node).alignItems)).toBe("center");
   expect(await page.locator(".phase5-order-card .order-work-table__index").first().evaluate((node) => parseFloat(getComputedStyle(node).width))).toBeGreaterThanOrEqual(33);
 
-  await page.getByRole("tab", { name: "Финансы" }).click();
+  await page.getByRole("tab", { name: "Расчёт" }).click();
   const financeTiles = page.locator(".phase5-order-card .finance-strip > div");
   await expect(financeTiles).toHaveCount(5);
   const heights = await financeTiles.evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().height));

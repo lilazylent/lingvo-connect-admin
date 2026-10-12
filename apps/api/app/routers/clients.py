@@ -8,6 +8,7 @@ from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app import crm_stats
 from app.client_models import ClientActivity, ClientDepositTransaction, Company, Representative
 from app.db import get_db
 from app.dependencies import SessionContext, require_authenticated, require_authenticated_write
@@ -154,10 +155,15 @@ def list_companies(
     context: Read,
     q: str = Query("", max_length=200),
     archived: bool = False,
+    kind: Literal["", "company", "individual"] = "",
+    sort: Literal["name", "orders", "revenue", "profit"] = "name",
+    order: Literal["asc", "desc"] = "asc",
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ):
     filters = [Company.archived == archived]
+    if kind:
+        filters.append(Company.kind == kind)
     if q.strip():
         filters.append(
             or_(
@@ -178,15 +184,19 @@ def list_companies(
             )
         )
     total = db.scalar(select(func.count()).select_from(Company).where(*filters)) or 0
-    rows = db.scalars(
-        select(Company)
-        .where(*filters)
-        .order_by(Company.name, Company.id)
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-    ).all()
+    stats = crm_stats.client_aggregates(db)
+    empty = {"orders_count": 0, "revenue": Decimal("0"), "executor_cost": Decimal("0"), "profit": Decimal("0")}
+    if sort == "name":
+        name_order = Company.name.desc() if order == "desc" else Company.name
+        rows = db.scalars(select(Company).where(*filters).order_by(name_order, Company.id).offset((page - 1) * page_size).limit(page_size)).all()
+    else:
+        # ranking by business metrics: computed for the whole filtered set, then paginated
+        key = {"orders": "orders_count", "revenue": "revenue", "profit": "profit"}[sort]
+        everything = db.scalars(select(Company).where(*filters).order_by(Company.name, Company.id)).all()
+        everything = sorted(everything, key=lambda c: stats.get(c.id, empty)[key], reverse=order == "desc")
+        rows = everything[(page - 1) * page_size: page * page_size]
     return {
-        "items": [view(row) for row in rows],
+        "items": [{**view(row), "stats": stats.get(row.id, empty)} for row in rows],
         "total": total,
         "page": page,
         "pages": max(1, (total + page_size - 1) // page_size),

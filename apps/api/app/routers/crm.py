@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from decimal import Decimal, ROUND_CEILING, ROUND_HALF_UP
 from typing import Annotated, Literal
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, UploadFile
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session
@@ -26,6 +26,8 @@ from app.crm_models import (
     Tariff,
 )
 from app.audit import record_event
+from app import crm_stats
+from app.crm_stats import REVENUE_ORDER_STATUSES
 from app.db import get_db
 from app.dependencies import (
     SessionContext,
@@ -38,7 +40,7 @@ from app.executor_matching import direct_executor_candidates
 from app.models import Application, ApplicationActivity, User, utcnow
 from app.operations_models import ApplicationClient, Executor, ExecutorAssignment, ExecutorDirection, OperationalActivity, Order, OrderWork
 from app.order_files import OrderFile
-from app.order_numbering import next_order_number, peek_next_order_number
+from app.order_numbering import claim_explicit_order_number, next_order_number, peek_next_order_number
 from app.service_definitions import billing_unit_for, canonical_service_code, definition_for, definition_view, fields_for, lookup_codes
 from app.routers.clients import view
 from app.storage import UnsafeFileError, storage_from_settings
@@ -60,7 +62,6 @@ StatusColor = Literal["slate", "blue", "violet", "amber", "cyan", "green", "rose
 # Orders the client has accepted. Only these count towards revenue/profit KPIs:
 # "Новый" and "Рассчитан" (ESTIMATING) still await the client's decision and
 # "Отменён" never became revenue. Business status decides, not the archive flag.
-REVENUE_ORDER_STATUSES = ("APPROVED", "IN_PROGRESS", "REVIEW", "READY", "DELIVERED", "COMPLETED")
 
 BUILTIN_ORDER_STATUS_BOARDS = {
     "NEW": "MAIN",
@@ -415,6 +416,9 @@ class WizardOrder(BaseModel):
     notes: str = Field(default="", max_length=10000)
     works: list[WizardWork] = Field(default_factory=list, max_length=100)
     payment: WizardPayment = Field(default_factory=WizardPayment)
+    # owner may set the public number and the order date by hand; empty = automatic
+    number: str | None = Field(default=None, max_length=32)
+    order_date: date | None = None
 
 
 class OrderCoreEdit(BaseModel):
@@ -426,6 +430,8 @@ class OrderCoreEdit(BaseModel):
     contact_id: str | None = None
     manager_id: str | None = None
     notes: str = Field(default="", max_length=10000)
+    number: str | None = Field(default=None, max_length=32)   # None = keep current
+    order_date: date | None = None                           # None = keep current
     version: int = Field(ge=1)
 
 
@@ -1380,28 +1386,13 @@ def pricing_quote(payload: QuoteRequest, db: DB, context: Read):
 
 
 
-@router.get("/orders")
-def crm_orders(
-    db: DB,
-    context: Read,
-    q: str = Query("", max_length=200),
-    client_id: str = "",
-    executor_id: str = "",
-    manager_id: str = "",
-    status: str = "",
-    service_code: str = "",
-    language: str = Query("", max_length=80),
-    created_from: date | None = None,
-    created_to: date | None = None,
-    deadline_from: date | None = None,
-    deadline_to: date | None = None,
-    overdue: bool | None = None,
-    paid: bool | None = None,
-    scope: Literal["active", "due_today", "unassigned", "awaiting_payment"] | None = None,
-    archived: bool = False,
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-):
+def order_list_filters(
+    *, q: str = "", client_id: str = "", executor_id: str = "", manager_id: str = "", status: str = "",
+    service_code: str = "", language: str = "", created_from: date | None = None, created_to: date | None = None,
+    deadline_from: date | None = None, deadline_to: date | None = None, overdue: bool | None = None,
+    paid: bool | None = None, scope: str | None = None, archived: bool = False,
+) -> list:
+    """Filters of the Orders list; the Excel export reuses them so both always match."""
     filters = [Order.archived == archived]
     work_query = select(OrderWork.order_id).where(OrderWork.archived.is_(False))
     has_work_filter = False
@@ -1505,6 +1496,36 @@ def crm_orders(
     elif scope == "awaiting_payment":
         filters.append(Order.id.in_(select(ClientPayment.order_id).where(ClientPayment.amount_paid < ClientPayment.amount_due)))
 
+    return filters
+
+
+@router.get("/orders")
+def crm_orders(
+    db: DB,
+    context: Read,
+    q: str = Query("", max_length=200),
+    client_id: str = "",
+    executor_id: str = "",
+    manager_id: str = "",
+    status: str = "",
+    service_code: str = "",
+    language: str = Query("", max_length=80),
+    created_from: date | None = None,
+    created_to: date | None = None,
+    deadline_from: date | None = None,
+    deadline_to: date | None = None,
+    overdue: bool | None = None,
+    paid: bool | None = None,
+    scope: Literal["active", "due_today", "unassigned", "awaiting_payment"] | None = None,
+    archived: bool = False,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+):
+    filters = order_list_filters(
+        q=q, client_id=client_id, executor_id=executor_id, manager_id=manager_id, status=status,
+        service_code=service_code, language=language, created_from=created_from, created_to=created_to,
+        deadline_from=deadline_from, deadline_to=deadline_to, overdue=overdue, paid=paid, scope=scope, archived=archived,
+    )
     total = db.scalar(select(func.count()).select_from(Order).where(*filters)) or 0
     total_all = db.scalar(select(func.count()).select_from(Order)) or 0
     rows = db.scalars(
@@ -1536,6 +1557,11 @@ def crm_orders(
     }
 
 
+def order_date_timestamp(day: date) -> datetime:
+    """Midday UTC keeps the chosen calendar day stable in Russian time zones."""
+    return datetime(day.year, day.month, day.day, 12, 0, tzinfo=UTC)
+
+
 @router.get("/orders/number-preview")
 def order_number_preview(
     db: DB,
@@ -1559,13 +1585,19 @@ def create_order_wizard(payload: WizardOrder, db: DB, context: Write):
         raise HTTPException(409, "Для этой заявки уже создан заказ")
     deadlines = [w.deadline for w in payload.works if w.deadline]
     order_deadline = max(deadlines) if deadlines else None
-    number = next_order_number(db, execution_year=order_deadline.year if order_deadline else None)
+    number = (
+        claim_explicit_order_number(db, payload.number)
+        if payload.number and payload.number.strip()
+        else next_order_number(db, execution_year=order_deadline.year if order_deadline else None)
+    )
     order = Order(
         number=number, title=number, client_id=payload.client_id,
         contact_id=payload.contact_id, manager_id=payload.manager_id,
         application_id=payload.application_id, deadline=order_deadline,
         status=payload.status, notes=payload.notes,
     )
+    if payload.order_date and payload.order_date != date.today():
+        order.created_at = order_date_timestamp(payload.order_date)
     db.add(order); db.flush()
     total = Decimal("0")
     for index, item in enumerate(payload.works):
@@ -1617,6 +1649,55 @@ def create_order_wizard(payload: WizardOrder, db: DB, context: Write):
     db.add(OperationalActivity(order_id=order.id, actor_user_id=context.user.id, action="order.wizard_created"))
     db.commit()
     return order_detail(order.id, db, context)
+
+
+def _xlsx(content: bytes, filename: str) -> Response:
+    return Response(
+        content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}", "Cache-Control": "private, no-store"},
+    )
+
+
+@router.get("/orders/export.xlsx")
+def export_orders(
+    db: DB, context: Read,
+    q: str = Query("", max_length=200), client_id: str = "", executor_id: str = "", manager_id: str = "", status: str = "",
+    service_code: str = "", language: str = Query("", max_length=80), created_from: date | None = None, created_to: date | None = None,
+    deadline_from: date | None = None, deadline_to: date | None = None, overdue: bool | None = None, paid: bool | None = None,
+    scope: Literal["active", "due_today", "unassigned", "awaiting_payment"] | None = None, archived: bool = False,
+):
+    """Every order matching the Orders-list filters (all pages) as an Excel workbook."""
+    filters = order_list_filters(
+        q=q, client_id=client_id, executor_id=executor_id, manager_id=manager_id, status=status,
+        service_code=service_code, language=language, created_from=created_from, created_to=created_to,
+        deadline_from=deadline_from, deadline_to=deadline_to, overdue=overdue, paid=paid, scope=scope, archived=archived,
+    )
+    orders = list(db.scalars(select(Order).where(*filters).order_by(Order.created_at, Order.number)).all())
+    ds = crm_stats.load(db, orders=orders, executor_id=executor_id, service_code=service_code)
+    return _xlsx(crm_stats.workbook(ds, "Выгрузка из раздела «Заказы»"), f"orders_{date.today():%Y-%m-%d}.xlsx")
+
+
+def _stats_dataset(db, date_from, date_to, client_id, executor_id, service_code, kind):
+    return crm_stats.load(db, date_from=date_from, date_to=date_to, client_id=client_id, executor_id=executor_id, service_code=service_code, kind=kind)
+
+
+@router.get("/statistics")
+def statistics(
+    db: DB, context: Read, date_from: date | None = None, date_to: date | None = None,
+    client_id: str = "", executor_id: str = "", service_code: str = "", kind: Literal["", "company", "individual"] = "",
+):
+    return crm_stats.summarize(_stats_dataset(db, date_from, date_to, client_id, executor_id, service_code, kind))
+
+
+@router.get("/statistics/export.xlsx")
+def statistics_export(
+    db: DB, context: Read, date_from: date | None = None, date_to: date | None = None,
+    client_id: str = "", executor_id: str = "", service_code: str = "", kind: Literal["", "company", "individual"] = "",
+):
+    period = f"{date_from:%d.%m.%y} — {date_to:%d.%m.%y}" if date_from and date_to else "весь период"
+    ds = _stats_dataset(db, date_from, date_to, client_id, executor_id, service_code, kind)
+    return _xlsx(crm_stats.workbook(ds, period), f"statistics_{date.today():%Y-%m-%d}.xlsx")
 
 
 @router.get("/orders/{order_id}")
@@ -1681,6 +1762,15 @@ def edit_order_core(order_id: str, payload: OrderCoreEdit, db: DB, context: Writ
             db.delete(link)
 
     changed = []
+    if payload.number and payload.number.strip() and payload.number.strip() != order.number:
+        new_number = claim_explicit_order_number(db, payload.number, exclude_order_id=order.id)
+        if order.title == order.number:
+            order.title = new_number
+        order.number = new_number
+        changed.append("number")
+    if payload.order_date and payload.order_date != order.created_at.date():
+        order.created_at = order_date_timestamp(payload.order_date)
+        changed.append("order_date")
     for field in ("client_id", "contact_id", "manager_id", "notes"):
         value = getattr(payload, field)
         if getattr(order, field) != value:
@@ -2102,7 +2192,9 @@ def client_summary(client_id: str, db: DB, context: Read):
     if not client: raise HTTPException(404, "Клиент не найден")
     orders = db.scalars(select(Order).where(Order.client_id == client_id).order_by(Order.created_at.desc())).all()
     financials = [finance(db, o.id) for o in orders]
-    return {"client": view(client), "orders": [view(o) for o in orders[:50]], "order_count": len(orders), "active_orders": sum(o.status not in {"COMPLETED", "CANCELLED"} and not o.archived for o in orders), "revenue": money(sum((f["revenue"] for f in financials), Decimal("0"))), "debt": money(sum((f["client_debt"] for f in financials), Decimal("0"))), "deposit_balance": money(client.deposit_balance or 0), "last_order": view(orders[0]) if orders else None}
+    totals = crm_stats.summarize(crm_stats.load(db, client_id=client_id))["totals"]
+    accepted_debt = money(sum((f["client_debt"] for o, f in zip(orders, financials) if o.status in REVENUE_ORDER_STATUSES), Decimal("0")))
+    return {"client": view(client), "orders": [view(o) for o in orders[:50]], "order_count": len(orders), "active_orders": sum(o.status not in {"COMPLETED", "CANCELLED"} and not o.archived for o in orders), "revenue": totals["revenue"], "executor_cost": totals["executor_cost"], "profit": totals["profit"], "debt": accepted_debt, "deposit_balance": money(client.deposit_balance or 0), "last_order": view(orders[0]) if orders else None}
 
 
 @router.get("/executors/{executor_id}/summary")

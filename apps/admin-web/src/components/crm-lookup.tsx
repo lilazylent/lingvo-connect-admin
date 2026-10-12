@@ -15,14 +15,18 @@ type LookupItem = {
 
 type LookupPage = { items: LookupItem[] };
 
+/** Inline "create a new record from what I typed" action shown under the search results. */
+export type LookupCreateOption = { label: (query: string) => string; create: (query: string) => Promise<LookupItem> };
+
 /** Debounced server-side autocomplete. Typing never changes the selected record. */
-export function CrmLookup({ label, path, value, onChange, disabled = false, placeholder }: {
+export function CrmLookup({ label, path, value, onChange, disabled = false, placeholder, createOptions = [] }: {
   label: string;
   path: string;
   value: string;
   onChange: (id: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  createOptions?: LookupCreateOption[];
 }) {
   const id = useId();
   const [query, setQuery] = useState("");
@@ -32,6 +36,7 @@ export function CrmLookup({ label, path, value, onChange, disabled = false, plac
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -67,6 +72,20 @@ export function CrmLookup({ label, path, value, onChange, disabled = false, plac
     onChange(item.id);
     setQuery("");
     setOpen(false);
+  };
+  const typed = query.trim();
+  const exactMatch = items.some((item) => item.name?.trim().toLowerCase() === typed.toLowerCase());
+  const showCreate = createOptions.length > 0 && typed.length >= 2 && !loading && !exactMatch;
+  const createFrom = async (option: LookupCreateOption) => {
+    setCreating(true);
+    setError("");
+    try {
+      choose(await option.create(typed));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось создать запись");
+    } finally {
+      setCreating(false);
+    }
   };
 
   return <div className={`crm-lookup crm-combobox ${disabled ? "is-disabled" : ""}`}>
@@ -110,6 +129,13 @@ export function CrmLookup({ label, path, value, onChange, disabled = false, plac
         onMouseEnter={() => setActiveIndex(index)}
         onClick={() => choose(item)}
       ><strong>{item.name || "Без названия"}</strong>{secondary(item) && <small>{secondary(item)}</small>}</button>) : <div className="crm-combobox__state">Совпадений не найдено</div>}
+      {showCreate && createOptions.map((option) => <button
+        key={option.label("")}
+        type="button"
+        className="crm-combobox__option crm-combobox__create"
+        disabled={creating}
+        onClick={() => void createFrom(option)}
+      ><strong>＋ {option.label(typed)}</strong><small>{creating ? "Создаём…" : "Запись сразу появится в справочнике"}</small></button>)}
     </div>}
   </div>;
 }

@@ -11,6 +11,7 @@ function permissionForPath(pathname: string): string | undefined {
   if (pathname.startsWith("/admin/applications")) return "APPLICATIONS_VIEW";
   if (pathname.startsWith("/admin/clients")) return "CLIENTS_VIEW";
   if (pathname.startsWith("/admin/orders")) return "ORDERS_VIEW";
+  if (pathname.startsWith("/admin/statistics")) return "ORDERS_VIEW";
   if (pathname.startsWith("/admin/translators")) return "EXECUTORS_VIEW";
   if (pathname.startsWith("/admin/files")) return "FILES_VIEW";
   if (pathname === "/admin") return "OVERVIEW_VIEW";

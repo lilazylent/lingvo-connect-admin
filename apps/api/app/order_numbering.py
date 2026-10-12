@@ -8,17 +8,18 @@ and Phase 12 owner-correction migration 0021 aligns historical rows/counters.
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 
 from fastapi import HTTPException
-from sqlalchemy import update
+from sqlalchemy import case, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import utcnow
-from app.operations_models import OrderCounter
+from app.operations_models import Order, OrderCounter
 
 
 def _ensure_year_counter(db: Session, year: int) -> None:
@@ -106,3 +107,31 @@ def next_order_number(
     if sequence > 9999:
         raise HTTPException(409, f"Исчерпан диапазон номеров заказов за {year} год")
     return format_order_number(year, sequence)
+
+
+ORDER_NUMBER_PATTERN = re.compile(r"^(\d{2})-(\d{4})$")
+
+
+def claim_explicit_order_number(db: Session, number: str, *, exclude_order_id: str | None = None) -> str:
+    """Validate a manually entered ``YY-NNNN`` number and keep the counter ahead of it.
+
+    The owner may type the number while registering or editing an order. The counter for
+    that year is raised (never lowered) so later automatic numbers cannot collide with it.
+    """
+    value = (number or "").strip()
+    match = ORDER_NUMBER_PATTERN.match(value)
+    if not match:
+        raise HTTPException(422, "Номер заказа должен быть в формате ГГ-NNNN, например 26-0123")
+    year, sequence = 2000 + int(match.group(1)), int(match.group(2))
+    if sequence < 1:
+        raise HTTPException(422, "Порядковый номер заказа должен быть больше нуля")
+    taken = db.scalar(select(Order.id).where(Order.number == value, *([Order.id != exclude_order_id] if exclude_order_id else [])))
+    if taken:
+        raise HTTPException(409, f"Номер {value} уже занят другим заказом")
+    _ensure_year_counter(db, year)
+    db.execute(
+        update(OrderCounter)
+        .where(OrderCounter.id == year)
+        .values(value=case((OrderCounter.value < sequence, sequence), else_=OrderCounter.value))
+    )
+    return value

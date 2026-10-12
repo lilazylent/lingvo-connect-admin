@@ -18,7 +18,7 @@ import {
   Select,
   Textarea,
 } from "./ui";
-import { CrmLookup } from "./crm-lookup";
+import { CrmLookup, type LookupCreateOption } from "./crm-lookup";
 import { LanguageCombobox } from "./language-combobox";
 import { OrderRecords } from "./crm-order-records";
 import { Icon, Pictogram } from "./icons";
@@ -318,6 +318,8 @@ type DraftExecutorAssignment = {
   route_stage_index?: number | null;
   route_source_language?: string;
   route_target_language?: string;
+  // true while the executor volume/deadline mirror the work; any manual edit unlinks it
+  volumeLinked?: boolean;
 };
 
 type DraftWork = {
@@ -637,6 +639,17 @@ const serviceFieldPatch = (work: DraftWork, service: Service | undefined): Parti
     ...resetQuotePatch,
   };
 };
+const createClient = (kind: "company" | "individual") => (name: string) =>
+  api<{ id: string; name: string }>("/api/admin/companies", { method: "POST", body: JSON.stringify({ name, kind }) });
+const clientCreateOptions: LookupCreateOption[] = [
+  { label: (name) => `Создать компанию «${name}»`, create: createClient("company") },
+  { label: (name) => `Создать частное лицо «${name}»`, create: createClient("individual") },
+];
+const contactCreateOptions = (clientId: string): LookupCreateOption[] => [
+  { label: (name) => `Добавить контакт «${name}»`, create: (name) => api<{ id: string; name: string }>(`/api/admin/companies/${clientId}/representatives`, { method: "POST", body: JSON.stringify({ name }) }) },
+];
+const orderDateValue = (createdAt: string | null | undefined) => (createdAt ? new Date(createdAt).toLocaleDateString("sv-SE") : "");
+const ASSIGNMENT_VOLUME_KEYS = ["character_count", "page_count", "document_count", "duration_seconds", "hour_count"] as const;
 const emptyAssignment = (): DraftExecutorAssignment => ({
   key: newKey(),
   executor_id: "",
@@ -765,6 +778,9 @@ export function CrmOrders() {
   const [metrics, setMetrics] = useState({ total: 0, active: 0, completed: 0, awaiting: 0, overdue: 0 });
   const applicationId = searchParams.get("application_id") ?? "";
   const openId = searchParams.get("open") ?? "";
+  // the export mirrors the visible list filters (without paging)
+  const exportParams = new URLSearchParams({ q: query, status, archived: String(archived) });
+  for (const [key, value] of Object.entries({ overdue, paid, scope, language, executor_id: executorId })) if (value) exportParams.set(key, value);
 
   const load = useCallback(async () => {
     try {
@@ -984,6 +1000,9 @@ export function CrmOrders() {
             <span className="archive-toggle__box" />
             <span className="archive-toggle__label">Архив</span>
           </label>
+          <a className="button button--secondary phase5-orders-export" href={apiDownloadUrl(`/api/admin/crm/orders/export.xlsx?${exportParams.toString()}`)}>
+            <Icon name="download" size={16} /> Выгрузить в Excel
+          </a>
           <div
             className="view-switch"
             role="group"
@@ -1350,6 +1369,8 @@ function OrderWizard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [orderNumberPreview, setOrderNumberPreview] = useState("");
+  const [manualNumber, setManualNumber] = useState("");
+  const [orderDate, setOrderDate] = useState(() => new Date().toLocaleDateString("sv-SE"));
   const [clientDeposit, setClientDeposit] = useState<ClientDepositPreview | null>(null);
   const [tariffOptions, setTariffOptions] = useState<
     Record<string, TariffOption[]>
@@ -1617,6 +1638,9 @@ function OrderWizard({
         application_id: applicationId || null,
         status,
         notes,
+        // an untouched field keeps automatic numbering (no race between two open wizards)
+        number: manualNumber.trim() && manualNumber.trim() !== orderNumberPreview ? manualNumber.trim() : null,
+        order_date: orderDate || null,
         works: works.map((w) => ({
           service_code: w.service_code,
           work_type: w.work_type,
@@ -1721,7 +1745,7 @@ function OrderWizard({
     <section className="crm-wizard">
       <header className="crm-wizard__head">
         <div>
-          <span className="overline">Новый заказ{orderNumberPreview ? ` · ${orderNumberPreview}` : ""}</span>
+          <span className="overline">Новый заказ{orderNumberPreview ? ` · ${manualNumber || orderNumberPreview}` : ""}</span>
           <h2>Регистрация заказа</h2>
           <p>Шесть коротких шагов вместо одной длинной формы.</p>
         </div>
@@ -1767,6 +1791,7 @@ function OrderWizard({
                 setClient(id);
                 setContact("");
               }}
+              createOptions={clientCreateOptions}
             />
             {client && (
               <CrmLookup
@@ -1775,8 +1800,19 @@ function OrderWizard({
                 path={`/api/admin/companies/${client}/representatives`}
                 value={contact}
                 onChange={setContact}
+                createOptions={contactCreateOptions(client)}
               />
             )}
+            <div className="wizard-number-row">
+              <Input
+                label="Номер заказа"
+                value={manualNumber || orderNumberPreview}
+                onChange={(e) => setManualNumber(e.target.value)}
+                hint={manualNumber && manualNumber !== orderNumberPreview ? `Автоматический номер: ${orderNumberPreview}` : "Подставлен автоматически, можно изменить"}
+                placeholder="ГГ-NNNN"
+              />
+              <Input label="Дата заказа" type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} />
+            </div>
             <Select
               label="Ответственный"
               value={manager}
@@ -2614,8 +2650,10 @@ function ExecutorAssignmentsEditor({
     }, 0);
     return () => window.clearTimeout(timer);
   }, [assignments]);
-  const patchAssignment = (key: string, patch: Partial<DraftExecutorAssignment>) =>
-    onChange(assignments.map((item) => (item.key === key ? { ...item, ...patch } : item)));
+  const patchAssignment = (key: string, patch: Partial<DraftExecutorAssignment>) => {
+    const editsVolume = ASSIGNMENT_VOLUME_KEYS.some((field) => field in patch);
+    onChange(assignments.map((item) => (item.key === key ? { ...item, ...patch, ...(editsVolume ? { volumeLinked: false } : {}) } : item)));
+  };
   const assignmentFromWork = () => {
     const next = emptyAssignment();
     next.character_count = work.character_count;
@@ -2626,9 +2664,38 @@ function ExecutorAssignmentsEditor({
     next.billing_unit = work.billing_unit === "CUSTOM" ? serviceBillingUnit(service, work.certification_mode) : work.billing_unit;
     next.deadline = work.executor_deadline || work.deadline;
     next.deadline_time = work.executor_deadline ? work.executor_deadline_time : work.deadline_time;
+    next.volumeLinked = true;
     return next;
   };
   const addAssignment = () => onChange([...assignments, assignmentFromWork()]);
+  // Owner rule: the executor gets the work's volume/deadline by default (editable afterwards).
+  const autoCreated = useRef(false);
+  const workVolumeSignature = [work.character_count, work.page_count, work.document_count, work.duration_seconds, work.hour_count, work.deadline, work.deadline_time, work.executor_deadline, work.executor_deadline_time].join("|");
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (!assignments.length) {
+        if (autoCreated.current) return;
+        autoCreated.current = true;
+        onChange([assignmentFromWork()]);
+        return;
+      }
+      const source = assignmentFromWork();
+      let changed = false;
+      const synced = assignments.map((item) => {
+        if (!item.volumeLinked || item.route_stage_index) return item;
+        const patch: Partial<DraftExecutorAssignment> = {};
+        for (const field of [...ASSIGNMENT_VOLUME_KEYS, "deadline", "deadline_time"] as const) {
+          if (item[field] !== source[field]) patch[field] = source[field];
+        }
+        if (!Object.keys(patch).length) return item;
+        changed = true;
+        return { ...item, ...patch };
+      });
+      if (changed) onChange(synced);
+    }, 0);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workVolumeSignature, assignments.length]);
   const candidateRateKey = (candidate: ExecutorCandidate, stageIndex?: number) =>
     stageIndex ? `route:${stageIndex}:${candidate.executor_id}` : `direct:${candidate.executor_id}`;
   const effectiveCandidateRate = (candidate: ExecutorCandidate, stageIndex?: number) => {
@@ -2700,11 +2767,12 @@ function ExecutorAssignmentsEditor({
   const selectCandidate = (candidate: ExecutorCandidate) => {
     if (candidate.candidate_state === "UNAVAILABLE") return;
     if (assignments.some((assignment) => assignment.executor_id === candidate.executor_id)) return;
-    const next = assignmentFromWork();
+    const placeholder = assignments.find((assignment) => !assignment.executor_id && !assignment.route_stage_index);
+    const next = placeholder ? { ...placeholder } : assignmentFromWork();
     next.executor_id = candidate.executor_id;
     next.rate = effectiveCandidateRate(candidate);
     next.billing_unit = candidate.rate_unit || next.billing_unit;
-    onChange([...assignments, next]);
+    onChange(placeholder ? assignments.map((item) => (item.key === placeholder.key ? next : item)) : [...assignments, next]);
   };
   const routeStageFor = (stageIndex: number) =>
     candidateData?.routed_match.stages.find((stage) => stage.index === stageIndex);
@@ -2719,7 +2787,7 @@ function ExecutorAssignmentsEditor({
     next.route_stage_index = stage.index;
     next.route_source_language = stage.source_language;
     next.route_target_language = stage.target_language;
-    const withoutStage = assignments.filter((assignment) => assignment.route_stage_index !== stageIndex);
+    const withoutStage = assignments.filter((assignment) => assignment.route_stage_index !== stageIndex && (assignment.executor_id || assignment.route_stage_index));
     onChange([...withoutStage, next].sort((left, right) =>
       (left.route_stage_index ?? 99) - (right.route_stage_index ?? 99)
     ));
@@ -3087,7 +3155,7 @@ function ExecutorAssignmentsEditor({
               <CrmLookup
                 label="Исполнитель"
                 placeholder="Имя, телефон, email или Telegram"
-                path={`/api/admin/executors?language=${encodeURIComponent(work.target_language || work.source_language)}&work_type=${encodeURIComponent(work.work_type)}`}
+                path="/api/admin/executors?archived=false"
                 value={assignment.executor_id}
                 onChange={(id) => patchAssignment(assignment.key, { executor_id: id })}
               />
@@ -3342,6 +3410,8 @@ function OrderCard({
     contact_id: "",
     manager_id: "",
     notes: "",
+    number: "",
+    order_date: "",
   });
 
   const load = useCallback(async () => {
@@ -3361,6 +3431,8 @@ function OrderCard({
         contact_id: detail.contact_id ?? "",
         manager_id: detail.manager_id ?? "",
         notes: detail.notes ?? "",
+        number: detail.number ?? "",
+        order_date: orderDateValue(detail.created_at),
       });
       setError("");
     } catch (e) {
@@ -3566,6 +3638,8 @@ function OrderCard({
           contact_id: detailDraft.contact_id || null,
           manager_id: detailDraft.manager_id || null,
           notes: detailDraft.notes,
+          number: detailDraft.number.trim() && detailDraft.number.trim() !== order.number ? detailDraft.number.trim() : null,
+          order_date: detailDraft.order_date && detailDraft.order_date !== orderDateValue(order.created_at) ? detailDraft.order_date : null,
           version: order.version,
         }),
       });
@@ -3750,7 +3824,7 @@ function OrderCard({
           ["core", "Основное"],
           ["works", `Работы ${order.works.length}`],
           ["executors", `Исполнители ${executorGroups.size}`],
-          ["finance", "Финансы"],
+          ["finance", "Расчёт"],
           ["files", `Файлы ${order.files.length}`],
           ["history", "История"],
         ] as const).map(([value, label]) => (
@@ -3797,6 +3871,7 @@ function OrderCard({
                       contact_id: "",
                     })
                   }
+                  createOptions={clientCreateOptions}
                 />
                 {detailDraft.client_id && (
                   <CrmLookup
@@ -3806,6 +3881,7 @@ function OrderCard({
                     onChange={(id) =>
                       setDetailDraft({ ...detailDraft, contact_id: id })
                     }
+                    createOptions={contactCreateOptions(detailDraft.client_id)}
                   />
                 )}
                 <Select
@@ -3828,6 +3904,20 @@ function OrderCard({
               </fieldset>
               <fieldset className="order-edit-group">
                 <legend>Параметры и заметки</legend>
+                <div className="wizard-number-row">
+                  <Input
+                    label="Номер заказа"
+                    value={detailDraft.number}
+                    placeholder="ГГ-NNNN"
+                    onChange={(e) => setDetailDraft({ ...detailDraft, number: e.target.value })}
+                  />
+                  <Input
+                    label="Дата заказа"
+                    type="date"
+                    value={detailDraft.order_date}
+                    onChange={(e) => setDetailDraft({ ...detailDraft, order_date: e.target.value })}
+                  />
+                </div>
                 <Textarea
                   label="Внутренний комментарий"
                   value={detailDraft.notes}
@@ -3850,6 +3940,8 @@ function OrderCard({
                     contact_id: order.contact_id ?? "",
                     manager_id: order.manager_id ?? "",
                     notes: order.notes ?? "",
+                    number: order.number ?? "",
+                    order_date: orderDateValue(order.created_at),
                   });
                 }}
               >
@@ -3888,7 +3980,7 @@ function OrderCard({
       </section>
       <section id="order-finance" role="tabpanel" className={`phase5-finance-workspace phase5-order-panel${activeTab === "finance" ? " is-active" : ""}`}>
         <header className="phase5-finance-workspace__head">
-          <div><span className="overline">Финансы</span><h3>Экономика заказа</h3></div>
+          <div><span className="overline">Расчёт</span><h3>Экономика заказа</h3></div>
           <p>Стоимость, выплаты, прибыль, маржинальность и текущий долг клиента.</p>
         </header>
         <div className="phase5-finance-main-column">
