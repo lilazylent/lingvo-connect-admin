@@ -35,6 +35,7 @@ type ServiceDefinition = {
   matching_mode: "LANGUAGE_PAIR" | "SOURCE_LANGUAGE" | "SERVICE_ONLY";
   supports_routing: boolean;
   default_variant?: string;
+  variant_label?: string;
   variants?: Record<string, { label: string; billing_unit: string; fields: string[] }>;
 };
 type Service = {
@@ -297,6 +298,7 @@ type TariffOption = {
   components: TariffComponent[];
   discount_name?: string | null;
   is_auto: boolean;
+  client_tariff?: { client_name: string; tier_id: string; quantity_from: Money; tiers: number };
 };
 type DraftExecutorAssignment = {
   key: string;
@@ -453,15 +455,20 @@ const paymentStateLabel = (state: Financial["payment_state"]) => ({
   PAID: "Оплачено", UNPAID: "Не оплачено", PARTIAL: "Частично оплачено", DEPOSIT: "Депозит",
 })[state];
 const billingQuantityLabel = (unit: string, quantity: number) => formatBillingQuantity(unit, quantity);
+const serviceVariant = (service: Service | undefined, certificationMode = "") => {
+  const variants = service?.definition?.variants;
+  if (!variants) return "";
+  return variants[certificationMode] ? certificationMode : service?.definition?.default_variant || Object.keys(variants)[0] || "";
+};
 const activeServiceFields = (service: Service | undefined, certificationMode = "") => {
   const definition = service?.definition;
   if (!definition) return new Set<string>();
   const fields = new Set(definition.fields);
-  if (service?.code === "company_certification" && definition.variants) {
-    fields.delete("document_count");
-    fields.delete("page_count");
-    const variant = definition.variants[certificationMode || definition.default_variant || "BOUND"];
-    variant?.fields.forEach((field) => fields.add(field));
+  const variant = definition.variants?.[serviceVariant(service, certificationMode)];
+  if (variant) {
+    // volume fields belong to the variants: only the selected variant's ones stay
+    Object.values(definition.variants || {}).forEach((option) => option.fields.forEach((field) => fields.delete(field)));
+    variant.fields.forEach((field) => fields.add(field));
   }
   return fields;
 };
@@ -470,10 +477,8 @@ const serviceHasField = (service: Service | undefined, field: string, certificat
 const serviceBillingUnit = (service: Service | undefined, certificationMode = "") => {
   const definition = service?.definition;
   if (!definition) return service?.billing_mode || "CUSTOM";
-  if (service?.code === "company_certification" && definition.variants) {
-    const variant = definition.variants[certificationMode || definition.default_variant || "BOUND"];
-    if (variant?.billing_unit) return variant.billing_unit;
-  }
+  const variant = definition.variants?.[serviceVariant(service, certificationMode)];
+  if (variant?.billing_unit) return variant.billing_unit;
   return definition.billing_unit || service?.billing_mode || "CUSTOM";
 };
 const draftWorkDirectionLabel = (work: DraftWork) => {
@@ -519,7 +524,12 @@ const executorVolumeLabel = (assignment: Pick<FinanceExecutorAssignment, "billin
   if (assignment.character_count) return formatBillingQuantity("CONDITIONAL_PAGE", conditionalPages(assignment.character_count));
   return "Объём не указан";
 };
+const clientTariffLabel = (option: TariffOption) => {
+  const tier = option.client_tariff && Number(option.client_tariff.quantity_from) > 1 ? ` (от ${Number(option.client_tariff.quantity_from)})` : "";
+  return `Тариф клиента «${option.client_tariff?.client_name ?? ""}»${tier}`;
+};
 const tariffOptionLabel = (service: Service | undefined, option: TariffOption) => {
+  if (option.client_tariff) return `${clientTariffLabel(option)} · ${formatRate(option.rate, option.unit)}${option.is_auto ? " · по умолчанию" : ""}`;
   const matchingMode = service?.definition?.matching_mode;
   const scope =
     matchingMode === "SERVICE_ONLY"
@@ -541,8 +551,9 @@ const tariffMessage = (option: TariffOption, automatic = option.is_auto) => {
   const quantity = Number(option.quantity ?? 0);
   const multiplier = Number(option.surcharge_multiplier ?? 1);
   const discount = Number(option.discount_percent ?? 0);
-  const route =
-    option.resolution === "via_russian"
+  const route = option.client_tariff
+    ? clientTariffLabel(option)
+    : option.resolution === "via_russian"
       ? "через русский"
       : option.resolution === "native_speaker"
         ? "носитель"
@@ -553,7 +564,7 @@ const tariffMessage = (option: TariffOption, automatic = option.is_auto) => {
     option.resolution === "via_russian" && option.components?.length
       ? ` · ${option.components.map((item) => `${item.source_language || "Русский"} → ${item.target_language}: ${rub(item.rate)}`).join(" + ")}`
       : "";
-  return `${automatic ? "Тариф подобран CRM" : "Тариф выбран менеджером"}: ${formatRate(option.rate, option.unit)} × ${billingQuantityLabel(option.unit, quantity)}${multiplier > 1 ? ` × ${multiplier} срочность` : ""}${discount > 0 ? ` − ${discount}% скидка` : ""} · ${route}${components}`;
+  return `${automatic ? "Тариф подобран CRM" : "Тариф выбран менеджером"}: ${formatRate(option.rate, option.unit)} × ${billingQuantityLabel(option.unit, quantity)}${multiplier > 1 ? ` × ${multiplier} срочность` : ""}${discount > 0 ? ` − ${discount}% ${option.client_tariff ? "скидка клиента" : "скидка"}` : ""} · ${route}${components}`;
 };
 const newKey = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const conditionalPages = (value: string | number | null | undefined) => {
@@ -607,9 +618,7 @@ const serviceFieldPatch = (work: DraftWork, service: Service | undefined): Parti
     };
   }
   const definition = service.definition;
-  const defaultVariant = service.code === "company_certification"
-    ? definition?.default_variant || "BOUND"
-    : "";
+  const defaultVariant = serviceVariant(service);
   const fields = activeServiceFields(service, defaultVariant);
   const keep = (field: string) => !definition || fields.has(field);
   return {
@@ -1511,6 +1520,7 @@ function OrderWizard({
             urgent: work.urgent,
             urgency_multiplier: Number(work.urgency_multiplier || 1),
             native_speaker: work.native_speaker,
+            client_id: client || null,
           }),
         },
       );
@@ -1789,6 +1799,8 @@ function OrderWizard({
               value={client}
               onChange={(id) => {
                 setClient(id);
+                // the client may have its own price list: quotes are recalculated for the new client
+                setWorks((items) => items.map((item) => (item.manualPrice ? item : { ...item, ...resetQuotePatch })));
                 setContact("");
               }}
               createOptions={clientCreateOptions}
@@ -2354,16 +2366,18 @@ function WorkDraft({
 
         {service && has("certification_mode") && (
           <Select
-            label="Вариант заверения"
-            value={work.certification_mode || definition?.default_variant || "BOUND"}
+            label={definition?.variant_label || "Вариант расчёта"}
+            value={serviceVariant(service, work.certification_mode)}
             onChange={(e) => {
               const mode = e.target.value;
               const nextFields = activeServiceFields(service, mode);
               patch({
                 certification_mode: mode,
                 billing_unit: serviceBillingUnit(service, mode),
+                executor_billing_unit: serviceBillingUnit(service, mode),
                 document_count: nextFields.has("document_count") ? work.document_count : "",
                 page_count: nextFields.has("page_count") ? work.page_count : "",
+                character_count: nextFields.has("character_count") ? work.character_count : "",
                 ...resetQuotePatch,
               });
             }}
@@ -3701,7 +3715,9 @@ function OrderCard({
         volume !== "Объём не указан" ? `Объём: ${volume}` : "",
         work.service_code === "company_certification"
           ? `Вариант заверения: ${work.certification_mode === "PER_PAGE" ? "Постранично" : "Сшивка"}`
-          : "",
+          : work.certification_mode === "DOCUMENT"
+            ? "Шаблонные документы, расчёт за документ"
+            : "",
         Number(work.client_rate || 0) > 0 ? `Ставка: ${formatRate(work.client_rate, work.billing_unit)}` : "",
         work.urgent && Number(work.urgency_multiplier || 1) > 1
           ? `Наценка / срочность: ×${Number(work.urgency_multiplier).toLocaleString("ru-RU")}`

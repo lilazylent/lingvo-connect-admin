@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "./auth-provider";
 import { CrmContacts } from "./crm-contacts";
+import { ClientTariffsPanel } from "./crm-client-tariffs";
 import { api } from "@/lib/api";
 import { formatActivityDate, operationalActivityLabel } from "@/lib/activity-labels";
 import { formatCrmDate, formatCrmDateTime } from "@/lib/format-date";
@@ -136,7 +137,7 @@ type ExecutorAvailability = {
   version: number;
 };
 
-type DetailTab = "overview" | "contacts" | "availability" | "records" | "history";
+type DetailTab = "overview" | "contacts" | "tariffs" | "availability" | "records" | "history";
 type ExecutorDirectoryView = "list" | "calendar";
 
 type ActivityItem = {
@@ -660,6 +661,7 @@ function DirectoryDetail({ entry, executor, summary, onClose, onEdit, onOpenAvai
   const tabs = useMemo(() => [
     { id: "overview" as const, label: "Обзор" },
     { id: "contacts" as const, label: executor ? "Направления" : "Контакты" },
+    ...(executor ? [] : [{ id: "tariffs" as const, label: "Тарифы" }]),
     ...(executor ? [{ id: "availability" as const, label: "Доступность" }] : []),
     { id: "records" as const, label: executor ? "Работы" : "Заказы" },
     { id: "history" as const, label: "История" },
@@ -701,6 +703,7 @@ function DirectoryDetail({ entry, executor, summary, onClose, onEdit, onOpenAvai
       {tab === "contacts" && (executor
         ? <ExecutorDirectionsPanel entry={entry} />
         : <CrmContacts clientId={entry.id} disabled={entry.archived} />)}
+      {tab === "tariffs" && !executor && <ClientTariffsPanel clientId={entry.id} disabled={entry.archived} />}
       {tab === "availability" && executor && <ExecutorAvailabilityPanel entry={entry} onOpenCalendar={onOpenAvailabilityCalendar} />}
       {tab === "records" && (executor
         ? <ExecutorWorksPanel summary={summary} />

@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session
 
-from app.client_models import ClientDepositTransaction, Company, Representative
+from app.client_models import ClientDepositTransaction, ClientTariff, Company, Representative
 from app.crm_models import (
     ClientPayment,
     ExecutorPayment,
@@ -41,7 +41,7 @@ from app.models import Application, ApplicationActivity, User, utcnow
 from app.operations_models import ApplicationClient, Executor, ExecutorAssignment, ExecutorDirection, OperationalActivity, Order, OrderWork
 from app.order_files import OrderFile
 from app.order_numbering import claim_explicit_order_number, next_order_number, peek_next_order_number
-from app.service_definitions import billing_unit_for, canonical_service_code, definition_for, definition_view, fields_for, lookup_codes
+from app.service_definitions import billing_unit_for, canonical_service_code, definition_for, definition_view, fields_for, lookup_codes, variant_for
 from app.routers.clients import view
 from app.storage import UnsafeFileError, storage_from_settings
 from app.config import get_settings
@@ -199,6 +199,7 @@ class QuoteRequest(BaseModel):
     urgent: bool = False
     urgency_multiplier: Decimal | None = Field(default=None, ge=1, le=10)
     native_speaker: bool = False
+    client_id: str | None = Field(default=None, max_length=36)
 
 
 def _active_tariff_query(service_code: str):
@@ -269,6 +270,10 @@ def _tariff_matches_request(tariffs: list[Tariff], payload: QuoteRequest) -> boo
         return False
     if any(canonical_service_code(t.service_code) != canonical_service_code(payload.service_code) for t in tariffs):
         return False
+    expected_unit = billing_unit_for(payload.service_code, payload.certification_mode)
+    if expected_unit and any(t.unit != expected_unit for t in tariffs):
+        # e.g. per-document written translation never matches the per-page tariff grid
+        return False
     if payload.service_code != "written_translation":
         expected_unit = billing_unit_for(payload.service_code, payload.certification_mode)
         if len(tariffs) != 1 or (expected_unit and tariffs[0].unit != expected_unit):
@@ -335,6 +340,75 @@ def _quote_from_tariffs(payload: QuoteRequest, tariffs: list[Tariff], resolution
         "base_amount": priced["base_amount"], "surcharge_multiplier": priced["multiplier"],
         "before_discount": Decimal(str(priced["amount"])),
     }
+
+# ---------------------------------------------------------------- client-specific tariffs
+CLIENT_TARIFF_PREFIX = "client:"
+
+
+def _client_tariff_ladder(db: Session, company_id: str, payload: QuoteRequest, anchor: ClientTariff | None = None) -> list[ClientTariff]:
+    """Price ladder of the client for this work: same service, variant and the most specific language match."""
+    codes = lookup_codes(payload.service_code) or {payload.service_code}
+    variant = variant_for(payload.service_code, payload.certification_mode)
+    rows = db.scalars(select(ClientTariff).where(
+        ClientTariff.company_id == company_id, ClientTariff.active.is_(True), ClientTariff.service_code.in_(codes),
+    )).all()
+    rows = [
+        r for r in rows
+        if (r.variant or "") == variant
+        and r.source_language in {"", payload.source_language}
+        and r.target_language in {"", payload.target_language}
+    ]
+    if anchor is not None:
+        rows = [r for r in rows if (r.source_language, r.target_language) == (anchor.source_language, anchor.target_language)]
+    if not rows:
+        return []
+    # an exact language pair beats "any language"
+    best = max(rows, key=lambda r: (bool(r.source_language) + bool(r.target_language), bool(r.source_language)))
+    group = (best.source_language, best.target_language)
+    return sorted((r for r in rows if (r.source_language, r.target_language) == group), key=lambda r: Decimal(str(r.quantity_from)))
+
+
+def _client_tariff_option(db: Session, company: Company, payload: QuoteRequest, anchor: ClientTariff | None = None) -> dict | None:
+    ladder = _client_tariff_ladder(db, company.id, payload, anchor)
+    if not ladder:
+        return None
+    unit = billing_unit_for(payload.service_code, payload.certification_mode) or "CUSTOM"
+    volume = dict(
+        unit=unit, character_count=payload.character_count, page_count=payload.page_count, quantity=payload.quantity,
+        duration_seconds=payload.duration_seconds, document_count=payload.document_count, hour_count=payload.hour_count,
+    )
+    quantity = calculate(PricingRequest(rate=Decimal("0"), **volume))["quantity"]
+    tier = ladder[0]
+    for row in ladder:
+        if Decimal(str(row.quantity_from)) <= quantity:
+            tier = row
+    priced = calculate(PricingRequest(
+        rate=Decimal(str(tier.amount)), urgent=payload.urgent,
+        urgency_multiplier=payload.urgency_multiplier or Decimal("1"), **volume,
+    ))
+    before_discount = Decimal(str(priced["amount"]))
+    discount_percent = Decimal(str(company.client_discount_percent or 0))
+    discount_amount = money(before_discount * discount_percent / Decimal("100"))
+    key = f"{CLIENT_TARIFF_PREFIX}{ladder[0].id}"      # stable while the quantity moves between tiers
+    return {
+        "key": key, "tariff_ids": [key], "resolution": "client_tariff",
+        "rate": money(Decimal(str(tier.amount))), "unit": unit, "amount": money(before_discount - discount_amount),
+        "quantity": priced["quantity"], "base_amount": priced["base_amount"],
+        "surcharge_multiplier": priced["multiplier"], "before_discount": before_discount,
+        "discount_percent": discount_percent, "discount_amount": discount_amount,
+        "discount_name": "Скидка клиента" if discount_percent else None,
+        "source_language": payload.source_language, "target_language": payload.target_language,
+        "directions": [], "components": [], "is_auto": False,
+        "client_tariff": {
+            "client_name": company.name, "tier_id": tier.id,
+            "quantity_from": Decimal(str(tier.quantity_from)), "tiers": len(ladder),
+        },
+    }
+
+
+def _client_for_quote(db: Session, client_id: str | None) -> Company | None:
+    return db.get(Company, client_id) if client_id else None
+
 
 class ExecutorAssignmentPayload(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
@@ -787,7 +861,7 @@ def _apply_work_payload(db: Session, row: OrderWork, payload: WizardWork) -> Non
         if not service:
             raise HTTPException(422, f"Неизвестная или отключённая услуга: {payload.service_code}")
 
-    certification_mode = payload.certification_mode or ("BOUND" if payload.service_code == "company_certification" else "")
+    certification_mode = variant_for(payload.service_code, payload.certification_mode)
     service_unit = billing_unit_for(payload.service_code, certification_mode)
     resolved_rate = payload.client_rate
     resolved_unit = service_unit or payload.billing_unit
@@ -810,7 +884,9 @@ def _apply_work_payload(db: Session, row: OrderWork, payload: WizardWork) -> Non
     before_discount = Decimal(str(calculated["amount"]))
     quantity = Decimal(str(calculated["quantity"]))
 
-    selected_tariffs = _tariffs_by_ids(db, payload.tariff_ids, payload.service_code) if payload.service_code else []
+    client_keys = [item for item in payload.tariff_ids if item.startswith(CLIENT_TARIFF_PREFIX)]
+    standard_ids = [item for item in payload.tariff_ids if not item.startswith(CLIENT_TARIFF_PREFIX)]
+    selected_tariffs = _tariffs_by_ids(db, standard_ids, payload.service_code) if payload.service_code else []
     quote_payload = QuoteRequest(
         service_code=payload.service_code or "custom",
         source_language=source_language,
@@ -825,9 +901,29 @@ def _apply_work_payload(db: Session, row: OrderWork, payload: WizardWork) -> Non
         urgency_multiplier=payload.urgency_multiplier,
         native_speaker=effective_native,
     )
-    if payload.tariff_ids and len(selected_tariffs) != len(payload.tariff_ids):
+    if standard_ids and len(selected_tariffs) != len(standard_ids):
         raise HTTPException(422, "Выбранный тариф недоступен или больше не действует")
-    if selected_tariffs:
+    order = db.get(Order, row.order_id) if row.order_id else None
+    client = db.get(Company, order.client_id) if order and order.client_id else None
+    client_option = None
+    if client_keys and client and payload.service_code:
+        anchor = db.get(ClientTariff, client_keys[0][len(CLIENT_TARIFF_PREFIX):])
+        # a tariff of another client (the order's client was changed) simply no longer applies
+        if anchor and anchor.company_id == client.id:
+            client_option = _client_tariff_option(db, client, quote_payload, anchor)
+            if client_option is None:
+                raise HTTPException(422, "Тариф клиента не подходит к параметрам работы")
+    elif (
+        not selected_tariffs and client and client.pricing_mode == "CLIENT" and payload.service_code
+        and payload.price is None and payload.client_rate == 0
+    ):
+        client_option = _client_tariff_option(db, client, quote_payload)
+    if client_option:
+        before_discount = Decimal(str(client_option["before_discount"]))
+        quantity = Decimal(str(client_option["quantity"]))
+        resolved_rate = Decimal(str(client_option["rate"]))
+        resolved_unit = str(client_option["unit"])
+    elif selected_tariffs:
         if not _tariff_matches_request(selected_tariffs, quote_payload):
             raise HTTPException(422, "Выбранный тариф не соответствует параметрам работы")
         evaluated = _quote_from_tariffs(quote_payload, selected_tariffs, "manual_selection")
@@ -847,7 +943,8 @@ def _apply_work_payload(db: Session, row: OrderWork, payload: WizardWork) -> Non
         applied_discount = Decimal("0")
         discount_overridden = False
     elif payload.discount_percent is None:
-        applied_discount, _ = _discount_for(db, payload.service_code, quantity)
+        # client tariffs carry the client's own discount instead of the volume discounts
+        applied_discount = Decimal(str(client_option["discount_percent"])) if client_option else _discount_for(db, payload.service_code, quantity)[0]
         discount_overridden = False
     else:
         applied_discount = Decimal(str(payload.discount_percent))
@@ -865,7 +962,7 @@ def _apply_work_payload(db: Session, row: OrderWork, payload: WizardWork) -> Non
     row.native_speaker = effective_native
     row.discount_percent = applied_discount
     row.discount_overridden = discount_overridden
-    row.tariff_ids = ",".join(payload.tariff_ids)
+    row.tariff_ids = client_option["key"] if client_option else ",".join(standard_ids)
     row.character_count = payload.character_count if not definition or "character_count" in active_fields else None
     row.page_count = (
         quantity
@@ -880,7 +977,7 @@ def _apply_work_payload(db: Session, row: OrderWork, payload: WizardWork) -> Non
     row.hour_count = payload.hour_count if not definition or "hour_count" in active_fields else None
     row.start_date = payload.start_date if not definition or "start_date" in active_fields else None
     row.start_time = payload.start_time if not definition or "start_time" in active_fields else ""
-    row.certification_mode = certification_mode if payload.service_code == "company_certification" else ""
+    row.certification_mode = certification_mode
     row.billing_unit = resolved_unit
     row.client_rate = resolved_rate
     row.auto_price = auto_price
@@ -1282,6 +1379,8 @@ def pricing_options(payload: QuoteRequest, db: DB, context: Read):
         raise HTTPException(422, "Услуга не найдена или отключена")
     candidates: list[tuple[list[Tariff], str]] = []
     auto_tariffs, auto_resolution = (_resolve_translation_tariff(db, payload) if payload.service_code == "written_translation" else ([], "direct"))
+    if auto_tariffs and not _tariff_matches_request(auto_tariffs, payload):
+        auto_tariffs, auto_resolution = [], "not_found"
     if payload.service_code != "written_translation":
         query = _active_tariff_query(payload.service_code)
         expected_unit = billing_unit_for(payload.service_code, payload.certification_mode)
@@ -1330,10 +1429,21 @@ def pricing_options(payload: QuoteRequest, db: DB, context: Read):
             "discount_name": discount_name,
             "is_auto": ids == tuple(t.id for t in auto_tariffs),
         })
+    auto_key = ",".join(t.id for t in auto_tariffs) if auto_tariffs and options else ""
+    client = _client_for_quote(db, payload.client_id)
+    client_option = _client_tariff_option(db, client, payload) if client else None
+    if client_option:
+        # the client's own price list is offered first; it is the default when the client is set to it
+        if client.pricing_mode == "CLIENT" or not auto_key:
+            for option in options:
+                option["is_auto"] = False
+            client_option["is_auto"] = True
+            auto_key = client_option["key"]
+        options.insert(0, client_option)
     return {
         "options": options,
-        "auto_key": ",".join(t.id for t in auto_tariffs) if auto_tariffs else "",
-        "resolution": auto_resolution,
+        "auto_key": auto_key,
+        "resolution": "client_tariff" if client_option and client_option["is_auto"] else auto_resolution,
         "message": "" if options else _unresolved_tariff_message(auto_resolution),
     }
 
@@ -1352,6 +1462,8 @@ def pricing_quote(payload: QuoteRequest, db: DB, context: Read):
     resolution = "direct"
     if payload.service_code == "written_translation":
         tariffs, resolution = _resolve_translation_tariff(db, payload)
+        if tariffs and not _tariff_matches_request(tariffs, payload):
+            tariffs, resolution = [], "not_found"
     else:
         query = _active_tariff_query(payload.service_code)
         expected_unit = billing_unit_for(payload.service_code, payload.certification_mode)

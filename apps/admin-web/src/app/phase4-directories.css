@@ -428,3 +428,23 @@
   .client-deposit-panel__actions { grid-column: 1; }
   .client-deposit-panel__actions .button { width: 100%; }
 }
+
+/* Client price list (owner feedback 2026-10-27): lives in the narrow detail panel, so it stacks */
+.client-tariffs { display: grid; gap: var(--ui-space-3); }
+.client-tariffs__settings { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--ui-space-2); }
+.client-tariffs__settings > * { min-width: 0; }
+.client-tariffs__settings .button { justify-self: start; }
+.client-tariffs__hint { margin: 0; }
+.client-tariffs__list { display: grid; gap: var(--ui-space-2); padding-top: var(--ui-space-3); border-top: 1px solid var(--crm-border); }
+.client-tariffs__row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px var(--ui-space-2); align-items: start; padding: 10px 11px; border: 1px solid var(--crm-border); border-radius: var(--ui-radius-control); background: var(--crm-surface-raised); }
+.client-tariffs__row > div:first-child { min-width: 0; display: grid; gap: 2px; }
+.client-tariffs__row b { color: var(--crm-text); overflow-wrap: anywhere; }
+.client-tariffs__row span { color: var(--crm-text-muted); font-size: var(--ui-text-xs); }
+.client-tariffs__row .badge { white-space: nowrap; }
+.client-tariffs__row-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: var(--ui-space-1); margin-left: -8px; }
+.client-tariffs__form { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--ui-space-2); padding: var(--ui-space-3); border: 1px solid var(--crm-border-strong); border-radius: var(--ui-radius-control); background: var(--crm-surface-raised); }
+.client-tariffs__form > * { min-width: 0; }
+.client-tariffs__form-actions { display: flex; flex-wrap: wrap; gap: var(--ui-space-2); }
+@media (max-width: 620px) {
+  .client-tariffs__form-actions .button { flex: 1 1 auto; }
+}

@@ -28,6 +28,11 @@ class Company(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     deposit_balance: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"))
+    # Owner feedback 2026-10-27: some clients have their own price list.
+    # STANDARD = company tariffs by default, CLIENT = this client's tariffs by default.
+    pricing_mode: Mapped[str] = mapped_column(String(20), default="STANDARD")
+    # Discount granted to the client (e.g. for a prepaid deposit), applied with client tariffs.
+    client_discount_percent: Mapped[Decimal] = mapped_column(Numeric(8, 4), default=Decimal("0"))
 
 
 class ClientDepositTransaction(Base):
@@ -41,6 +46,29 @@ class ClientDepositTransaction(Base):
     balance_after: Mapped[Decimal] = mapped_column(Numeric(14, 2))
     note: Mapped[str] = mapped_column(String(500), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+class ClientTariff(Base):
+    """A client-specific price for one service (optionally one language pair).
+
+    Several rows of the same service/variant/languages form a price ladder:
+    the row with the highest ``quantity_from`` not above the work quantity applies
+    (e.g. notarisation 500 ₽ from 1 document, 450 ₽ from 5 documents).
+    """
+
+    __tablename__ = "client_tariffs"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id", ondelete="RESTRICT"), index=True)
+    service_code: Mapped[str] = mapped_column(String(64), index=True)
+    variant: Mapped[str] = mapped_column(String(20), default="")
+    source_language: Mapped[str] = mapped_column(String(80), default="")
+    target_language: Mapped[str] = mapped_column(String(80), default="")
+    quantity_from: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("1"))
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    notes: Mapped[str] = mapped_column(String(500), default="")
+    active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class Representative(Base):

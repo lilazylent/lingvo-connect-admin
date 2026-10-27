@@ -9,10 +9,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app import crm_stats
-from app.client_models import ClientActivity, ClientDepositTransaction, Company, Representative
+from app.client_models import ClientActivity, ClientDepositTransaction, ClientTariff, Company, Representative
+from app.crm_models import ServiceType
 from app.db import get_db
 from app.dependencies import SessionContext, require_authenticated, require_authenticated_write
 from app.models import User, utcnow
+from app.service_definitions import canonical_service_code, definition_for, variant_for
 
 router = APIRouter(prefix="/api/admin/companies", tags=["clients"])
 DB = Annotated[Session, Depends(get_db)]
@@ -64,6 +66,23 @@ class DepositChange(BaseModel):
     mode: Literal["TOP_UP", "SET_BALANCE"] = "TOP_UP"
     amount: Decimal = Field(ge=0, max_digits=14, decimal_places=2)
     note: str = Field(default="", max_length=500)
+
+
+class PricingSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    pricing_mode: Literal["STANDARD", "CLIENT"] = "STANDARD"
+    client_discount_percent: Decimal = Field(default=Decimal("0"), ge=0, le=100, max_digits=8, decimal_places=4)
+
+
+class ClientTariffFields(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    service_code: str = Field(min_length=2, max_length=64)
+    variant: str = Field(default="", max_length=20)
+    source_language: str = Field(default="", max_length=80)
+    target_language: str = Field(default="", max_length=80)
+    quantity_from: Decimal = Field(default=Decimal("1"), ge=0, max_digits=10, decimal_places=2)
+    amount: Decimal = Field(ge=0, max_digits=14, decimal_places=2)
+    notes: str = Field(default="", max_length=500)
 
 
 def money(value: Decimal | int | str) -> Decimal:
@@ -287,6 +306,95 @@ def validate_manager(db, manager_id):
         manager = db.get(User, manager_id)
         if not manager or not manager.is_active or manager.role not in {"ADMIN", "MANAGER"}:
             raise HTTPException(422, "Выберите действующего менеджера")
+
+
+# ---------------------------------------------------------------- client-specific tariffs
+def pricing_view(db, row):
+    items = db.scalars(
+        select(ClientTariff)
+        .where(ClientTariff.company_id == row.id, ClientTariff.active.is_(True))
+        .order_by(ClientTariff.service_code, ClientTariff.variant, ClientTariff.source_language, ClientTariff.target_language, ClientTariff.quantity_from)
+    ).all()
+    return {
+        "company_id": row.id,
+        "pricing_mode": row.pricing_mode or "STANDARD",
+        "client_discount_percent": row.client_discount_percent or Decimal("0"),
+        "items": [view(item) for item in items],
+    }
+
+
+def tariff_values(db, payload: ClientTariffFields) -> dict:
+    code = canonical_service_code(payload.service_code)
+    if not db.scalar(select(ServiceType).where(ServiceType.code == code, ServiceType.active.is_(True))):
+        raise HTTPException(422, "Выберите действующую услугу")
+    definition = definition_for(code) or {}
+    variants = definition.get("variants") or {}
+    variant = payload.variant.upper()
+    if variants and variant and variant not in variants:
+        raise HTTPException(422, "Неизвестный способ расчёта для этой услуги")
+    return {
+        **payload.model_dump(),
+        "service_code": code,
+        "variant": variant_for(code, variant),
+        "quantity_from": max(Decimal("1"), payload.quantity_from),
+    }
+
+
+def client_tariff(db, company_id, tariff_id):
+    row = db.scalar(select(ClientTariff).where(ClientTariff.id == tariff_id, ClientTariff.company_id == company_id, ClientTariff.active.is_(True)))
+    if row is None:
+        raise HTTPException(404, "Тариф клиента не найден")
+    return row
+
+
+@router.get("/{company_id}/tariffs")
+def get_client_tariffs(company_id: str, db: DB, context: Read):
+    return pricing_view(db, company(db, company_id))
+
+
+@router.put("/{company_id}/pricing")
+def set_client_pricing(company_id: str, payload: PricingSettings, db: DB, context: Write):
+    row = company(db, company_id, active=True, lock=True)
+    row.pricing_mode = payload.pricing_mode
+    row.client_discount_percent = payload.client_discount_percent
+    row.version += 1
+    row.updated_at = utcnow()
+    record(db, context, row.id, "company.pricing_changed")
+    db.commit()
+    return pricing_view(db, row)
+
+
+@router.post("/{company_id}/tariffs", status_code=201)
+def create_client_tariff(company_id: str, payload: ClientTariffFields, db: DB, context: Write):
+    row = company(db, company_id, active=True)
+    db.add(ClientTariff(company_id=row.id, **tariff_values(db, payload)))
+    record(db, context, row.id, "company.tariff_created")
+    db.commit()
+    return pricing_view(db, row)
+
+
+@router.patch("/{company_id}/tariffs/{tariff_id}")
+def edit_client_tariff(company_id: str, tariff_id: str, payload: ClientTariffFields, db: DB, context: Write):
+    row = company(db, company_id, active=True)
+    item = client_tariff(db, company_id, tariff_id)
+    for key, value in tariff_values(db, payload).items():
+        setattr(item, key, value)
+    item.updated_at = utcnow()
+    record(db, context, row.id, "company.tariff_updated")
+    db.commit()
+    return pricing_view(db, row)
+
+
+@router.delete("/{company_id}/tariffs/{tariff_id}")
+def delete_client_tariff(company_id: str, tariff_id: str, db: DB, context: Write):
+    # soft delete: existing orders keep their prices and history stays readable
+    row = company(db, company_id, active=True)
+    item = client_tariff(db, company_id, tariff_id)
+    item.active = False
+    item.updated_at = utcnow()
+    record(db, context, row.id, "company.tariff_deleted")
+    db.commit()
+    return pricing_view(db, row)
 
 
 @router.post("/{company_id}/archive")

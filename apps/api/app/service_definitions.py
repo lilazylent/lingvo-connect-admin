@@ -19,15 +19,30 @@ SERVICE_DEFINITIONS: dict[str, dict[str, Any]] = {
     "written_translation": {
         "category": "text",
         "fields": [
-            "source_language", "target_language", "character_count", "page_count",
+            "source_language", "target_language", "certification_mode", "character_count", "page_count",
             "topic", "translator_type", "markup", "discount", "deadline",
             "deadline_time", "status", "notes",
         ],
         "billing_unit": "CONDITIONAL_PAGE",
-        "allowed_billing_units": ["CONDITIONAL_PAGE"],
+        "allowed_billing_units": ["CONDITIONAL_PAGE", "PER_DOCUMENT"],
         "page_from_characters": True,
         "matching_mode": "LANGUAGE_PAIR",
         "supports_routing": True,
+        # Template documents (passports, certificates...) are priced per document, never by characters.
+        "variant_label": "Способ расчёта",
+        "variants": {
+            "CHARACTERS": {
+                "label": "По знакам (условные страницы)",
+                "billing_unit": "CONDITIONAL_PAGE",
+                "fields": ["character_count", "page_count"],
+            },
+            "DOCUMENT": {
+                "label": "Шаблонные документы (за документ)",
+                "billing_unit": "PER_DOCUMENT",
+                "fields": ["document_count"],
+            },
+        },
+        "default_variant": "CHARACTERS",
     },
     "editing": {
         "category": "text",
@@ -91,6 +106,7 @@ SERVICE_DEFINITIONS: dict[str, dict[str, Any]] = {
         "page_from_characters": False,
         "matching_mode": "SERVICE_ONLY",
         "supports_routing": False,
+        "variant_label": "Вариант заверения",
         "variants": {
             "BOUND": {
                 "label": "Сшивка",
@@ -248,15 +264,27 @@ def definition_view(code: str | None) -> dict[str, Any] | None:
     return result
 
 
+def variant_for(code: str | None, certification_mode: str = "") -> str:
+    """Effective pricing variant of a service ("" when the service has no variants).
+
+    ``certification_mode`` is the historical column name; it now stores the variant of
+    any service that defines ``variants`` (company certification, written translation).
+    """
+    definition = definition_for(code)
+    variants = (definition or {}).get("variants") or {}
+    if not variants:
+        return ""
+    requested = (certification_mode or "").upper()
+    return requested if requested in variants else str(definition.get("default_variant") or next(iter(variants)))
+
+
 def billing_unit_for(code: str | None, certification_mode: str = "") -> str | None:
     definition = definition_for(code)
     if not definition:
         return None
-    if canonical_service_code(code) == "company_certification":
-        variant = (certification_mode or definition.get("default_variant") or "BOUND").upper()
-        selected = definition.get("variants", {}).get(variant)
-        if selected:
-            return str(selected["billing_unit"])
+    variant = variant_for(code, certification_mode)
+    if variant:
+        return str(definition["variants"][variant]["billing_unit"])
     return str(definition["billing_unit"])
 
 
@@ -275,13 +303,12 @@ def fields_for(code: str | None, certification_mode: str = "") -> set[str]:
     if not definition:
         return set()
     fields = set(definition.get("fields", []))
-    if canonical_service_code(code) == "company_certification":
-        fields.discard("document_count")
-        fields.discard("page_count")
-        variant = (certification_mode or definition.get("default_variant") or "BOUND").upper()
-        selected = definition.get("variants", {}).get(variant)
-        if selected:
-            fields.update(selected.get("fields", []))
+    variant = variant_for(code, certification_mode)
+    if variant:
+        # volume fields belong to the variants: keep only the selected variant's ones
+        for option in definition["variants"].values():
+            fields.difference_update(option.get("fields", []))
+        fields.update(definition["variants"][variant].get("fields", []))
     return fields
 
 

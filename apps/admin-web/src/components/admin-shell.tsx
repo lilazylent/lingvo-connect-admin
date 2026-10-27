@@ -9,14 +9,17 @@ import { useAuth } from "@/components/auth-provider";
 import { CrmThemeLoader } from "@/components/crm-theme-loader";
 import { Icon, type IconName } from "@/components/icons";
 
-const operational: Array<[string, string, IconName, string]> = [
+// Sidebar order approved by the owner (2026-10-27): each item is shown only with its permission.
+const navigation: Array<[string, string, IconName, string]> = [
   ["Обзор", "/admin", "overview", "OVERVIEW_VIEW"],
   ["Заявки", "/admin/applications", "applications", "APPLICATIONS_VIEW"],
-  ["Клиенты", "/admin/clients", "clients", "CLIENTS_VIEW"],
   ["Заказы", "/admin/orders", "orders", "ORDERS_VIEW"],
   ["Статистика", "/admin/statistics", "trend", "ORDERS_VIEW"],
+  ["Клиенты", "/admin/clients", "clients", "CLIENTS_VIEW"],
   ["Исполнители", "/admin/translators", "executors", "EXECUTORS_VIEW"],
+  ["Пользователи", "/admin/users", "users", "USERS_MANAGE"],
   ["Файлы", "/admin/files", "files", "FILES_VIEW"],
+  ["Настройки", "/admin/settings", "settings", "SETTINGS_MANAGE"],
 ];
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
@@ -36,12 +39,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const allowed = (permission: string) => admin || permissions.includes(permission);
   const items = useMemo(() => {
     if (!state) return [];
-    const next: Array<[string, string, IconName]> = operational
+    return navigation
       .filter(([, , , permission]) => admin || state.user.permissions.includes(permission))
       .map(([label, href, icon]) => [label, href, icon] as [string, string, IconName]);
-    if (admin || state.user.permissions.includes("USERS_MANAGE")) next.push(["Пользователи", "/admin/users", "users"]);
-    if (admin || state.user.permissions.includes("SETTINGS_MANAGE")) next.push(["Настройки", "/admin/settings", "settings"]);
-    return next;
   }, [admin, state]);
 
   // Owner feedback: typing into a numeric field must replace its value (e.g. the default "0")
