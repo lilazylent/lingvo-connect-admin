@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import serviceDefinitions from "./fixtures/service-definitions.json";
 
 // Paid upgrade package 2026-10-31 (DOCX v3): 5-step order registration, compact header summary,
 // «Общее и Клиент», config-driven work forms, payment layouts, tariffs and volumes.
@@ -127,5 +128,136 @@ for (const width of [1440, 1280, 768, 390]) {
     expect(outside).toEqual([]);
     await wizard.evaluate((node) => node.scrollIntoView({ block: "start" }));
     if (process.env.CAPTURE_OWNER_QA) await page.screenshot({ path: `../../test-results/paid-v3/step1-${width}.png`, fullPage: false });
+  });
+}
+
+// ---------------------------------------------------------------- S2: work forms by the DOCX v3 tables
+// The services come from the real backend metadata (apps/api/app/service_definitions.py).
+
+const TEXT_TAIL = ["Тип переводчика", "Статус", "Тематика", "Комментарий", "Наценка / Срочность", "Скидка, %", "Прикрепить документы клиента", "Не учитывать в расчёте для клиента", "Название документа (-ов)"];
+const WRITTEN = ["Услуга", "Количество знаков", "Количество условных страниц (А)", "Язык оригинала", "Язык перевода", "Тариф (А)", "Стоимость (А)", ...TEXT_TAIL];
+const SIMPLE_TAIL = ["Наценка / Срочность", "Скидка, %", "Тариф (А)", "Стоимость (А)", "Не учитывать в расчёте для клиента", "Статус", "Комментарий"];
+// 16 logical work types of DOCX v3, in Oleg's order: picker entry → field labels in DOM order
+const V3_FORMS: [string, string[]][] = [
+  ["Письменный перевод (полный)", WRITTEN],
+  ["Письменный перевод (повторения)", WRITTEN],
+  ["Письменный перевод (шаблон)", ["Услуга", "Количество документов", "Язык оригинала", "Язык перевода", "Тариф (А)", "Стоимость (А)", ...TEXT_TAIL]],
+  ["Вычитка", WRITTEN],
+  ["Набор текста", ["Услуга", "Количество знаков", "Количество условных страниц (А)", "Язык оригинала", "Тариф (А)", "Стоимость (А)", ...TEXT_TAIL]],
+  ["Нотариальное заверение", ["Услуга", "Количество документов", ...SIMPLE_TAIL]],
+  ["Заверение печатью «Лингво Коннект»", ["Услуга", "Количество документов", "Вариант заверения", "Тариф (А)", "Стоимость (А)", "Наценка / Срочность", "Скидка, %", "Статус", "Не учитывать в расчёте для клиента", "Комментарий"]],
+  ["Апостиль", ["Услуга", "Количество документов", ...SIMPLE_TAIL]],
+  ["Нотариальная копия", ["Услуга", "Количество страниц", ...SIMPLE_TAIL]],
+  ["Вёрстка текста", ["Услуга", "Количество страниц", ...SIMPLE_TAIL]],
+  ["Вёрстка чертежей", ["Услуга", "Количество страниц", ...SIMPLE_TAIL]],
+  ["Распознавание", ["Услуга", "Количество страниц", ...SIMPLE_TAIL]],
+  ["Доставка", ["Услуга", "Дата", "Время", ...SIMPLE_TAIL]],
+  ["Аудирование", ["Услуга", "Длительность, секунд", ...SIMPLE_TAIL]],
+  ["Транскрибация", ["Услуга", "Количество знаков", "Количество условных страниц (А)", "Язык оригинала", "Тариф (А)", "Стоимость (А)", ...TEXT_TAIL]],
+  ["Устный перевод", ["Услуга", "Количество часов", "Тип перевода", "Тариф (А)", "Стоимость (А)", "Язык оригинала", "Язык перевода", "Статус", "Тип переводчика", "Комментарий", "Тематика", "Наценка / Срочность", "Скидка, %", "Прикрепить документы клиента", "Не учитывать в расчёте для клиента", "Название документа (-ов)"]],
+];
+const services = serviceDefinitions as unknown[];
+const topics = { items: [{ name: "юридическая" }, { name: "техническая" }] };
+const formLabels = (work: Locator) =>
+  work.locator(".work-layout > .work-layout__row").evaluateAll((rows) =>
+    rows.flatMap((row) => [...row.querySelectorAll(".field__label, .manual-switch b, .file-drop > span")].map((node) => node.textContent?.trim() ?? "")),
+  );
+
+test("every v3 work type shows its own fields in the agreed order", async ({ page }) => {
+  const wizard = await openWizard(page, [], { services, extra: (path) => (path.endsWith("/crm/topics") ? topics : undefined) });
+  await wizard.locator(".wizard-steps button").filter({ hasText: "02" }).click();
+  const work = wizard.locator(".work-draft").first();
+  for (const [choice, labels] of V3_FORMS) {
+    await pick(page, work, "Услуга", choice);
+    await expect.poll(() => formLabels(work), { message: choice }).toEqual(labels);
+  }
+  if (process.env.CAPTURE_OWNER_QA) await work.screenshot({ path: "../../test-results/paid-v3/work-interpreting.png" });
+});
+
+test("written variants, interpreting type, topic and per-work documents reach the payload", async ({ page }) => {
+  const requests: Request[] = [];
+  const wizard = await openWizard(page, requests, {
+    services,
+    extra: (path) =>
+      path.endsWith("/crm/topics") ? topics
+        : path.endsWith("/crm/files/analyze-preview") ? { page_count: 2, character_count: 3600, word_count: 500, analysis_note: "" }
+          : path.endsWith("/crm/orders/wizard") ? { id: "created-order", works: [{ id: "w-1" }, { id: "w-2" }] }
+            : undefined,
+  });
+  await wizard.locator(".wizard-steps button").filter({ hasText: "02" }).click();
+  const first = wizard.locator(".work-draft").nth(0);
+  await pick(page, first, "Услуга", "Письменный перевод (повторения)");
+  await pick(page, first, "Тематика", "юридическая");
+  await first.getByLabel("Носитель").check();
+  await expect(first.getByLabel("Обычный")).not.toBeChecked();
+  await first.locator(".work-files input[type=file]").setInputFiles([{ name: "Договор поставки.pdf", mimeType: "application/pdf", buffer: Buffer.from("x") }]);
+  await expect(first.getByLabel("Количество знаков (А)")).toHaveValue("3600");
+  await expect(first.getByLabel("Название документа (-ов) (А)")).toHaveValue("Договор поставки");
+  // a manual name («З») is kept
+  await first.getByLabel("Название документа (-ов) (А)").fill("Договор №5");
+  await expect(first.getByLabel("Название документа (-ов) (З)")).toHaveValue("Договор №5");
+
+  await wizard.getByRole("button", { name: "Добавить работу +" }).click();
+  const second = wizard.locator(".work-draft").nth(1);
+  await pick(page, second, "Услуга", "Устный перевод");
+  await second.getByLabel("Синхронный").check();
+  await second.getByLabel("Количество часов").fill("3");
+  await second.locator(".work-files input[type=file]").setInputFiles([{ name: "agenda.txt", mimeType: "text/plain", buffer: Buffer.from("y") }]);
+
+  await wizard.locator(".wizard-steps button").filter({ hasText: "05" }).click();
+  await wizard.getByRole("button", { name: "Создать заказ" }).click();
+  await expect.poll(() => requests.filter((r) => r.path.endsWith("/files/analyze")).length).toBe(2);
+  const payload = JSON.parse(requests.find((r) => r.path.endsWith("/crm/orders/wizard"))!.body);
+  expect(payload.works[0]).toMatchObject({
+    service_code: "written_translation", certification_mode: "REPETITIONS", topic: "юридическая", native_speaker: true,
+    character_count: 3600, character_count_source: "AUTO", measured_character_count: 3600, document_names: "Договор №5", document_names_source: "MANUAL",
+  });
+  expect(payload.works[1]).toMatchObject({ service_code: "simultaneous_interpreting", hour_count: 3 });
+  // each document is uploaded into its own work
+  const uploads = requests.filter((r) => r.path.endsWith("/files/analyze")).map((r) => r.body);
+  expect(uploads[0]).toContain("w-1");
+  expect(uploads[0]).toContain("work_id");
+  expect(uploads[1]).toContain("w-2");
+});
+
+test("executors step opens «Автоподбор» only on request", async ({ page }) => {
+  const requests: Request[] = [];
+  const empty = { available: 0, unknown: 0, unavailable: 0, total: 0 };
+  const candidates = {
+    order_id: null, work: { id: null, service_code: "apostille", service_name: "Апостиль", source_language: "", target_language: "", deadline: null, executor_deadline: null },
+    match_type: "DIRECT", matching_mode: "SERVICE_ONLY", matchable: true, missing_fields: [], required_date: null, required_date_source: null,
+    candidates: [], counts: empty, direct_viable: false, routed_match: { eligible: false, via_language: null, reason: null, complete: false, stages: [] },
+  };
+  const wizard = await openWizard(page, requests, { services, extra: (path) => (path.endsWith("/executor-candidates/preview") ? candidates : undefined) });
+  await wizard.locator(".wizard-steps button").filter({ hasText: "02" }).click();
+  await pick(page, wizard.locator(".work-draft").first(), "Услуга", "Апостиль");
+  await wizard.locator(".wizard-steps button").filter({ hasText: "04" }).click();
+  await expect(wizard.getByRole("button", { name: "Автоподбор" })).toBeVisible();
+  await expect(wizard.locator(".executor-matching")).toHaveCount(0);
+  expect(requests.some((r) => r.path.includes("executor-candidates"))).toBe(false);
+  await wizard.getByRole("button", { name: "Автоподбор" }).click();
+  await expect(wizard.locator(".executor-matching")).toBeVisible();
+});
+
+for (const width of [1280, 390]) {
+  test(`v3 work grid stays bounded at ${width}px`, async ({ page }) => {
+    const wizard = await openWizard(page, [], { services }, width);
+    await wizard.locator(".wizard-steps button").filter({ hasText: "02" }).click();
+    const work = wizard.locator(".work-draft").first();
+    await pick(page, work, "Услуга", "Письменный перевод (полный)");
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+    const outside = await work.evaluate((node) => {
+      const frame = node.getBoundingClientRect();
+      return [...node.querySelectorAll(".work-layout__cell")].filter((cell) => {
+        const box = cell.getBoundingClientRect();
+        return box.left < frame.left - 1 || box.right > frame.right + 1;
+      }).length;
+    });
+    expect(outside).toBe(0);
+    // the work card itself stays inside the wizard (the wizard clips overflow)
+    const [workBox, wizardBox] = await Promise.all([work.boundingBox(), wizard.boundingBox()]);
+    expect(workBox!.x + workBox!.width).toBeLessThanOrEqual(wizardBox!.x + wizardBox!.width + 1);
+    if (process.env.CAPTURE_OWNER_QA) await work.screenshot({ path: `../../test-results/paid-v3/work-written-${width}.png` });
   });
 }

@@ -119,7 +119,7 @@ test("wizard prices template documents per document and offers the client tariff
   const work = wizard.locator(".work-draft").first();
   await pick(page, work, "Услуга", "Письменный перевод");
   await expect(work.getByLabel("Количество знаков")).toBeVisible();
-  await pick(page, work, "Способ расчёта", "Шаблонные документы (за документ)");
+  await work.getByLabel("Шаблонные документы (за документ)").check();
   await expect(work.getByLabel("Количество знаков")).toHaveCount(0);
   await work.getByLabel("Количество документов").fill("2");
 

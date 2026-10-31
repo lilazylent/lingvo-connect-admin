@@ -84,19 +84,20 @@ test("order wizard keeps every picked document and uploads all of them after cre
   await page.goto("/admin/orders");
   await page.getByRole("button", { name: /Новый заказ/ }).first().click();
   await page.getByRole("button", { name: /02\s*Работы/ }).click();
-  const input = page.locator(".document-step input[type=file]");
+  // client documents are attached inside the work (DOCX v3)
+  const input = page.locator(".work-draft").first().locator(".work-files input[type=file]");
   await expect(input).toHaveAttribute("multiple", "");
 
   await input.setInputFiles([txt("passport.txt"), txt("diploma.txt")]);
-  await expect(page.locator(".analysis-result--file")).toHaveCount(2);
+  await expect(page.locator(".work-files__list li")).toHaveCount(2);
   // A second pick appends instead of replacing the first documents.
   await input.setInputFiles([txt("contract.txt")]);
-  await expect(page.locator(".analysis-result--file")).toHaveCount(3);
+  await expect(page.locator(".work-files__list li")).toHaveCount(3);
   await page.getByRole("button", { name: "Убрать документ diploma.txt" }).click();
-  await expect(page.locator(".analysis-result--file")).toHaveCount(2);
+  await expect(page.locator(".work-files__list li")).toHaveCount(2);
 
   await page.getByRole("button", { name: /05\s*Обзор/ }).click();
-  await expect(page.getByText("Файлы (2) будут загружены")).toBeVisible();
+  await expect(page.getByText("Файлы (2) будут загружены в свои работы")).toBeVisible();
   await page.getByRole("button", { name: "Создать заказ" }).click();
   await expect.poll(() => state.uploads).toEqual(["passport.txt", "contract.txt"]);
 });

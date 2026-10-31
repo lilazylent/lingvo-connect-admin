@@ -1212,8 +1212,9 @@ def test_phase14_service_driven_fields_units_and_matching(client, create_user):
     by_code = {item["code"]: item for item in catalog.json()}
     assert by_code["company_certification"]["definition"]["default_variant"] == "BOUND"
     assert by_code["company_certification"]["definition"]["variants"]["PER_PAGE"]["billing_unit"] == "PER_PAGE"
+    # DOCX v3 (2026-10-31) adds «Наценка / Срочность» and «Скидка» to delivery
     assert by_code["delivery"]["definition"]["fields"] == [
-        "start_date", "start_time", "deadline", "deadline_time", "status", "notes"
+        "start_date", "start_time", "markup", "discount", "deadline", "deadline_time", "status", "notes"
     ]
     assert by_code["audio_listening"]["definition"]["billing_unit"] == "PER_SECOND"
     assert by_code["transcription"]["definition"]["page_from_characters"] is True

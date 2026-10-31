@@ -1,0 +1,936 @@
+[
+ {
+  "id": "svc-written_translation",
+  "code": "written_translation",
+  "name": "Письменный перевод",
+  "billing_mode": "CONDITIONAL_PAGE",
+  "active": true,
+  "sort_order": 10,
+  "definition": {
+   "category": "text",
+   "fields": [
+    "source_language",
+    "target_language",
+    "character_count",
+    "page_count",
+    "topic",
+    "translator_type",
+    "markup",
+    "discount",
+    "deadline",
+    "deadline_time",
+    "status",
+    "notes",
+    "document_names",
+    "certification_mode"
+   ],
+   "billing_unit": "CONDITIONAL_PAGE",
+   "allowed_billing_units": [
+    "CONDITIONAL_PAGE",
+    "PER_DOCUMENT"
+   ],
+   "page_from_characters": true,
+   "matching_mode": "LANGUAGE_PAIR",
+   "supports_routing": true,
+   "variant_label": "Способ расчёта",
+   "variants_in_service_picker": true,
+   "variants": {
+    "CHARACTERS": {
+     "label": "Письменный перевод (полный)",
+     "billing_unit": "CONDITIONAL_PAGE",
+     "fields": [
+      "character_count",
+      "page_count"
+     ]
+    },
+    "REPETITIONS": {
+     "label": "Письменный перевод (повторения)",
+     "billing_unit": "CONDITIONAL_PAGE",
+     "fields": [
+      "character_count",
+      "page_count"
+     ],
+     "tariff_variant": "CHARACTERS",
+     "auto_discount_percent": "30",
+     "auto_discount_label": "Повторения −30 %"
+    },
+    "DOCUMENT": {
+     "label": "Письменный перевод (шаблон)",
+     "billing_unit": "PER_DOCUMENT",
+     "fields": [
+      "document_count"
+     ]
+    }
+   },
+   "default_variant": "CHARACTERS",
+   "layout": [
+    [
+     "service:2",
+     "character_count",
+     "page_count",
+     "document_count:2"
+    ],
+    [
+     "source_language",
+     "target_language",
+     "tariff",
+     "price"
+    ],
+    [
+     "translator_type:2",
+     "status:2"
+    ],
+    [
+     "topic:2",
+     "notes:2"
+    ],
+    [
+     "markup",
+     "discount",
+     "files:2"
+    ],
+    [
+     "client_billable:2",
+     "document_names:2"
+    ]
+   ]
+  }
+ },
+ {
+  "id": "svc-editing",
+  "code": "editing",
+  "name": "Редактура",
+  "billing_mode": "CONDITIONAL_PAGE",
+  "active": true,
+  "sort_order": 20,
+  "definition": {
+   "category": "text",
+   "fields": [
+    "source_language",
+    "target_language",
+    "character_count",
+    "page_count",
+    "topic",
+    "translator_type",
+    "markup",
+    "discount",
+    "deadline",
+    "deadline_time",
+    "status",
+    "notes",
+    "document_names"
+   ],
+   "billing_unit": "CONDITIONAL_PAGE",
+   "allowed_billing_units": [
+    "CONDITIONAL_PAGE"
+   ],
+   "page_from_characters": true,
+   "matching_mode": "LANGUAGE_PAIR",
+   "supports_routing": false,
+   "layout": [
+    [
+     "service:2",
+     "character_count",
+     "page_count"
+    ],
+    [
+     "source_language",
+     "target_language",
+     "tariff",
+     "price"
+    ],
+    [
+     "translator_type:2",
+     "status:2"
+    ],
+    [
+     "topic:2",
+     "notes:2"
+    ],
+    [
+     "markup",
+     "discount",
+     "files:2"
+    ],
+    [
+     "client_billable:2",
+     "document_names:2"
+    ]
+   ]
+  }
+ },
+ {
+  "id": "svc-proofreading",
+  "code": "proofreading",
+  "name": "Вычитка",
+  "billing_mode": "CONDITIONAL_PAGE",
+  "active": true,
+  "sort_order": 30,
+  "definition": {
+   "category": "text",
+   "fields": [
+    "source_language",
+    "target_language",
+    "character_count",
+    "page_count",
+    "topic",
+    "translator_type",
+    "markup",
+    "discount",
+    "deadline",
+    "deadline_time",
+    "status",
+    "notes",
+    "document_names"
+   ],
+   "billing_unit": "CONDITIONAL_PAGE",
+   "allowed_billing_units": [
+    "CONDITIONAL_PAGE"
+   ],
+   "page_from_characters": true,
+   "matching_mode": "LANGUAGE_PAIR",
+   "supports_routing": false,
+   "pricing_basis": {
+    "service_code": "written_translation",
+    "variant": "CHARACTERS",
+    "rate_factor": "0.7",
+    "label": "Тариф письменного перевода −30 %"
+   },
+   "layout": [
+    [
+     "service:2",
+     "character_count",
+     "page_count"
+    ],
+    [
+     "source_language",
+     "target_language",
+     "tariff",
+     "price"
+    ],
+    [
+     "translator_type:2",
+     "status:2"
+    ],
+    [
+     "topic:2",
+     "notes:2"
+    ],
+    [
+     "markup",
+     "discount",
+     "files:2"
+    ],
+    [
+     "client_billable:2",
+     "document_names:2"
+    ]
+   ]
+  }
+ },
+ {
+  "id": "svc-typing",
+  "code": "typing",
+  "name": "Набор текста",
+  "billing_mode": "CONDITIONAL_PAGE",
+  "active": true,
+  "sort_order": 40,
+  "definition": {
+   "category": "text",
+   "fields": [
+    "source_language",
+    "character_count",
+    "page_count",
+    "topic",
+    "translator_type",
+    "markup",
+    "discount",
+    "deadline",
+    "deadline_time",
+    "status",
+    "notes",
+    "document_names"
+   ],
+   "billing_unit": "CONDITIONAL_PAGE",
+   "allowed_billing_units": [
+    "CONDITIONAL_PAGE"
+   ],
+   "page_from_characters": true,
+   "matching_mode": "SOURCE_LANGUAGE",
+   "supports_routing": false,
+   "layout": [
+    [
+     "service:2",
+     "character_count",
+     "page_count"
+    ],
+    [
+     "source_language:2",
+     "tariff",
+     "price"
+    ],
+    [
+     "translator_type:2",
+     "status:2"
+    ],
+    [
+     "topic:2",
+     "notes:2"
+    ],
+    [
+     "markup",
+     "discount",
+     "files:2"
+    ],
+    [
+     "client_billable:2",
+     "document_names:2"
+    ]
+   ]
+  }
+ },
+ {
+  "id": "svc-notarial_certification",
+  "code": "notarial_certification",
+  "name": "Нотариальное заверение",
+  "billing_mode": "PER_DOCUMENT",
+  "active": true,
+  "sort_order": 50,
+  "definition": {
+   "category": "certification",
+   "fields": [
+    "document_count",
+    "markup",
+    "discount",
+    "deadline",
+    "deadline_time",
+    "status",
+    "notes"
+   ],
+   "billing_unit": "PER_DOCUMENT",
+   "allowed_billing_units": [
+    "PER_DOCUMENT"
+   ],
+   "page_from_characters": false,
+   "matching_mode": "SERVICE_ONLY",
+   "supports_routing": false,
+   "layout": [
+    [
+     "service:2",
+     "document_count:2"
+    ],
+    [
+     "markup",
+     "discount",
+     "tariff",
+     "price"
+    ],
+    [
+     "client_billable:2",
+     "status:2"
+    ],
+    [
+     "notes:4"
+    ]
+   ]
+  }
+ },
+ {
+  "id": "svc-company_certification",
+  "code": "company_certification",
+  "name": "Заверение печатью «Лингво Коннект»",
+  "billing_mode": "PER_DOCUMENT",
+  "active": true,
+  "sort_order": 60,
+  "definition": {
+   "category": "certification",
+   "fields": [
+    "certification_mode",
+    "document_count",
+    "page_count",
+    "markup",
+    "discount",
+    "deadline",
+    "deadline_time",
+    "status",
+    "notes"
+   ],
+   "billing_unit": "PER_DOCUMENT",
+   "allowed_billing_units": [
+    "PER_DOCUMENT",
+    "PER_PAGE"
+   ],
+   "page_from_characters": false,
+   "matching_mode": "SERVICE_ONLY",
+   "supports_routing": false,
+   "variant_label": "Вариант заверения",
+   "variants": {
+    "BOUND": {
+     "label": "Сшивка",
+     "billing_unit": "PER_DOCUMENT",
+     "fields": [
+      "document_count"
+     ]
+    },
+    "PER_PAGE": {
+     "label": "Постранично",
+     "billing_unit": "PER_PAGE",
+     "fields": [
+      "page_count"
+     ]
+    }
+   },
+   "default_variant": "BOUND",
+   "layout": [
+    [
+     "service:2",
+     "document_count:2",
+     "page_count:2"
+    ],
+    [
+     "certification_mode:2",
+     "tariff",
+     "price"
+    ],
+    [
+     "markup",
+     "discount",
+     "status:2"
+    ],
+    [
+     "client_billable:2",
+     "notes:2"
+    ]
+   ]
+  }
+ },
+ {
+  "id": "svc-apostille",
+  "code": "apostille",
+  "name": "Апостиль",
+  "billing_mode": "PER_DOCUMENT",
+  "active": true,
+  "sort_order": 70,
+  "definition": {
+   "category": "certification",
+   "fields": [
+    "document_count",
+    "markup",
+    "discount",
+    "deadline",
+    "deadline_time",
+    "status",
+    "notes"
+   ],
+   "billing_unit": "PER_DOCUMENT",
+   "allowed_billing_units": [
+    "PER_DOCUMENT"
+   ],
+   "page_from_characters": false,
+   "matching_mode": "SERVICE_ONLY",
+   "supports_routing": false,
+   "layout": [
+    [
+     "service:2",
+     "document_count:2"
+    ],
+    [
+     "markup",
+     "discount",
+     "tariff",
+     "price"
+    ],
+    [
+     "client_billable:2",
+     "status:2"
+    ],
+    [
+     "notes:4"
+    ]
+   ]
+  }
+ },
+ {
+  "id": "svc-notarial_copy",
+  "code": "notarial_copy",
+  "name": "Нотариальная копия",
+  "billing_mode": "PER_PAGE",
+  "active": true,
+  "sort_order": 80,
+  "definition": {
+   "category": "certification",
+   "fields": [
+    "page_count",
+    "markup",
+    "discount",
+    "deadline",
+    "deadline_time",
+    "status",
+    "notes"
+   ],
+   "billing_unit": "PER_PAGE",
+   "allowed_billing_units": [
+    "PER_PAGE"
+   ],
+   "page_from_characters": false,
+   "matching_mode": "SERVICE_ONLY",
+   "supports_routing": false,
+   "layout": [
+    [
+     "service:2",
+     "page_count:2"
+    ],
+    [
+     "markup",
+     "discount",
+     "tariff",
+     "price"
+    ],
+    [
+     "client_billable:2",
+     "status:2"
+    ],
+    [
+     "notes:4"
+    ]
+   ]
+  }
+ },
+ {
+  "id": "svc-text_layout",
+  "code": "text_layout",
+  "name": "Вёрстка текста",
+  "billing_mode": "PER_PAGE",
+  "active": true,
+  "sort_order": 90,
+  "definition": {
+   "category": "layout",
+   "fields": [
+    "page_count",
+    "markup",
+    "discount",
+    "deadline",
+    "deadline_time",
+    "status",
+    "notes"
+   ],
+   "billing_unit": "PER_PAGE",
+   "allowed_billing_units": [
+    "PER_PAGE"
+   ],
+   "page_from_characters": false,
+   "matching_mode": "SERVICE_ONLY",
+   "supports_routing": false,
+   "layout": [
+    [
+     "service:2",
+     "page_count:2"
+    ],
+    [
+     "markup",
+     "discount",
+     "tariff",
+     "price"
+    ],
+    [
+     "client_billable:2",
+     "status:2"
+    ],
+    [
+     "notes:4"
+    ]
+   ]
+  }
+ },
+ {
+  "id": "svc-drawing_layout",
+  "code": "drawing_layout",
+  "name": "Вёрстка чертежей",
+  "billing_mode": "PER_PAGE",
+  "active": true,
+  "sort_order": 100,
+  "definition": {
+   "category": "layout",
+   "fields": [
+    "page_count",
+    "markup",
+    "discount",
+    "deadline",
+    "deadline_time",
+    "status",
+    "notes"
+   ],
+   "billing_unit": "PER_PAGE",
+   "allowed_billing_units": [
+    "PER_PAGE"
+   ],
+   "page_from_characters": false,
+   "matching_mode": "SERVICE_ONLY",
+   "supports_routing": false,
+   "layout": [
+    [
+     "service:2",
+     "page_count:2"
+    ],
+    [
+     "markup",
+     "discount",
+     "tariff",
+     "price"
+    ],
+    [
+     "client_billable:2",
+     "status:2"
+    ],
+    [
+     "notes:4"
+    ]
+   ]
+  }
+ },
+ {
+  "id": "svc-recognition",
+  "code": "recognition",
+  "name": "Распознавание",
+  "billing_mode": "PER_PAGE",
+  "active": true,
+  "sort_order": 110,
+  "definition": {
+   "category": "layout",
+   "fields": [
+    "page_count",
+    "markup",
+    "discount",
+    "deadline",
+    "deadline_time",
+    "status",
+    "notes"
+   ],
+   "billing_unit": "PER_PAGE",
+   "allowed_billing_units": [
+    "PER_PAGE"
+   ],
+   "page_from_characters": false,
+   "matching_mode": "SERVICE_ONLY",
+   "supports_routing": false,
+   "layout": [
+    [
+     "service:2",
+     "page_count:2"
+    ],
+    [
+     "markup",
+     "discount",
+     "tariff",
+     "price"
+    ],
+    [
+     "client_billable:2",
+     "status:2"
+    ],
+    [
+     "notes:4"
+    ]
+   ]
+  }
+ },
+ {
+  "id": "svc-delivery",
+  "code": "delivery",
+  "name": "Доставка",
+  "billing_mode": "FIXED",
+  "active": true,
+  "sort_order": 120,
+  "definition": {
+   "category": "additional",
+   "fields": [
+    "start_date",
+    "start_time",
+    "markup",
+    "discount",
+    "deadline",
+    "deadline_time",
+    "status",
+    "notes"
+   ],
+   "billing_unit": "FIXED",
+   "allowed_billing_units": [
+    "FIXED"
+   ],
+   "page_from_characters": false,
+   "matching_mode": "SERVICE_ONLY",
+   "supports_routing": false,
+   "labels": {
+    "start_date": "Дата",
+    "start_time": "Время"
+   },
+   "layout": [
+    [
+     "service:2",
+     "start_date",
+     "start_time"
+    ],
+    [
+     "markup",
+     "discount",
+     "tariff",
+     "price"
+    ],
+    [
+     "client_billable:2",
+     "status:2"
+    ],
+    [
+     "notes:4"
+    ]
+   ]
+  }
+ },
+ {
+  "id": "svc-audio_listening",
+  "code": "audio_listening",
+  "name": "Аудирование",
+  "billing_mode": "PER_SECOND",
+  "active": true,
+  "sort_order": 130,
+  "definition": {
+   "category": "audio_video",
+   "fields": [
+    "duration_seconds",
+    "markup",
+    "discount",
+    "status",
+    "notes"
+   ],
+   "billing_unit": "PER_SECOND",
+   "allowed_billing_units": [
+    "PER_SECOND"
+   ],
+   "page_from_characters": false,
+   "matching_mode": "SERVICE_ONLY",
+   "supports_routing": false,
+   "layout": [
+    [
+     "service:2",
+     "duration_seconds:2"
+    ],
+    [
+     "markup",
+     "discount",
+     "tariff",
+     "price"
+    ],
+    [
+     "client_billable:2",
+     "status:2"
+    ],
+    [
+     "notes:4"
+    ]
+   ]
+  }
+ },
+ {
+  "id": "svc-transcription",
+  "code": "transcription",
+  "name": "Транскрибация",
+  "billing_mode": "CONDITIONAL_PAGE",
+  "active": true,
+  "sort_order": 140,
+  "definition": {
+   "category": "audio_video",
+   "fields": [
+    "source_language",
+    "character_count",
+    "page_count",
+    "topic",
+    "translator_type",
+    "markup",
+    "discount",
+    "status",
+    "notes",
+    "document_names"
+   ],
+   "billing_unit": "CONDITIONAL_PAGE",
+   "allowed_billing_units": [
+    "CONDITIONAL_PAGE"
+   ],
+   "page_from_characters": true,
+   "matching_mode": "SERVICE_ONLY",
+   "supports_routing": false,
+   "layout": [
+    [
+     "service:2",
+     "character_count",
+     "page_count"
+    ],
+    [
+     "source_language:2",
+     "tariff",
+     "price"
+    ],
+    [
+     "translator_type:2",
+     "status:2"
+    ],
+    [
+     "topic:2",
+     "notes:2"
+    ],
+    [
+     "markup",
+     "discount",
+     "files:2"
+    ],
+    [
+     "client_billable:2",
+     "document_names:2"
+    ]
+   ]
+  }
+ },
+ {
+  "id": "svc-consecutive_interpreting",
+  "code": "consecutive_interpreting",
+  "name": "Последовательный перевод",
+  "billing_mode": "HOURLY",
+  "active": true,
+  "sort_order": 150,
+  "definition": {
+   "category": "interpreting",
+   "fields": [
+    "source_language",
+    "target_language",
+    "hour_count",
+    "topic",
+    "translator_type",
+    "markup",
+    "discount",
+    "start_date",
+    "start_time",
+    "deadline",
+    "deadline_time",
+    "status",
+    "notes",
+    "document_names"
+   ],
+   "billing_unit": "HOURLY",
+   "allowed_billing_units": [
+    "HOURLY"
+   ],
+   "page_from_characters": false,
+   "matching_mode": "LANGUAGE_PAIR",
+   "supports_routing": false,
+   "service_group": {
+    "code": "interpreting",
+    "label": "Устный перевод",
+    "toggle_label": "Тип перевода",
+    "option_label": "Последовательный"
+   },
+   "layout": [
+    [
+     "service:2",
+     "hour_count:2"
+    ],
+    [
+     "service_variant:2",
+     "tariff",
+     "price"
+    ],
+    [
+     "source_language",
+     "target_language",
+     "status:2"
+    ],
+    [
+     "translator_type:2",
+     "notes:2"
+    ],
+    [
+     "topic:2"
+    ],
+    [
+     "markup",
+     "discount",
+     "files:2"
+    ],
+    [
+     "client_billable:2",
+     "document_names:2"
+    ]
+   ]
+  }
+ },
+ {
+  "id": "svc-simultaneous_interpreting",
+  "code": "simultaneous_interpreting",
+  "name": "Синхронный перевод",
+  "billing_mode": "HOURLY",
+  "active": true,
+  "sort_order": 160,
+  "definition": {
+   "category": "interpreting",
+   "fields": [
+    "source_language",
+    "target_language",
+    "hour_count",
+    "topic",
+    "translator_type",
+    "markup",
+    "discount",
+    "start_date",
+    "start_time",
+    "deadline",
+    "deadline_time",
+    "status",
+    "notes",
+    "document_names"
+   ],
+   "billing_unit": "HOURLY",
+   "allowed_billing_units": [
+    "HOURLY"
+   ],
+   "page_from_characters": false,
+   "matching_mode": "LANGUAGE_PAIR",
+   "supports_routing": false,
+   "service_group": {
+    "code": "interpreting",
+    "label": "Устный перевод",
+    "toggle_label": "Тип перевода",
+    "option_label": "Синхронный"
+   },
+   "layout": [
+    [
+     "service:2",
+     "hour_count:2"
+    ],
+    [
+     "service_variant:2",
+     "tariff",
+     "price"
+    ],
+    [
+     "source_language",
+     "target_language",
+     "status:2"
+    ],
+    [
+     "translator_type:2",
+     "notes:2"
+    ],
+    [
+     "topic:2"
+    ],
+    [
+     "markup",
+     "discount",
+     "files:2"
+    ],
+    [
+     "client_billable:2",
+     "document_names:2"
+    ]
+   ]
+  }
+ }
+]

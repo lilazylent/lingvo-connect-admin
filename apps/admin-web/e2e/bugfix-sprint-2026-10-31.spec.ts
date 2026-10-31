@@ -121,7 +121,7 @@ test("an existing work keeps its disabled service and stays editable", async ({ 
   await card.locator(".order-work-card").last().getByRole("button", { name: "Изменить", exact: true }).click();
   const editor = card.locator(".work-inline-editor");
   await expect(editor.getByLabel("Услуга")).toContainText("Скан (отключена)");
-  await editor.getByLabel("Статус работы").click();
+  await editor.locator(".work-draft").getByLabel("Статус", { exact: true }).click();
   await page.getByRole("option", { name: "Готово", exact: true }).click();
   await editor.getByRole("button", { name: "Сохранить работу" }).click();
   await expect.poll(() => requests.find((r) => r.method === "PATCH" && r.path.endsWith("/works/work-scan"))?.body).toBeTruthy();
@@ -172,14 +172,14 @@ test("manual character count survives document analysis and is editable on «Р�
 
   // the analysed value is marked «А» (documents are attached on the «Работы» step)
   await wizard.locator(".file-drop input[type=file]").setInputFiles({ name: "contract.txt", mimeType: "text/plain", buffer: Buffer.from("x") });
-  await expect(wizard.locator(".analysis-result")).toContainText("5");
+  await expect(work.locator(".work-files__list")).toContainText("5");
   await expect(work.getByLabel("Количество знаков (А)")).toHaveValue("5000");
 
   // the manager corrects it («З»); a later document no longer overwrites the correction
   await work.getByLabel("Количество знаков (А)").fill("4100");
   await expect(work.getByLabel("Количество знаков (З)")).toHaveValue("4100");
   await wizard.locator(".file-drop input[type=file]").setInputFiles({ name: "annex.txt", mimeType: "text/plain", buffer: Buffer.from("y") });
-  await expect(wizard.locator(".analysis-result")).toHaveCount(2);
+  await expect(work.locator(".work-files__list li")).toHaveCount(2);
 
   // «Расчёт» shows the manual value and allows correcting it again; pages follow
   await wizard.locator(".wizard-steps button").filter({ hasText: "03" }).click();

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { api, apiDownloadUrl } from "@/lib/api";
 import { formatCrmDate } from "@/lib/format-date";
 import { formatBillingQuantity, formatRate } from "@/lib/billing-format";
@@ -37,7 +37,15 @@ type ServiceDefinition = {
   supports_routing: boolean;
   default_variant?: string;
   variant_label?: string;
-  variants?: Record<string, { label: string; billing_unit: string; fields: string[] }>;
+  variants?: Record<string, { label: string; billing_unit: string; fields: string[]; auto_discount_percent?: string; auto_discount_label?: string }>;
+  // DOCX v3 grid: rows of "token" / "token:span" (4 columns), owned by the API
+  layout?: string[][];
+  labels?: Record<string, string>;
+  // written translation: «полный / повторения / шаблон» are entries of «Услуга»
+  variants_in_service_picker?: boolean;
+  // «Устный перевод»: one entry, «Тип перевода» switches between the grouped services
+  service_group?: { code: string; label: string; toggle_label: string; option_label: string };
+  pricing_basis?: { service_code: string; variant: string; rate_factor: string; label: string };
 };
 type Service = {
   id: string;
@@ -107,6 +115,10 @@ type Work = {
   discount_percent: Money;
   discount_overridden: boolean;
   character_count: number | null;
+  character_count_source?: "" | "AUTO" | "MANUAL";
+  measured_character_count?: number | null;
+  final_character_count?: number | null;
+  final_volume_at?: string | null;
   page_count: Money | null;
   word_count: number | null;
   document_count: number | null;
@@ -114,6 +126,8 @@ type Work = {
   hour_count: Money | null;
   start_date: string | null;
   start_time: string;
+  document_names?: string;
+  document_names_source?: "" | "AUTO" | "MANUAL";
   certification_mode: string;
   billing_unit: string;
   client_rate: Money;
@@ -157,6 +171,8 @@ type OrderDetail = Order & {
   client_name: string;
   contact_name: string;
   manager_name: string;
+  // what the client deposit ledger debited for this order (read-only)
+  deposit_applied?: Money;
 };
 type FinanceExecutorAssignment = {
   assignment_id: string;
@@ -203,6 +219,7 @@ type Financial = {
 };
 type OrderFile = {
   id: string;
+  work_id?: string | null;
   original_name: string;
   page_count: number | null;
   character_count: number | null;
@@ -344,8 +361,14 @@ type DraftWork = {
   discount_percent: string;
   character_count: string;
   // «Количество знаков (А/З)»: AUTO = taken from document analysis, MANUAL = typed by the
-  // manager; a manual value is never replaced by a later analysis result (UI-only flag)
+  // manager; a manual value is never replaced by a later analysis result. Saved with the
+  // work ("" = historical work, source unknown).
   charactersSource?: "AUTO" | "MANUAL";
+  measured_character_count?: string;
+  // final volume by the delivered translation; the client price follows it once set
+  final_character_count?: string;
+  document_names?: string;
+  documentNamesSource?: "AUTO" | "MANUAL";
   page_count: string;
   word_count: string;
   document_count: string;
@@ -489,6 +512,49 @@ const serviceBillingUnit = (service: Service | undefined, certificationMode = ""
   if (variant?.billing_unit) return variant.billing_unit;
   return definition.billing_unit || service?.billing_mode || "CUSTOM";
 };
+type ServiceChoice = { value: string; label: string; service: Service; variant: string };
+// «Услуга (РС)» of DOCX v3: written translation is offered as «полный / повторения /
+// шаблон» (variants of one service), the two interpreting services as one «Устный перевод».
+const serviceChoices = (services: Service[], current?: { service_code: string; certification_mode: string }) => {
+  const choices: ServiceChoice[] = [];
+  const groups = new Set<string>();
+  for (const service of services) {
+    const definition = service.definition;
+    const isCurrent = service.code === current?.service_code;
+    if (service.active === false && !isCurrent) continue;
+    const suffix = service.active === false ? " (отключена)" : "";
+    if (definition?.variants_in_service_picker && definition.variants) {
+      for (const [variant, option] of Object.entries(definition.variants))
+        choices.push({ value: `${service.code}::${variant}`, label: option.label + suffix, service, variant });
+      continue;
+    }
+    const group = definition?.service_group;
+    if (group) {
+      // the group entry stands for whichever member the work uses (else the first active)
+      const value = `group:${group.code}`;
+      if (groups.has(group.code)) {
+        if (isCurrent) choices.splice(choices.findIndex((item) => item.value === value), 1, { value, label: group.label + suffix, service, variant: "" });
+        continue;
+      }
+      groups.add(group.code);
+      choices.push({ value, label: group.label + suffix, service, variant: "" });
+      continue;
+    }
+    choices.push({ value: service.code, label: service.name + suffix, service, variant: "" });
+  }
+  return choices;
+};
+const serviceChoiceValue = (service: Service | undefined, certificationMode: string) => {
+  if (!service) return "";
+  const definition = service.definition;
+  if (definition?.variants_in_service_picker) return `${service.code}::${serviceVariant(service, certificationMode)}`;
+  if (definition?.service_group) return `group:${definition.service_group.code}`;
+  return service.code;
+};
+const groupMembers = (services: Service[], service: Service | undefined) => {
+  const code = service?.definition?.service_group?.code;
+  return code ? services.filter((item) => item.definition?.service_group?.code === code && (item.active !== false || item.code === service?.code)) : [];
+};
 const draftWorkDirectionLabel = (work: DraftWork) => {
   if (work.source_language && work.target_language) return `${work.source_language} → ${work.target_language}`;
   if (work.source_language) return `Язык: ${work.source_language}`;
@@ -522,14 +588,14 @@ const workTimingLabel = (work: DraftWork | Work) => {
 const executorVolumeLabel = (assignment: Pick<FinanceExecutorAssignment, "billing_unit" | "character_count" | "page_count" | "document_count" | "duration_seconds" | "hour_count">) => {
   const quantity = assignment.billing_unit === "CONDITIONAL_PAGE" && Number(assignment.page_count || 0) > 0
     ? Number(assignment.page_count)
-    : numericQuantity(assignment.billing_unit, assignment);
+    : numericQuantity(assignment.billing_unit, assignment, false);
   if (quantity > 0) return billingQuantityLabel(assignment.billing_unit, quantity);
   // A non-standard unit without a matching quantity: fall back to whatever volume exists.
   if (assignment.page_count) return formatBillingQuantity("PER_PAGE", assignment.page_count);
   if (assignment.document_count) return formatBillingQuantity("PER_DOCUMENT", assignment.document_count);
   if (assignment.hour_count) return formatBillingQuantity("HOURLY", assignment.hour_count);
   if (assignment.duration_seconds) return formatBillingQuantity("PER_SECOND", assignment.duration_seconds);
-  if (assignment.character_count) return formatBillingQuantity("CONDITIONAL_PAGE", conditionalPages(assignment.character_count));
+  if (assignment.character_count) return formatBillingQuantity("CONDITIONAL_PAGE", conditionalPages(assignment.character_count, false));
   return "Объём не указан";
 };
 const clientTariffLabel = (option: TariffOption) => {
@@ -575,12 +641,13 @@ const tariffMessage = (option: TariffOption, automatic = option.is_auto) => {
   return `${automatic ? "Тариф подобран CRM" : "Тариф выбран менеджером"}: ${formatRate(option.rate, option.unit)} × ${billingQuantityLabel(option.unit, quantity)}${multiplier > 1 ? ` × ${multiplier} срочность` : ""}${discount > 0 ? ` − ${discount}% ${option.client_tariff ? "скидка клиента" : "скидка"}` : ""} · ${route}${components}`;
 };
 const newKey = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-const conditionalPages = (value: string | number | null | undefined) => {
+const conditionalPages = (value: string | number | null | undefined, minimum = true) => {
   const chars = Number(value || 0);
   if (!chars) return "";
-  // Oleg's matrix: 1800 characters with spaces = 1 conditional page;
-  // values are rounded upward to one decimal and the billable/display minimum is 1 page.
-  return String(Math.max(1, Math.ceil((chars / 1800) * 10) / 10));
+  // Oleg's matrix: 1800 characters with spaces = 1 conditional page; values are rounded
+  // upward to one decimal. The 1-page minimum is the client's rule, executors get 0.1 page.
+  const pages = Math.ceil((chars / 1800) * 10) / 10;
+  return String(minimum ? Math.max(1, pages) : pages);
 };
 const numericQuantity = (
   unit: string,
@@ -591,10 +658,11 @@ const numericQuantity = (
     duration_seconds?: string | number | null;
     hour_count?: string | number | null;
   },
+  pageMinimum = true,
 ) => {
   if (unit === "CONDITIONAL_PAGE")
     return values.character_count
-      ? Number(conditionalPages(values.character_count))
+      ? Number(conditionalPages(values.character_count, pageMinimum))
       : Number(values.page_count || 0);
   if (unit === "PER_1000_CHARS") return Number(values.character_count || 0) / 1000;
   if (unit === "PER_PAGE") return Number(values.page_count || 0);
@@ -621,9 +689,14 @@ const volumeQuotePatch = (work: DraftWork): Partial<DraftWork> =>
   work.tariff_ids.some((id) => id.startsWith("client:"))
     ? { quoteAmount: "", quoteBeforeDiscount: "", quoteAutoDiscount: "", quoteMessage: "" }
     : resetQuotePatch;
+const billedCharacters = (work: Pick<DraftWork, "character_count" | "final_character_count">) =>
+  work.final_character_count || work.character_count;
+// «Название документа (-ов) (А)»: file names without the extension
+const documentNamesFrom = (files: { name: string }[]) =>
+  files.map((file) => file.name.replace(/\.[^.\s]{1,8}$/, "")).filter(Boolean).join("; ");
 const charactersLabel = (source: DraftWork["charactersSource"]) =>
   source === "AUTO" ? "Количество знаков (А)" : source === "MANUAL" ? "Количество знаков (З)" : "Количество знаков";
-const serviceFieldPatch = (work: DraftWork, service: Service | undefined): Partial<DraftWork> => {
+const serviceFieldPatch = (work: DraftWork, service: Service | undefined, variant = ""): Partial<DraftWork> => {
   if (!service) {
     return {
       service_code: "",
@@ -634,7 +707,7 @@ const serviceFieldPatch = (work: DraftWork, service: Service | undefined): Parti
     };
   }
   const definition = service.definition;
-  const defaultVariant = serviceVariant(service);
+  const defaultVariant = serviceVariant(service, variant);
   const fields = activeServiceFields(service, defaultVariant);
   const keep = (field: string) => !definition || fields.has(field);
   return {
@@ -658,12 +731,77 @@ const serviceFieldPatch = (work: DraftWork, service: Service | undefined): Parti
     deadline: keep("deadline") ? work.deadline : "",
     deadline_time: keep("deadline_time") ? work.deadline_time : "",
     urgent: keep("markup") ? work.urgent : false,
+    urgency_multiplier: keep("markup") ? work.urgency_multiplier : "1",
     native_speaker: keep("translator_type") ? work.native_speaker : false,
     manualDiscount: keep("discount") ? work.manualDiscount : false,
     discount_percent: keep("discount") ? work.discount_percent : "0",
+    document_names: keep("document_names") ? work.document_names : "",
+    final_character_count: keep("character_count") ? work.final_character_count : "",
     ...resetQuotePatch,
   };
 };
+
+// One payload for the wizard and the order card (same backend contract).
+const workPayload = (w: DraftWork, overrideReason: string) => ({
+  service_code: w.service_code,
+  work_type: w.work_type,
+  source_language: w.source_language,
+  target_language: w.target_language,
+  tariff_ids: w.tariff_ids,
+  topic: w.topic,
+  urgent: w.urgent,
+  urgency_multiplier: Number(w.urgency_multiplier || 1),
+  native_speaker: w.native_speaker,
+  discount_percent: w.manualDiscount ? Number(w.discount_percent || 0) : null,
+  character_count: w.character_count ? Number(w.character_count) : null,
+  character_count_source: w.character_count ? w.charactersSource ?? "" : "",
+  measured_character_count: w.measured_character_count ? Number(w.measured_character_count) : null,
+  final_character_count: w.final_character_count ? Number(w.final_character_count) : null,
+  page_count: w.page_count ? Number(w.page_count) : null,
+  word_count: w.word_count ? Number(w.word_count) : null,
+  document_count: w.document_count ? Number(w.document_count) : null,
+  duration_seconds: w.duration_seconds ? Number(w.duration_seconds) : null,
+  hour_count: w.hour_count ? Number(w.hour_count) : null,
+  start_date: w.start_date || null,
+  start_time: w.start_time,
+  document_names: w.document_names ?? "",
+  document_names_source: w.document_names ? w.documentNamesSource ?? "" : "",
+  certification_mode: w.certification_mode,
+  billing_unit: w.billing_unit,
+  client_rate: Number(w.client_rate || 0),
+  price: w.manualPrice ? Number(w.price || 0) : null,
+  price_override_reason: w.manualPrice ? overrideReason : "",
+  client_billable: w.client_billable,
+  executor_id: w.executor_id || null,
+  executor_rate: Number(w.executor_rate || 0),
+  executor_billing_unit: w.executor_billing_unit,
+  executor_cost: w.manualExecutorCost ? Number(w.executor_cost || 0) : null,
+  deadline: w.deadline || null,
+  deadline_time: w.deadline_time,
+  executor_deadline: w.executor_deadline || null,
+  executor_deadline_time: w.executor_deadline_time,
+  executor_assignments: w.executor_assignments.filter((assignment) => assignment.executor_id).map((assignment) => ({
+    id: assignment.id,
+    executor_id: assignment.executor_id,
+    character_count: assignment.character_count ? Number(assignment.character_count) : null,
+    page_count: assignment.page_count ? Number(assignment.page_count) : null,
+    document_count: assignment.document_count ? Number(assignment.document_count) : null,
+    duration_seconds: assignment.duration_seconds ? Number(assignment.duration_seconds) : null,
+    hour_count: assignment.hour_count ? Number(assignment.hour_count) : null,
+    billing_unit: assignment.billing_unit,
+    rate: Number(assignment.rate || 0),
+    cost: assignment.manualCost ? Number(assignment.cost || 0) : null,
+    deadline: assignment.deadline || null,
+    deadline_time: assignment.deadline_time,
+    route_stage_index: assignment.route_stage_index ?? null,
+    route_source_language: assignment.route_source_language || "",
+    route_target_language: assignment.route_target_language || "",
+    status: assignment.status,
+    notes: assignment.notes,
+  })),
+  status: w.status,
+  notes: w.notes,
+});
 const createClient = (kind: "company" | "individual") => (name: string) =>
   api<{ id: string; name: string }>("/api/admin/companies", { method: "POST", body: JSON.stringify({ name, kind }) });
 const clientCreateOptions: LookupCreateOption[] = [
@@ -781,7 +919,7 @@ const emptyWork = (): DraftWork => ({
 
 function assignmentPrice(assignment: DraftExecutorAssignment) {
   const rate = Number(assignment.rate || 0);
-  const quantity = numericQuantity(assignment.billing_unit, assignment);
+  const quantity = numericQuantity(assignment.billing_unit, assignment, false);
   return Math.round(quantity * rate * 100) / 100;
 }
 
@@ -809,7 +947,7 @@ function localPrice(work: DraftWork, executor = false) {
   }
   const unit = executor ? work.executor_billing_unit : work.billing_unit;
   const rate = Number(executor ? work.executor_rate : work.client_rate) || 0;
-  const quantity = numericQuantity(unit, work);
+  const quantity = numericQuantity(unit, executor ? work : { ...work, character_count: billedCharacters(work) }, !executor);
   let result = quantity * rate;
   if (!executor && work.urgent) result *= Number(work.urgency_multiplier || 1);
   if (!executor && work.manualDiscount) result *= 1 - Number(work.discount_percent || 0) / 100;
@@ -1453,9 +1591,10 @@ function OrderWizard({
   const [works, setWorks] = useState<DraftWork[]>([emptyWork()]);
   const [services, setServices] = useState<Service[]>([]);
   const [managers, setManagers] = useState<UserSummary[]>([]);
-  const [files, setFiles] = useState<File[]>([]);
+  // «Прикрепить документы клиента» belongs to each work (DOCX v3)
+  const [workFiles, setWorkFiles] = useState<Record<string, File[]>>({});
   const [analyses, setAnalyses] = useState<Record<string, Analysis>>({});
-  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzing, setAnalyzing] = useState("");
   const [payment, setPayment] = useState({
     amount_paid: "0",
     payment_method: "",
@@ -1661,51 +1800,52 @@ function OrderWizard({
       });
     }
   }
-  // Volume of the first work = sum over every analysed client document, so adding a
-  // second document never discards the first one's figures.
-  function applyAnalyzedVolume(selected: File[], results: Record<string, Analysis>) {
+  // Volume of a work = sum over every analysed document of that work, so adding a second
+  // document never discards the first one's figures. Manual values («З») are never replaced.
+  function applyAnalyzedVolume(workKey: string, selected: File[], results: Record<string, Analysis>) {
     const known = selected.map((item) => results[fileKey(item)]).filter((item): item is Analysis => Boolean(item));
-    if (!known.length) return;
     const total = (field: "character_count" | "page_count" | "word_count") =>
       known.some((item) => item[field] != null)
         ? known.reduce((sum, item) => sum + Number(item[field] ?? 0), 0)
         : null;
     const result = { character_count: total("character_count"), page_count: total("page_count"), word_count: total("word_count") };
     setWorks((ws) =>
-      ws.map((w, i) =>
-        i === 0
-          ? (() => {
-              const service = services.find((item) => item.code === w.service_code);
-              const canUseCharacters = serviceHasField(service, "character_count", w.certification_mode);
-              const canUsePages = serviceHasField(service, "page_count", w.certification_mode);
-              if (w.charactersSource === "MANUAL") return { ...w, word_count: result.word_count?.toString() ?? w.word_count };
-              const analysed = canUseCharacters ? result.character_count?.toString() : undefined;
-              const character_count = analysed ?? w.character_count;
-              const volumeChanged = character_count !== w.character_count;
-              return {
-                ...w,
-                character_count,
-                charactersSource: analysed !== undefined ? "AUTO" : w.charactersSource,
-                page_count: canUsePages
-                  ? service?.definition?.page_from_characters && character_count
-                    ? conditionalPages(character_count)
-                    : result.page_count?.toString() ?? w.page_count
-                  : w.page_count,
-                word_count: result.word_count?.toString() ?? w.word_count,
-                // an old quote was priced for the previous volume
-                ...(volumeChanged && !w.manualPrice ? volumeQuotePatch(w) : {}),
-              };
-            })()
-          : w,
-      ),
+      ws.map((w) => {
+        if (w.key !== workKey) return w;
+        const service = services.find((item) => item.code === w.service_code);
+        const names = w.documentNamesSource === "MANUAL" ? {} : { document_names: documentNamesFrom(selected), documentNamesSource: selected.length ? ("AUTO" as const) : undefined };
+        if (!known.length) return { ...w, ...names };
+        const canUseCharacters = serviceHasField(service, "character_count", w.certification_mode);
+        const canUsePages = serviceHasField(service, "page_count", w.certification_mode);
+        const measured = canUseCharacters ? result.character_count?.toString() : undefined;
+        if (w.charactersSource === "MANUAL") return { ...w, ...names, measured_character_count: measured ?? w.measured_character_count, word_count: result.word_count?.toString() ?? w.word_count };
+        const character_count = measured ?? w.character_count;
+        const volumeChanged = character_count !== w.character_count;
+        return {
+          ...w,
+          ...names,
+          character_count,
+          measured_character_count: measured ?? w.measured_character_count,
+          charactersSource: measured !== undefined ? "AUTO" : w.charactersSource,
+          page_count: canUsePages
+            ? service?.definition?.page_from_characters && character_count
+              ? conditionalPages(character_count)
+              : result.page_count?.toString() ?? w.page_count
+            : w.page_count,
+          word_count: result.word_count?.toString() ?? w.word_count,
+          // an old quote was priced for the previous volume
+          ...(volumeChanged && !w.manualPrice ? volumeQuotePatch(w) : {}),
+        };
+      }),
     );
   }
-  async function addFiles(picked: File[]) {
-    const selected = mergeFiles(files, picked);
-    const added = selected.slice(files.length);
-    setFiles(selected);
+  async function addFiles(workKey: string, picked: File[]) {
+    const current = workFiles[workKey] ?? [];
+    const selected = mergeFiles(current, picked);
+    const added = selected.slice(current.length);
+    setWorkFiles((items) => ({ ...items, [workKey]: selected }));
     if (!added.length) return;
-    setAnalyzing(true);
+    setAnalyzing(workKey);
     setError("");
     const results = { ...analyses };
     const failed: string[] = [];
@@ -1722,15 +1862,16 @@ function OrderWizard({
       }
     }
     setAnalyses(results);
-    applyAnalyzedVolume(selected, results);
+    applyAnalyzedVolume(workKey, selected, results);
     if (failed.length) setError(`Не удалось проанализировать: ${failed.join("; ")}. Файлы останутся в списке, объём можно указать вручную.`);
-    setAnalyzing(false);
+    setAnalyzing("");
   }
-  function removeFile(target: File) {
-    const selected = files.filter((item) => fileKey(item) !== fileKey(target));
-    setFiles(selected);
-    applyAnalyzedVolume(selected, analyses);
+  function removeFile(workKey: string, target: File) {
+    const selected = (workFiles[workKey] ?? []).filter((item) => fileKey(item) !== fileKey(target));
+    setWorkFiles((items) => ({ ...items, [workKey]: selected }));
+    applyAnalyzedVolume(workKey, selected, analyses);
   }
+  const fileCount = works.reduce((sum, w) => sum + (workFiles[w.key]?.length ?? 0), 0);
   async function create() {
     setBusy(true);
     setError("");
@@ -1748,65 +1889,7 @@ function OrderWizard({
         deadline: deadline || null,
         deadline_time_mode: deadlineMode,
         deadline_time: deadlineMode === "DURING_DAY" ? "" : deadlineTime,
-        works: works.map((w) => ({
-          service_code: w.service_code,
-          work_type: w.work_type,
-          source_language: w.source_language,
-          target_language: w.target_language,
-          tariff_ids: w.tariff_ids,
-          topic: w.topic,
-          urgent: w.urgent,
-          urgency_multiplier: Number(w.urgency_multiplier || 1),
-          native_speaker: w.native_speaker,
-          discount_percent: w.manualDiscount ? Number(w.discount_percent || 0) : null,
-          character_count: w.character_count ? Number(w.character_count) : null,
-          page_count: w.page_count ? Number(w.page_count) : null,
-          word_count: w.word_count ? Number(w.word_count) : null,
-          document_count: w.document_count ? Number(w.document_count) : null,
-          duration_seconds: w.duration_seconds ? Number(w.duration_seconds) : null,
-          hour_count: w.hour_count ? Number(w.hour_count) : null,
-          start_date: w.start_date || null,
-          start_time: w.start_time,
-          certification_mode: w.certification_mode,
-          billing_unit: w.billing_unit,
-          client_rate: Number(w.client_rate || 0),
-          price: w.manualPrice ? Number(w.price || 0) : null,
-          price_override_reason: w.manualPrice
-            ? "Ручная корректировка менеджером"
-            : "",
-          client_billable: w.client_billable,
-          executor_id: w.executor_id || null,
-          executor_rate: Number(w.executor_rate || 0),
-          executor_billing_unit: w.executor_billing_unit,
-          executor_cost: w.manualExecutorCost
-            ? Number(w.executor_cost || 0)
-            : null,
-          deadline: w.deadline || null,
-          deadline_time: w.deadline_time,
-          executor_deadline: w.executor_deadline || null,
-          executor_deadline_time: w.executor_deadline_time,
-          executor_assignments: w.executor_assignments.filter((assignment) => assignment.executor_id).map((assignment) => ({
-            id: assignment.id,
-            executor_id: assignment.executor_id,
-            character_count: assignment.character_count ? Number(assignment.character_count) : null,
-            page_count: assignment.page_count ? Number(assignment.page_count) : null,
-            document_count: assignment.document_count ? Number(assignment.document_count) : null,
-            duration_seconds: assignment.duration_seconds ? Number(assignment.duration_seconds) : null,
-            hour_count: assignment.hour_count ? Number(assignment.hour_count) : null,
-            billing_unit: assignment.billing_unit,
-            rate: Number(assignment.rate || 0),
-            cost: assignment.manualCost ? Number(assignment.cost || 0) : null,
-            deadline: assignment.deadline || null,
-            deadline_time: assignment.deadline_time,
-            route_stage_index: assignment.route_stage_index ?? null,
-            route_source_language: assignment.route_source_language || "",
-            route_target_language: assignment.route_target_language || "",
-            status: assignment.status,
-            notes: assignment.notes,
-          })),
-          status: w.status,
-          notes: w.notes,
-        })),
+        works: works.map((w) => workPayload(w, "Ручная корректировка менеджером")),
         payment: {
           ...payment,
           amount_paid: Number(payment.amount_paid || 0),
@@ -1818,9 +1901,13 @@ function OrderWizard({
         method: "POST",
         body: JSON.stringify(payload),
       });
-      const uploads = await uploadEach(files, (next) => {
+      // works come back in the payload order: each document goes to its own work
+      const target = new Map(works.flatMap((w, index) => (workFiles[w.key] ?? []).map((file) => [file, created.works?.[index]?.id] as const)));
+      const uploads = await uploadEach([...target.keys()], (file) => {
         const form = new FormData();
-        form.append("upload", next);
+        form.append("upload", file);
+        const workId = target.get(file);
+        if (workId) form.append("work_id", workId);
         return api(`/api/admin/crm/orders/${created.id}/files/analyze`, {
           method: "POST",
           body: form,
@@ -1998,6 +2085,23 @@ function OrderWizard({
                 remove={() =>
                   setWorks((items) => items.filter((x) => x.key !== w.key))
                 }
+                filesSlot={
+                  <WorkFilesField
+                    label={w.service_code ? "Прикрепить документы клиента" : "Документы клиента"}
+                    busy={analyzing === w.key}
+                    onPick={(picked) => void addFiles(w.key, picked)}
+                    items={(workFiles[w.key] ?? []).map((item) => {
+                      const analysis = analyses[fileKey(item)];
+                      return {
+                        key: fileKey(item),
+                        name: item.name,
+                        meta: analysis ? [analysis.character_count != null ? `${analysis.character_count.toLocaleString("ru-RU")} знаков` : "", analysis.page_count != null ? `${analysis.page_count} стр.` : ""].filter(Boolean).join(" · ") : "",
+                        note: analysis?.analysis_note || "",
+                        onRemove: () => removeFile(w.key, item),
+                      };
+                    })}
+                  />
+                }
               />
             ))}
             {!works.length && (
@@ -2015,58 +2119,6 @@ function OrderWizard({
             >
               Добавить работу +
             </Button>
-          </div>
-        )}
-        {step === 2 && (
-          <div className="document-step">
-            <label className="file-drop">
-              <input
-                type="file"
-                multiple
-                accept=".pdf,.docx,.txt,.xlsx,.xlsm,image/*"
-                onChange={(e) => {
-                  const picked = Array.from(e.target.files ?? []);
-                  e.currentTarget.value = "";
-                  if (picked.length) void addFiles(picked);
-                }}
-              />
-              <span>{files.length ? "Добавить ещё документы" : "Прикрепить документы клиента"}</span>
-              <strong>PDF, DOCX, TXT, XLSX или изображение · можно выбрать несколько файлов</strong>
-            </label>
-            {analyzing && <LoadingState label="Анализируем документы" />}
-            {files.map((item) => {
-              const analysis = analyses[fileKey(item)];
-              return (
-                <div className="analysis-result analysis-result--file" key={fileKey(item)}>
-                  <div className="analysis-result__name">
-                    <span>Документ</span>
-                    <strong title={item.name}>{item.name}</strong>
-                  </div>
-                  <div>
-                    <span>Страниц</span>
-                    <strong>{analysis?.page_count ?? "—"}</strong>
-                  </div>
-                  <div>
-                    <span>Знаков</span>
-                    <strong>
-                      {analysis?.character_count?.toLocaleString("ru-RU") ?? "—"}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Слов</span>
-                    <strong>
-                      {analysis?.word_count?.toLocaleString("ru-RU") ?? "—"}
-                    </strong>
-                  </div>
-                  <Button type="button" variant="quiet" onClick={() => removeFile(item)} aria-label={`Убрать документ ${item.name}`}>Убрать</Button>
-                  {analysis?.analysis_note && <p>{analysis.analysis_note}</p>}
-                </div>
-              );
-            })}
-            <p className="context-note">
-              Если значение нельзя определить надёжно, CRM не придумывает его.
-              Объём можно вручную исправить в каждой работе.
-            </p>
           </div>
         )}
         {step === 3 && (
@@ -2360,7 +2412,7 @@ function OrderWizard({
                   onChange={(executor_assignments) =>
                     patchWork(w.key, { executor_assignments })
                   }
-                  matching={{ preview: true, workId: w.key, autoLoad: true }}
+                  matching={{ preview: true, workId: w.key }}
                 />
               </article>
             ))}
@@ -2427,11 +2479,11 @@ function OrderWizard({
               ))}
             </div>
             <div className="review-submit-zone">
-              {files.length > 0 && (
+              {fileCount > 0 && (
                 <p className="context-note">
-                  {files.length === 1
-                    ? `Файл «${files[0].name}» будет загружен и проанализирован после создания заказа.`
-                    : `Файлы (${files.length}) будут загружены и проанализированы после создания заказа.`}
+                  {fileCount === 1
+                    ? "Файл будет загружен в свою работу и проанализирован после создания заказа."
+                    : `Файлы (${fileCount}) будут загружены в свои работы и проанализированы после создания заказа.`}
                 </p>
               )}
               <Button disabled={busy} onClick={() => void create()}>
@@ -2460,19 +2512,207 @@ function OrderWizard({
   );
 }
 
+const quoteRequestBody = (work: DraftWork, clientId: string | null) => ({
+  service_code: work.service_code,
+  source_language: work.source_language,
+  target_language: work.target_language,
+  character_count: billedCharacters(work) ? Number(billedCharacters(work)) : null,
+  page_count: work.page_count ? Number(work.page_count) : null,
+  document_count: work.document_count ? Number(work.document_count) : null,
+  duration_seconds: work.duration_seconds ? Number(work.duration_seconds) : null,
+  hour_count: work.hour_count ? Number(work.hour_count) : null,
+  certification_mode: work.certification_mode,
+  urgent: work.urgent,
+  urgency_multiplier: Number(work.urgency_multiplier || 1),
+  native_speaker: work.native_speaker,
+  client_id: clientId || null,
+});
+const tariffSourceLabel = (work: DraftWork) =>
+  work.manualPrice
+    ? "Итог задан вручную"
+    : work.tariff_ids.some((id) => id.startsWith("client:"))
+      ? "Тариф клиента"
+      : work.tariff_ids.length
+        ? "Стандартный тариф"
+        : Number(work.client_rate || 0) > 0
+          ? "Ставка вручную"
+          : "Подбирается CRM при сохранении";
+
+/** «Тариф (А)» of a saved order: choose another allowed tariff (client / standard). */
+function WorkTariffPicker({ work, service, clientId, patch }: { work: DraftWork; service?: Service; clientId: string | null; patch: (p: Partial<DraftWork>) => void }) {
+  const [options, setOptions] = useState<TariffOption[] | null>(null);
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+  const selectedKey = work.tariff_ids.join(",");
+  async function load() {
+    if (!work.service_code) return;
+    setLoading(true);
+    try {
+      const result = await api<{ options: TariffOption[]; message?: string }>("/api/admin/crm/pricing/options", {
+        method: "POST",
+        body: JSON.stringify(quoteRequestBody(work, clientId)),
+      });
+      setOptions(result.options);
+      setMessage(result.options.length ? "" : result.message || "Подходящих тарифов нет — укажите ставку вручную.");
+    } catch (e) {
+      setOptions([]);
+      setMessage(e instanceof Error ? e.message : "Не удалось загрузить тарифы");
+    } finally {
+      setLoading(false);
+    }
+  }
+  if (!options)
+    return (
+      <div className="pricing-field work-tariff-picker">
+        <span className="field__label">Тариф (А)</span>
+        <div className="calculated-value">
+          <strong>{Number(work.client_rate || 0) > 0 ? formatRate(work.client_rate, work.billing_unit) : "—"}</strong>
+          <small>{tariffSourceLabel(work)}</small>
+        </div>
+        <Button type="button" variant="quiet" disabled={!work.service_code || loading} onClick={() => void load()}>
+          {loading ? "Загружаем…" : "Выбрать другой тариф"}
+        </Button>
+      </div>
+    );
+  return (
+    <div className="work-tariff-picker">
+      <Select
+        label="Тариф"
+        value={options.some((option) => option.key === selectedKey) ? selectedKey : ""}
+        hint={message || `Сейчас: ${tariffSourceLabel(work)}`}
+        onChange={(e) => {
+          const option = options.find((item) => item.key === e.target.value);
+          if (!option) return;
+          patch({
+            tariff_ids: option.tariff_ids,
+            client_rate: "0",
+            manualPrice: false,
+            quoteAmount: String(option.amount),
+            quoteBeforeDiscount: String(option.before_discount ?? option.amount),
+            quoteAutoDiscount: String(option.discount_percent ?? 0),
+            discount_percent: work.manualDiscount ? work.discount_percent : String(option.discount_percent ?? 0),
+            quoteRate: String(option.rate),
+            quoteUnit: option.unit,
+            quoteMessage: tariffMessage(option, false),
+          });
+        }}
+      >
+        <option value="">{options.length ? "Выберите тариф" : "Подходящих тарифов нет"}</option>
+        {options.map((option) => <option key={option.key} value={option.key}>{tariffOptionLabel(service, option)}</option>)}
+      </Select>
+    </div>
+  );
+}
+
+type WorkFileItem = { key: string; name: string; meta: string; note: string; onRemove?: () => void; href?: string };
+
+/** «Прикрепить документы клиента» of one work: several PDF/DOCX/TXT/XLSX/images. */
+function WorkFilesField({ label, items, busy, onPick, disabled = false }: { label: string; items: WorkFileItem[]; busy: boolean; onPick: (files: File[]) => void; disabled?: boolean }) {
+  return (
+    <div className="work-files">
+      <label className={`file-drop file-drop--compact${disabled ? " is-disabled" : ""}`}>
+        <input
+          type="file"
+          multiple
+          disabled={disabled}
+          accept=".pdf,.docx,.txt,.xlsx,.xlsm,image/*"
+          onChange={(e) => {
+            const picked = Array.from(e.target.files ?? []);
+            e.currentTarget.value = "";
+            if (picked.length) onPick(picked);
+          }}
+        />
+        <span>{items.length ? "Добавить ещё документы" : label}</span>
+        <strong>PDF, DOCX, TXT, XLSX или изображение · можно выбрать несколько файлов</strong>
+      </label>
+      {busy && <LoadingState label="Анализируем документы" />}
+      {items.length > 0 && (
+        <ul className="work-files__list">
+          {items.map((item) => (
+            <li key={item.key}>
+              <div>
+                {item.href ? <a href={item.href} target="_blank" rel="noreferrer" title={item.name}>{item.name}</a> : <strong title={item.name}>{item.name}</strong>}
+                {(item.meta || item.note) && <small>{[item.meta, item.note].filter(Boolean).join(" · ")}</small>}
+              </div>
+              {item.onRemove && <Button type="button" variant="quiet" onClick={item.onRemove} aria-label={`Убрать документ ${item.name}`}>Убрать</Button>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// Rows used when a service has no v3 definition (custom services, historical rows).
+const FALLBACK_LAYOUT = [
+  ["service:2", "certification_mode:2"],
+  ["character_count", "page_count", "document_count", "hour_count"],
+  ["source_language", "target_language", "tariff", "price"],
+  ["duration_seconds", "status"],
+  ["topic:2", "notes:2"],
+  ["markup", "discount", "files:2"],
+  ["client_billable:2", "document_names:2"],
+];
+// timing fields kept outside the v3 grid (the order deadline is set on step 1)
+const WORK_TIMING_FIELDS = ["start_date", "start_time", "deadline", "deadline_time"] as const;
+const TOPIC_SOURCE = "/api/admin/crm/topics";
+
+function useTopics() {
+  const [topics, setTopics] = useState<string[]>([]);
+  useEffect(() => {
+    let active = true;
+    api<{ items: { name: string }[] }>(TOPIC_SOURCE)
+      .then((result) => {
+        if (active) setTopics(result.items.map((item) => item.name));
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+  return topics;
+}
+
+/** Two mutually exclusive options shown as «(Г) A / (Г) B» or a «П» switch (left = default). */
+function ChoicePair({ label, options, value, onChange }: { label: string; options: [string, string][]; value: string; onChange: (value: string) => void }) {
+  return (
+    <fieldset className="choice-pair">
+      <legend className="field__label">{label}</legend>
+      <div className="choice-pair__options">
+        {options.map(([optionValue, optionLabel]) => (
+          <label key={optionValue} className={`choice-pair__option${value === optionValue ? " is-checked" : ""}`}>
+            <input type="checkbox" checked={value === optionValue} onChange={() => onChange(optionValue)} />
+            <span>{optionLabel}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
 function WorkDraft({
   work,
   index,
   services,
   patch,
   remove,
+  tariffSlot,
+  filesSlot,
+  showFinalVolume = false,
 }: {
   work: DraftWork;
   index: number;
   services: Service[];
   patch: (p: Partial<DraftWork>) => void;
   remove: () => void;
+  // «Тариф (А)»: read-only in the wizard (chosen on «Расчёт»), a selector in the order card
+  tariffSlot?: ReactNode;
+  // «Прикрепить документы клиента» of this work
+  filesSlot?: ReactNode;
+  // the final volume is confirmed later, on a saved work in the order card
+  showFinalVolume?: boolean;
 }) {
+  const topics = useTopics();
   const service = services.find((s) => s.code === work.service_code);
   const definition = service?.definition;
   const fields = activeServiceFields(service, work.certification_mode);
@@ -2480,45 +2720,51 @@ function WorkDraft({
   const pageFromCharacters = Boolean(definition?.page_from_characters);
   const clearQuote = () => volumeQuotePatch(work);
   const patchQuantity = (payload: Partial<DraftWork>) => patch({ ...payload, ...clearQuote() });
+  const label = (field: string, fallback: string) => definition?.labels?.[field] || fallback;
+  const choices = serviceChoices(services, work);
+  const autoDiscount = work.quoteAutoDiscount || (work.manualDiscount ? "0" : work.discount_percent) || "0";
+  // documents may be attached before the service is chosen (their analysis fills the volume)
+  const layout = !service ? [["service:2", "files:2"]] : definition?.layout?.length ? definition.layout : FALLBACK_LAYOUT;
+  const laidOut = new Set(layout.flat().map((token) => token.split(":")[0]));
+  const timingFields = WORK_TIMING_FIELDS.filter((field) => service && has(field) && !laidOut.has(field));
+  const topicOptions = work.topic && !topics.includes(work.topic) ? [...topics, work.topic] : topics;
 
-  return (
-    <article className="work-draft service-driven-work-draft">
-      <header>
-        <div>
-          <span className="overline">Работа {String(index + 1).padStart(2, "0")}</span>
-          <strong>{service?.name || "Новая работа"}</strong>
-        </div>
-        <Button variant="quiet" onClick={remove}>Удалить</Button>
-      </header>
-
-      <div className={`wizard-grid service-driven-grid${service?.code === "written_translation" ? " service-driven-grid--written" : ""}`}>
-        <div className="work-field work-field--service"><Select
-          label="Услуга"
-          value={work.service_code}
-          onChange={(e) => {
-            const nextService = services.find((item) => item.code === e.target.value);
-            patch(serviceFieldPatch(work, nextService));
-          }}
-        >
-          <option value="">Выберите услугу</option>
-          {services.filter((item) => item.active !== false || item.code === work.service_code).map((item) => (
-            <option key={item.code} value={item.code}>{item.active === false ? `${item.name} (отключена)` : item.name}</option>
-          ))}
-        </Select></div>
-
-        {!service && (
-          <div className="service-form-intro" role="note">
-            <strong>Сначала выберите услугу</strong>
-            <span>После выбора CRM покажет только те поля, которые нужны именно для этой работы.</span>
-          </div>
-        )}
-
-        {service && has("certification_mode") && (
+  const cell = (token: string): ReactNode => {
+    switch (token) {
+      case "service":
+        return (
           <Select
-            label={definition?.variant_label || "Вариант расчёта"}
-            value={serviceVariant(service, work.certification_mode)}
+            label="Услуга"
+            value={serviceChoiceValue(service, work.certification_mode)}
             onChange={(e) => {
-              const mode = e.target.value;
+              const choice = choices.find((item) => item.value === e.target.value);
+              patch(serviceFieldPatch(work, choice?.service, choice?.variant));
+            }}
+          >
+            <option value="">Выберите услугу</option>
+            {choices.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
+          </Select>
+        );
+      case "service_variant": {
+        const members = groupMembers(services, service);
+        if (members.length < 2) return null;
+        return (
+          <ChoicePair
+            label={definition?.service_group?.toggle_label || "Вариант"}
+            options={members.map((item) => [item.code, item.definition?.service_group?.option_label || item.name])}
+            value={work.service_code}
+            onChange={(code) => code !== work.service_code && patch(serviceFieldPatch(work, members.find((item) => item.code === code)))}
+          />
+        );
+      }
+      case "certification_mode":
+        if (!definition?.variants) return null;
+        return (
+          <ChoicePair
+            label={definition.variant_label || "Вариант"}
+            options={Object.entries(definition.variants).map(([value, variant]) => [value, variant.label])}
+            value={serviceVariant(service, work.certification_mode)}
+            onChange={(mode) => {
               const nextFields = activeServiceFields(service, mode);
               patch({
                 certification_mode: mode,
@@ -2530,31 +2776,13 @@ function WorkDraft({
                 ...resetQuotePatch,
               });
             }}
-          >
-            {Object.entries(definition?.variants || {}).map(([value, variant]) => (
-              <option key={value} value={value}>{variant.label}</option>
-            ))}
-          </Select>
-        )}
-
-        {service && has("source_language") && (
-          <div className="work-field work-field--source"><LanguageCombobox
-            label={definition?.matching_mode === "SOURCE_LANGUAGE" ? "Язык" : "Язык оригинала"}
-            value={work.source_language}
-            onChange={(value) => patch({ source_language: value, ...resetQuotePatch })}
-          /></div>
-        )}
-        {service && has("target_language") && (
-          <div className="work-field work-field--target"><LanguageCombobox
-            label="Язык перевода"
-            value={work.target_language}
-            onChange={(value) => patch({ target_language: value, ...resetQuotePatch })}
-          /></div>
-        )}
-        {service && has("character_count") && (
-          <div className="work-field work-field--chars"><Input
+          />
+        );
+      case "character_count":
+        return (
+          <Input
             label={charactersLabel(work.charactersSource)}
-            hint={pageFromCharacters ? "Страницы рассчитываются автоматически: 1800 знаков = 1 страница" : undefined}
+            hint={work.measured_character_count && work.charactersSource === "MANUAL" ? `По документам: ${Number(work.measured_character_count).toLocaleString("ru-RU")}` : pageFromCharacters ? "1800 знаков = 1 страница" : undefined}
             type="number"
             min="0"
             value={work.character_count}
@@ -2566,189 +2794,208 @@ function WorkDraft({
                 page_count: pageFromCharacters && character_count ? conditionalPages(character_count) : work.page_count,
               });
             }}
-          /></div>
-        )}
-        {service && has("page_count") && (
-          <div className="work-field work-field--pages"><Input
-            label={pageFromCharacters ? "Количество страниц · авто" : "Количество страниц"}
-            hint={pageFromCharacters ? "Округление вверх до 0,1; минимум 1 страница" : undefined}
+          />
+        );
+      case "page_count":
+        return (
+          <Input
+            label={pageFromCharacters ? "Количество условных страниц (А)" : "Количество страниц"}
+            hint={pageFromCharacters ? "По количеству знаков: вверх до 0,1, минимум 1" : undefined}
             type="number"
             min="0"
             step="0.1"
             readOnly={pageFromCharacters}
-            value={pageFromCharacters && work.character_count ? conditionalPages(work.character_count) : work.page_count}
+            value={pageFromCharacters && billedCharacters(work) ? conditionalPages(billedCharacters(work)) : work.page_count}
             onChange={(e) => !pageFromCharacters && patchQuantity({ page_count: e.target.value })}
-          /></div>
-        )}
-        {service && has("document_count") && (
-          <Input
-            label="Количество документов"
-            type="number"
-            min="0"
-            step="1"
-            value={work.document_count}
-            onChange={(e) => patchQuantity({ document_count: e.target.value })}
           />
-        )}
-        {service && has("duration_seconds") && (
-          <Input
-            label="Длительность, секунд"
-            hint="Тарификация — за секунду."
-            type="number"
-            min="0"
-            step="1"
-            value={work.duration_seconds}
-            onChange={(e) => patchQuantity({ duration_seconds: e.target.value })}
-          />
-        )}
-        {service && has("hour_count") && (
-          <Input
-            label="Количество часов"
-            type="number"
-            min="0"
-            step="0.25"
-            value={work.hour_count}
-            onChange={(e) => patchQuantity({ hour_count: e.target.value })}
-          />
-        )}
-        {service && has("topic") && (
-          <div className="work-field work-field--topic"><Input
-            label="Тематика"
-            value={work.topic}
-            onChange={(e) => patch({ topic: e.target.value })}
-          /></div>
-        )}
-        {service && has("translator_type") && (
-          <div className="work-field work-field--translator"><Select
+        );
+      case "document_count":
+        return <Input label="Количество документов" type="number" min="0" step="1" value={work.document_count} onChange={(e) => patchQuantity({ document_count: e.target.value })} />;
+      case "duration_seconds":
+        return <Input label="Длительность, секунд" hint="Тарификация — за секунду." type="number" min="0" step="1" value={work.duration_seconds} onChange={(e) => patchQuantity({ duration_seconds: e.target.value })} />;
+      case "hour_count":
+        return <Input label="Количество часов" type="number" min="0" step="0.25" value={work.hour_count} onChange={(e) => patchQuantity({ hour_count: e.target.value })} />;
+      case "source_language":
+        return <LanguageCombobox label="Язык оригинала" value={work.source_language} onChange={(value) => patch({ source_language: value, ...resetQuotePatch })} />;
+      case "target_language":
+        return <LanguageCombobox label="Язык перевода" value={work.target_language} onChange={(value) => patch({ target_language: value, ...resetQuotePatch })} />;
+      case "tariff":
+        return tariffSlot ?? (
+          <div className="pricing-field">
+            <span className="field__label">Тариф (А)</span>
+            <div className="calculated-value">
+              <strong>{work.manualPrice ? "Итог вручную" : Number(work.client_rate || 0) > 0 ? formatRate(work.client_rate, work.billing_unit) : work.quoteRate && work.quoteAmount ? formatRate(work.quoteRate, work.quoteUnit || work.billing_unit) : "—"}</strong>
+              <small>{definition?.pricing_basis?.label || "Подбирается на шаге «Расчёт»"}</small>
+            </div>
+          </div>
+        );
+      case "price":
+        return (
+          <div className="pricing-field">
+            <span className="field__label">Стоимость (А)</span>
+            <div className="calculated-value">
+              <strong>{work.manualPrice ? rub(work.price) : work.quoteAmount || Number(work.client_rate || 0) > 0 ? rub(localPrice(work)) : "—"}</strong>
+              <small>{work.client_billable ? "Для клиента" : "Не входит в стоимость для клиента"}</small>
+            </div>
+          </div>
+        );
+      case "translator_type":
+        return (
+          <ChoicePair
             label="Тип переводчика"
+            options={[["regular", "Обычный"], ["native", "Носитель"]]}
             value={work.native_speaker ? "native" : "regular"}
-            onChange={(e) => patch({ native_speaker: e.target.value === "native", ...resetQuotePatch })}
-          >
-            <option value="regular">Обычный переводчик</option>
-            <option value="native">Носитель языка</option>
-          </Select><small className="field-help">Носитель языка учитывается при подборе исполнителя и расчёте тарифа.</small></div>
-        )}
-        {service && has("start_date") && (
-          <Input
-            label="Дата начала"
-            type="date"
-            value={work.start_date}
-            onChange={(e) => patch({ start_date: e.target.value })}
+            onChange={(value) => patch({ native_speaker: value === "native", ...resetQuotePatch })}
           />
-        )}
-        {service && has("start_time") && (
+        );
+      case "status":
+        return (
+          <Select label="Статус" value={work.status} onChange={(e) => patch({ status: e.target.value })}>
+            {workStatuses.map(([value, statusName]) => <option key={value} value={value}>{statusName}</option>)}
+          </Select>
+        );
+      case "topic":
+        return (
+          <Select label="Тематика" value={work.topic} onChange={(e) => patch({ topic: e.target.value })}>
+            <option value="">Не указана</option>
+            {topicOptions.map((topic) => (
+              <option key={topic} value={topic}>{topics.includes(topic) ? topic : `${topic} (не из справочника)`}</option>
+            ))}
+          </Select>
+        );
+      case "notes":
+        return <Textarea label="Комментарий" rows={2} value={work.notes} onChange={(e) => patch({ notes: e.target.value })} />;
+      case "markup":
+        return (
           <Input
-            label="Время начала"
-            type="time"
-            value={work.start_time}
-            onChange={(e) => patch({ start_time: e.target.value })}
+            label="Наценка / Срочность"
+            hint="Коэффициент, по умолчанию 1"
+            type="number"
+            min="1"
+            max="10"
+            step="0.1"
+            value={work.urgency_multiplier}
+            onChange={(e) => {
+              const value = e.target.value;
+              patch({ urgency_multiplier: value, urgent: Number(value || 1) > 1, ...resetQuotePatch });
+            }}
           />
-        )}
-        {service && has("deadline") && (
-          <div className="work-field work-field--deadline"><Input
-            label="Дата окончания"
-            type="date"
-            value={work.deadline}
-            onChange={(e) => patch({ deadline: e.target.value })}
-          /></div>
-        )}
-        {service && has("deadline_time") && (
-          <div className="work-field work-field--deadline-time"><Input
-            label="Время окончания"
-            type="time"
-            value={work.deadline_time}
-            onChange={(e) => patch({ deadline_time: e.target.value })}
-          /></div>
-        )}
-        {service && has("status") && (
-          <div className="work-field work-field--status"><Select label="Статус работы" value={work.status} onChange={(e) => patch({ status: e.target.value })}>
-            {workStatuses.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </Select></div>
-        )}
-
-        {service && has("markup") && (
-          <label className="manual-switch manual-switch--feature">
-            <input
-              type="checkbox"
-              checked={work.urgent}
-              onChange={(e) => patch({ urgent: e.target.checked, ...resetQuotePatch })}
+        );
+      case "discount":
+        return (
+          <div className="discount-field">
+            <Input
+              label="Скидка, %"
+              hint={work.manualDiscount ? "Задана вручную" : "Считается автоматически либо измените вручную"}
+              type="number"
+              min="0"
+              max="100"
+              step="0.1"
+              value={work.manualDiscount ? work.discount_percent : autoDiscount}
+              onChange={(e) => patch({ manualDiscount: true, discount_percent: e.target.value })}
             />
+            {work.manualDiscount && (
+              <button type="button" className="discount-field__reset" onClick={() => patch({ manualDiscount: false, discount_percent: work.quoteAutoDiscount || "0" })}>
+                Автоматически
+              </button>
+            )}
+          </div>
+        );
+      case "files":
+        return filesSlot ?? null;
+      case "client_billable":
+        return (
+          <label className="manual-switch manual-switch--feature internal-work-switch">
+            <input type="checkbox" checked={!work.client_billable} onChange={(e) => patch({ client_billable: !e.target.checked })} />
             <span>
-              <b>Наценка / срочность</b>
-              <small>Включите, если для этой работы применяется повышающий коэффициент</small>
+              <b>Не учитывать в расчёте для клиента</b>
+              <small>Исполнитель и себестоимость сохраняются, но работа не входит в клиентскую стоимость и в предварительный расчёт</small>
             </span>
           </label>
+        );
+      case "document_names":
+        return (
+          <Input
+            label={`Название документа (-ов)${work.documentNamesSource === "AUTO" ? " (А)" : work.documentNamesSource === "MANUAL" ? " (З)" : ""}`}
+            hint={work.documentNamesSource === "AUTO" ? "Из имён прикреплённых файлов, можно исправить" : undefined}
+            value={work.document_names ?? ""}
+            onChange={(e) => patch({ document_names: e.target.value, documentNamesSource: "MANUAL" })}
+          />
+        );
+      case "start_date":
+        return <Input label={label("start_date", "Дата начала")} type="date" value={work.start_date} onChange={(e) => patch({ start_date: e.target.value })} />;
+      case "start_time":
+        return <Input label={label("start_time", "Время начала")} type="time" value={work.start_time} onChange={(e) => patch({ start_time: e.target.value })} />;
+      case "deadline":
+        return <Input label="Дата окончания работы" type="date" value={work.deadline} onChange={(e) => patch({ deadline: e.target.value })} />;
+      case "deadline_time":
+        return <Input label="Время окончания работы" type="time" value={work.deadline_time} onChange={(e) => patch({ deadline_time: e.target.value })} />;
+      default:
+        return null;
+    }
+  };
+  const ALWAYS = new Set(["service", "tariff", "price", "files", "client_billable", "service_variant"]);
+  const visible = (field: string) => ALWAYS.has(field) || (Boolean(service) && has(field));
+
+  return (
+    <article className="work-draft service-driven-work-draft">
+      <header>
+        <div>
+          <span className="overline">Работа {String(index + 1).padStart(2, "0")}</span>
+          <strong>{choices.find((item) => item.value === serviceChoiceValue(service, work.certification_mode))?.label || service?.name || "Новая работа"}</strong>
+        </div>
+        <Button variant="quiet" onClick={remove}>Удалить</Button>
+      </header>
+
+      <div className="work-layout">
+        {layout.map((row, rowIndex) => {
+          const cells = row
+            .map((token) => {
+              const [field, span] = token.split(":");
+              if (!visible(field)) return null;
+              const content = cell(field);
+              return content ? <div key={field} className={`work-layout__cell work-layout__cell--${field} span-${span || 1}`}>{content}</div> : null;
+            })
+            .filter(Boolean);
+          return cells.length ? <div key={rowIndex} className="work-layout__row">{cells}</div> : null;
+        })}
+        {!service && (
+          <div className="service-form-intro" role="note">
+            <strong>Сначала выберите услугу</strong>
+            <span>После выбора CRM покажет поля этой работы в порядке, согласованном с Олегом.</span>
+          </div>
         )}
-        {service && has("markup") && work.urgent && (
-          <div className="pricing-field pricing-field--compact">
-            <span className="field__label">Коэффициент наценки</span>
-            <div className="urgency-coefficient-row">
-              {["1.2", "1.5", "2", "3", "4"].map((value) => (
-                <button
-                  type="button"
-                  key={value}
-                  className={`coefficient-chip${work.urgency_multiplier === value ? " is-active" : ""}`}
-                  onClick={() => patch({ urgency_multiplier: value, ...resetQuotePatch })}
-                >×{value}</button>
-              ))}
-              <input
-                aria-label="Свой коэффициент наценки"
-                className="input coefficient-custom-input"
+        {service && showFinalVolume && has("character_count") && (
+          <div className="work-layout__row work-final-volume">
+            <div className="work-layout__cell span-2">
+              <Input
+                label="Окончательный объём, знаков"
+                hint={work.final_character_count ? "Цена для клиента считается по окончательному объёму" : "По тексту выполненного перевода; пока не указан, расчёт идёт по предварительному объёму"}
                 type="number"
-                min="1"
-                max="10"
-                step="0.1"
-                value={work.urgency_multiplier}
-                onChange={(e) => patch({ urgency_multiplier: e.target.value, ...resetQuotePatch })}
+                min="0"
+                value={work.final_character_count ?? ""}
+                onChange={(e) => {
+                  const final_character_count = e.target.value;
+                  patchQuantity({
+                    final_character_count,
+                    page_count: pageFromCharacters && (final_character_count || work.character_count) ? conditionalPages(final_character_count || work.character_count) : work.page_count,
+                  });
+                }}
               />
+            </div>
+            <div className="work-layout__cell span-2 work-final-volume__summary">
+              <span className="field__label">Предварительный объём</span>
+              <strong>{work.character_count ? `${Number(work.character_count).toLocaleString("ru-RU")} знаков ${work.charactersSource === "AUTO" ? "(А)" : work.charactersSource === "MANUAL" ? "(З)" : "(источник не сохранён)"}` : "Не указан"}</strong>
             </div>
           </div>
         )}
-
-        {service && has("discount") && (
-          <label className="manual-switch manual-switch--feature">
-            <input
-              type="checkbox"
-              checked={work.manualDiscount}
-              onChange={(e) => patch({
-                manualDiscount: e.target.checked,
-                discount_percent: e.target.checked ? work.discount_percent || work.quoteAutoDiscount || "0" : work.quoteAutoDiscount || "0",
-              })}
-            />
-            <span>
-              <b>Скидка вручную</b>
-              <small>Иначе CRM использует автоматическое правило тарифа</small>
-            </span>
-          </label>
-        )}
-        {service && has("discount") && work.manualDiscount && (
-          <Input
-            label="Скидка, %"
-            type="number"
-            min="0"
-            max="100"
-            step="0.1"
-            value={work.discount_percent}
-            onChange={(e) => patch({ discount_percent: e.target.value })}
-          />
-        )}
-
-        {service && (
-          <label className="manual-switch manual-switch--feature internal-work-switch">
-            <input
-              type="checkbox"
-              checked={!work.client_billable}
-              onChange={(e) => patch({ client_billable: !e.target.checked })}
-            />
-            <span>
-              <b>Не учитывать в расчёте для клиента</b>
-              <small>Исполнитель и себестоимость сохраняются, но работа не входит в клиентскую стоимость и предварительный расчёт</small>
-            </span>
-          </label>
-        )}
-
-        {service && has("notes") && (
-          <Textarea label="Комментарий" value={work.notes} onChange={(e) => patch({ notes: e.target.value })} />
+        {timingFields.length > 0 && (
+          <details className="work-timing" open={Boolean(work.deadline || work.start_date)}>
+            <summary>Срок работы, если отличается от срока заказа</summary>
+            <div className="work-layout__row">
+              {timingFields.map((field) => <div key={field} className="work-layout__cell span-1">{cell(field)}</div>)}
+            </div>
+          </details>
         )}
       </div>
     </article>
@@ -3029,7 +3276,7 @@ function ExecutorAssignmentsEditor({
                 void loadCandidates();
               }}
             >
-              Подобрать исполнителя
+              Автоподбор
             </Button>
           )}
           <Button type="button" variant="secondary" onClick={addAssignment}>
@@ -3473,6 +3720,11 @@ function draftFromWork(work: Work): DraftWork {
     manualDiscount: work.discount_overridden,
     discount_percent: String(work.discount_percent ?? 0),
     character_count: work.character_count?.toString() ?? "",
+    charactersSource: work.character_count_source || undefined,
+    measured_character_count: work.measured_character_count?.toString() ?? "",
+    final_character_count: work.final_character_count?.toString() ?? "",
+    document_names: work.document_names ?? "",
+    documentNamesSource: work.document_names_source || undefined,
     page_count: work.page_count?.toString() ?? "",
     word_count: work.word_count?.toString() ?? "",
     document_count: work.document_count?.toString() ?? "",
@@ -3551,6 +3803,8 @@ type WorkEditorState = {
   version?: number;
   draft: DraftWork;
   openedAt?: number;
+  // documents of a new work wait for its id
+  pendingFiles?: File[];
 };
 
 function OrderCard({
@@ -3675,6 +3929,53 @@ function OrderCard({
       setUploading(false);
     }
   }
+  // «Прикрепить документы клиента» in the work editor: a saved work gets the files at once
+  // (with analysis); the measured volume and document names land in the open draft.
+  const [workUploading, setWorkUploading] = useState(false);
+  async function uploadToWork(picked: File[]) {
+    if (!workEditor) return;
+    if (workEditor.mode === "new" || !workEditor.workId) {
+      setWorkEditor({ ...workEditor, pendingFiles: mergeFiles(workEditor.pendingFiles ?? [], picked) });
+      return;
+    }
+    const workId = workEditor.workId;
+    setWorkUploading(true);
+    setError("");
+    const analysed: OrderFile[] = [];
+    const result = await uploadEach(picked, async (next) => {
+      const form = new FormData();
+      form.append("upload", next);
+      form.append("work_id", workId);
+      analysed.push(await api<OrderFile>(`/api/admin/crm/orders/${orderId}/files/analyze`, { method: "POST", body: form }));
+    });
+    setWorkUploading(false);
+    const detail = await api<OrderDetail>(`/api/admin/crm/orders/${orderId}`).catch(() => null);
+    if (detail) setOrder(detail);
+    const files = (detail?.files ?? []).filter((file) => file.work_id === workId);
+    setWorkEditor((current) => {
+      if (!current || current.workId !== workId) return current;
+      const w = current.draft;
+      const service = services.find((item) => item.code === w.service_code);
+      const measured = files.some((file) => file.character_count != null) ? String(files.reduce((sum, file) => sum + Number(file.character_count ?? 0), 0)) : w.measured_character_count;
+      const takeMeasured = Boolean(analysed.length && measured && w.charactersSource !== "MANUAL" && serviceHasField(service, "character_count", w.certification_mode));
+      return {
+        ...current,
+        draft: {
+          ...w,
+          measured_character_count: measured,
+          ...(takeMeasured ? {
+            character_count: measured,
+            charactersSource: "AUTO" as const,
+            page_count: service?.definition?.page_from_characters ? conditionalPages(measured) : w.page_count,
+            ...(w.manualPrice ? {} : volumeQuotePatch(w)),
+          } : {}),
+          ...(w.documentNamesSource === "MANUAL" ? {} : { document_names: documentNamesFrom(files.map((file) => ({ name: file.original_name }))), documentNamesSource: "AUTO" as const }),
+        },
+      };
+    });
+    const failure = uploadFailureMessage(result);
+    if (failure) setError(failure);
+  }
   async function deleteFile(fileId: string, name: string) {
     if (!confirm(`Удалить файл «${name}» из заказа? Остальные файлы останутся.`)) return;
     setError("");
@@ -3723,61 +4024,7 @@ function OrderCard({
     setError("");
     const w = workEditor.draft;
     const payload = {
-      service_code: w.service_code,
-      work_type: w.work_type,
-      source_language: w.source_language,
-      target_language: w.target_language,
-      tariff_ids: w.tariff_ids,
-      topic: w.topic,
-      urgent: w.urgent,
-      urgency_multiplier: Number(w.urgency_multiplier || 1),
-      native_speaker: w.native_speaker,
-      discount_percent: w.manualDiscount ? Number(w.discount_percent || 0) : null,
-      character_count: w.character_count ? Number(w.character_count) : null,
-      page_count: w.page_count ? Number(w.page_count) : null,
-      word_count: w.word_count ? Number(w.word_count) : null,
-      document_count: w.document_count ? Number(w.document_count) : null,
-      duration_seconds: w.duration_seconds ? Number(w.duration_seconds) : null,
-      hour_count: w.hour_count ? Number(w.hour_count) : null,
-      start_date: w.start_date || null,
-      start_time: w.start_time,
-      certification_mode: w.certification_mode,
-      billing_unit: w.billing_unit,
-      client_rate: Number(w.client_rate || 0),
-      price: w.manualPrice ? Number(w.price || 0) : null,
-      price_override_reason: w.manualPrice
-        ? "Ручная корректировка в карточке заказа"
-        : "",
-      client_billable: w.client_billable,
-      executor_id: w.executor_id || null,
-      executor_rate: Number(w.executor_rate || 0),
-      executor_billing_unit: w.executor_billing_unit,
-      executor_cost: w.manualExecutorCost ? Number(w.executor_cost || 0) : null,
-      deadline: w.deadline || null,
-      deadline_time: w.deadline_time,
-      executor_deadline: w.executor_deadline || null,
-      executor_deadline_time: w.executor_deadline_time,
-      executor_assignments: w.executor_assignments.filter((assignment) => assignment.executor_id).map((assignment) => ({
-        id: assignment.id,
-        executor_id: assignment.executor_id,
-        character_count: assignment.character_count ? Number(assignment.character_count) : null,
-        page_count: assignment.page_count ? Number(assignment.page_count) : null,
-        document_count: assignment.document_count ? Number(assignment.document_count) : null,
-        duration_seconds: assignment.duration_seconds ? Number(assignment.duration_seconds) : null,
-        hour_count: assignment.hour_count ? Number(assignment.hour_count) : null,
-        billing_unit: assignment.billing_unit,
-        rate: Number(assignment.rate || 0),
-        cost: assignment.manualCost ? Number(assignment.cost || 0) : null,
-        deadline: assignment.deadline || null,
-        deadline_time: assignment.deadline_time,
-        route_stage_index: assignment.route_stage_index ?? null,
-        route_source_language: assignment.route_source_language || "",
-        route_target_language: assignment.route_target_language || "",
-        status: assignment.status,
-        notes: assignment.notes,
-      })),
-      status: w.status,
-      notes: w.notes,
+      ...workPayload(w, "Ручная корректировка в карточке заказа"),
       ...(workEditor.mode === "edit" ? { version: workEditor.version } : {}),
     };
     try {
@@ -3785,13 +4032,22 @@ function OrderCard({
         workEditor.mode === "edit"
           ? `/api/admin/crm/orders/${orderId}/works/${workEditor.workId}`
           : `/api/admin/crm/orders/${orderId}/works`;
-      await api(path, {
+      const saved = await api<Work>(path, {
         method: workEditor.mode === "edit" ? "PATCH" : "POST",
         body: JSON.stringify(payload),
+      });
+      // documents picked for a new work are attached once the work exists
+      const uploads = await uploadEach(workEditor.pendingFiles ?? [], (file) => {
+        const form = new FormData();
+        form.append("upload", file);
+        form.append("work_id", saved.id);
+        return api(`/api/admin/crm/orders/${orderId}/files/analyze`, { method: "POST", body: form });
       });
       setWorkEditor(null);
       await load();
       await onChanged();
+      const failure = uploadFailureMessage(uploads);
+      if (failure) setError(failure);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось сохранить работу");
     } finally {
@@ -4321,6 +4577,38 @@ function OrderCard({
                 })
               }
               remove={() => setWorkEditor(null)}
+              showFinalVolume={workEditor.mode === "edit"}
+              tariffSlot={
+                <WorkTariffPicker
+                  work={workEditor.draft}
+                  service={services.find((item) => item.code === workEditor.draft.service_code)}
+                  clientId={order.client_id}
+                  patch={(patch) => setWorkEditor({ ...workEditor, draft: { ...workEditor.draft, ...patch } })}
+                />
+              }
+              filesSlot={
+                <WorkFilesField
+                  label="Прикрепить документы клиента"
+                  busy={workUploading}
+                  onPick={(picked) => void uploadToWork(picked)}
+                  items={[
+                    ...order.files.filter((file) => workEditor.workId && file.work_id === workEditor.workId).map((file) => ({
+                      key: file.id,
+                      name: file.original_name,
+                      meta: [file.character_count != null ? `${file.character_count.toLocaleString("ru-RU")} знаков` : "", file.page_count != null ? `${file.page_count} стр.` : ""].filter(Boolean).join(" · "),
+                      note: file.analysis_note,
+                      href: apiDownloadUrl(`/api/admin/orders/${orderId}/files/${file.id}/download`),
+                    })),
+                    ...(workEditor.pendingFiles ?? []).map((file) => ({
+                      key: fileKey(file),
+                      name: file.name,
+                      meta: "Загрузится после сохранения работы",
+                      note: "",
+                      onRemove: () => setWorkEditor({ ...workEditor, pendingFiles: (workEditor.pendingFiles ?? []).filter((item) => fileKey(item) !== fileKey(file)) }),
+                    })),
+                  ]}
+                />
+              }
             />
           </section>
           <section className="work-edit-module">

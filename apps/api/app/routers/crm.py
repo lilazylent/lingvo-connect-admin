@@ -10,7 +10,7 @@ from decimal import Decimal, ROUND_CEILING, ROUND_HALF_UP
 from typing import Annotated, Literal
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, UploadFile
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, Response, UploadFile
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session
@@ -24,6 +24,7 @@ from app.crm_models import (
     PricingRule,
     ServiceType,
     Tariff,
+    TopicCatalog,
 )
 from app.audit import record_event
 from app import crm_stats
@@ -41,7 +42,10 @@ from app.models import Application, ApplicationActivity, User, utcnow
 from app.operations_models import ApplicationClient, Executor, ExecutorAssignment, ExecutorDirection, OperationalActivity, Order, OrderWork
 from app.order_files import OrderFile
 from app.order_numbering import claim_explicit_order_number, next_order_number, peek_next_order_number
-from app.service_definitions import billing_unit_for, canonical_service_code, definition_for, definition_view, fields_for, lookup_codes, variant_for
+from app.service_definitions import (
+    auto_discount_for, billing_unit_for, canonical_service_code, definition_for, definition_view, fields_for,
+    lookup_codes, pricing_basis_for, tariff_variant_for, variant_for,
+)
 from app.routers.clients import view
 from app.storage import UnsafeFileError, storage_from_settings
 from app.config import get_settings
@@ -182,6 +186,8 @@ class PricingRequest(BaseModel):
     native_speaker: bool = False
     native_multiplier: Decimal = Field(default=Decimal("1.00"), ge=1)
     min_quantity: Decimal = Field(default=Decimal("0"), ge=0)
+    # client rule: at least 1 conditional page; executor volumes are paid as they are (0.1 page)
+    page_minimum: bool = True
 
 
 class QuoteRequest(BaseModel):
@@ -213,7 +219,11 @@ def _active_tariff_query(service_code: str):
     )
 
 
-def _discount_for(db: Session, service_code: str, quantity: Decimal) -> tuple[Decimal, str | None]:
+def _discount_for(db: Session, service_code: str, quantity: Decimal, certification_mode: str = "") -> tuple[Decimal, str | None]:
+    fixed = auto_discount_for(service_code, certification_mode)
+    if fixed:
+        # «повторения»: a fixed 30 % instead of the volume discounts (never on top of them)
+        return fixed
     service_codes = lookup_codes(service_code) or {service_code}
     rules = db.scalars(
         select(PricingRule).where(
@@ -258,23 +268,29 @@ def _resolve_translation_tariff(db: Session, payload: QuoteRequest) -> tuple[lis
     return [], "not_found"
 
 
+def _tariff_service(service_code: str) -> str:
+    """Service code of the tariff grid that prices ``service_code``."""
+    return pricing_basis_for(service_code)[0] or service_code
+
+
 def _tariffs_by_ids(db: Session, ids: list[str], service_code: str) -> list[Tariff]:
     if not ids:
         return []
-    rows = db.scalars(_active_tariff_query(service_code).where(Tariff.id.in_(ids))).all()
+    rows = db.scalars(_active_tariff_query(_tariff_service(service_code)).where(Tariff.id.in_(ids))).all()
     indexed = {row.id: row for row in rows}
     return [indexed[item_id] for item_id in ids if item_id in indexed]
 
 def _tariff_matches_request(tariffs: list[Tariff], payload: QuoteRequest) -> bool:
     if not tariffs:
         return False
-    if any(canonical_service_code(t.service_code) != canonical_service_code(payload.service_code) for t in tariffs):
+    tariff_service = _tariff_service(payload.service_code)
+    if any(canonical_service_code(t.service_code) != canonical_service_code(tariff_service) for t in tariffs):
         return False
     expected_unit = billing_unit_for(payload.service_code, payload.certification_mode)
     if expected_unit and any(t.unit != expected_unit for t in tariffs):
         # e.g. per-document written translation never matches the per-page tariff grid
         return False
-    if payload.service_code != "written_translation":
+    if tariff_service != "written_translation":
         expected_unit = billing_unit_for(payload.service_code, payload.certification_mode)
         if len(tariffs) != 1 or (expected_unit and tariffs[0].unit != expected_unit):
             return False
@@ -323,7 +339,8 @@ def _quote_from_tariffs(payload: QuoteRequest, tariffs: list[Tariff], resolution
     unit = tariffs[0].unit
     if any(t.unit != unit for t in tariffs):
         raise HTTPException(422, "Выбранные тарифы используют разные единицы расчёта")
-    rate = money(sum((Decimal(str(t.amount)) for t in tariffs), Decimal("0")))
+    # «Вычитка»: the written-translation rate × 0.7, rounded to kopecks
+    rate = money(sum((Decimal(str(t.amount)) for t in tariffs), Decimal("0")) * pricing_basis_for(payload.service_code)[2])
     # Base urgency is always x1. A higher coefficient belongs to the work, not the tariff.
     urgency_multiplier = payload.urgency_multiplier or Decimal("1")
     native_multiplier = max((Decimal(str(t.native_multiplier)) for t in tariffs), default=Decimal("1"))
@@ -348,7 +365,7 @@ CLIENT_TARIFF_PREFIX = "client:"
 def _client_tariff_ladder(db: Session, company_id: str, payload: QuoteRequest, anchor: ClientTariff | None = None) -> list[ClientTariff]:
     """Price ladder of the client for this work: same service, variant and the most specific language match."""
     codes = lookup_codes(payload.service_code) or {payload.service_code}
-    variant = variant_for(payload.service_code, payload.certification_mode)
+    variant = tariff_variant_for(payload.service_code, payload.certification_mode)
     rows = db.scalars(select(ClientTariff).where(
         ClientTariff.company_id == company_id, ClientTariff.active.is_(True), ClientTariff.service_code.in_(codes),
     )).all()
@@ -387,7 +404,8 @@ def _client_tariff_option(db: Session, company: Company, payload: QuoteRequest, 
         urgency_multiplier=payload.urgency_multiplier or Decimal("1"), **volume,
     ))
     before_discount = Decimal(str(priced["amount"]))
-    discount_percent = Decimal(str(company.client_discount_percent or 0))
+    fixed = auto_discount_for(payload.service_code, payload.certification_mode)
+    discount_percent = fixed[0] if fixed else Decimal(str(company.client_discount_percent or 0))
     discount_amount = money(before_discount * discount_percent / Decimal("100"))
     key = f"{CLIENT_TARIFF_PREFIX}{ladder[0].id}"      # stable while the quantity moves between tiers
     return {
@@ -396,7 +414,7 @@ def _client_tariff_option(db: Session, company: Company, payload: QuoteRequest, 
         "quantity": priced["quantity"], "base_amount": priced["base_amount"],
         "surcharge_multiplier": priced["multiplier"], "before_discount": before_discount,
         "discount_percent": discount_percent, "discount_amount": discount_amount,
-        "discount_name": "Скидка клиента" if discount_percent else None,
+        "discount_name": fixed[1] if fixed else "Скидка клиента" if discount_percent else None,
         "source_language": payload.source_language, "target_language": payload.target_language,
         "directions": [], "components": [], "is_auto": False,
         "client_tariff": {
@@ -444,6 +462,9 @@ class WizardWork(BaseModel):
     discount_percent: Decimal | None = Field(default=None, ge=0, le=100)
     tariff_ids: list[str] = Field(default_factory=list, max_length=2)
     character_count: int | None = Field(default=None, ge=0)
+    character_count_source: Literal["", "AUTO", "MANUAL"] = ""
+    measured_character_count: int | None = Field(default=None, ge=0)
+    final_character_count: int | None = Field(default=None, ge=0)
     page_count: Decimal | None = Field(default=None, ge=0)
     word_count: int | None = Field(default=None, ge=0)
     document_count: int | None = Field(default=None, ge=0)
@@ -451,6 +472,8 @@ class WizardWork(BaseModel):
     hour_count: Decimal | None = Field(default=None, ge=0)
     start_date: date | None = None
     start_time: str = Field(default="", max_length=5)
+    document_names: str = Field(default="", max_length=2000)
+    document_names_source: Literal["", "AUTO", "MANUAL"] = ""
     certification_mode: str = Field(default="", max_length=20)
     billing_unit: BillingUnit = "CUSTOM"
     client_rate: Decimal = Field(default=Decimal("0"), ge=0)
@@ -570,7 +593,7 @@ def client_payment_state(payment: ClientPayment | None, amount_due: Decimal) -> 
     return "UNPAID"
 
 
-def conditional_page_quantity(character_count: int | Decimal) -> Decimal:
+def conditional_page_quantity(character_count: int | Decimal, *, minimum: bool = True) -> Decimal:
     """Return 1800-character pages rounded upward to one decimal place.
 
     Oleg's order-registration rule treats one conditional page as the minimum
@@ -582,14 +605,14 @@ def conditional_page_quantity(character_count: int | Decimal) -> Decimal:
         return Decimal("0")
     pages = chars / Decimal("1800")
     rounded = (pages * Decimal("10")).to_integral_value(rounding=ROUND_CEILING) / Decimal("10")
-    return max(Decimal("1"), rounded)
+    return max(Decimal("1"), rounded) if minimum else rounded
 
 
 def quantity_for(payload: PricingRequest) -> Decimal:
     if payload.unit == "CONDITIONAL_PAGE":
         if payload.character_count is None:
             return payload.page_count or payload.quantity or Decimal("0")
-        return conditional_page_quantity(payload.character_count)
+        return conditional_page_quantity(payload.character_count, minimum=payload.page_minimum)
     if payload.unit == "PER_1000_CHARS":
         return Decimal(payload.character_count or 0) / Decimal("1000")
     if payload.unit == "PER_PAGE":
@@ -652,6 +675,7 @@ def assignment_auto_amount(item: ExecutorAssignmentPayload) -> Decimal:
         urgent=False,
         urgency_multiplier=Decimal("1"),
         native_speaker=False,
+        page_minimum=False,
     ))
     return result["amount"]
 
@@ -801,6 +825,7 @@ def _sync_executor_assignments(db: Session, row: OrderWork, payload: WizardWork)
                 unit="CONDITIONAL_PAGE",
                 rate=Decimal("0"),
                 character_count=effective_item.character_count,
+                page_minimum=False,
             ))
             if effective_item.billing_unit == "CONDITIONAL_PAGE" and effective_item.character_count is not None
             else effective_item.page_count
@@ -881,10 +906,16 @@ def _apply_work_payload(db: Session, row: OrderWork, payload: WizardWork) -> Non
     effective_urgent = payload.urgent if not definition or "markup" in active_fields else False
     effective_native = payload.native_speaker if not definition or "translator_type" in active_fields else False
 
+    uses_characters = not definition or "character_count" in active_fields
+    # the client is billed by the final volume once it is confirmed, else by the preliminary one
+    billed_characters = (
+        (payload.final_character_count if payload.final_character_count is not None else payload.character_count)
+        if uses_characters else None
+    )
     pricing_payload = PricingRequest(
         unit=resolved_unit,
         rate=payload.client_rate,
-        character_count=payload.character_count if not definition or "character_count" in active_fields else None,
+        character_count=billed_characters,
         page_count=payload.page_count if not definition or "page_count" in active_fields else None,
         document_count=payload.document_count if not definition or "document_count" in active_fields else None,
         duration_seconds=payload.duration_seconds if not definition or "duration_seconds" in active_fields else None,
@@ -957,7 +988,7 @@ def _apply_work_payload(db: Session, row: OrderWork, payload: WizardWork) -> Non
         discount_overridden = False
     elif payload.discount_percent is None:
         # client tariffs carry the client's own discount instead of the volume discounts
-        applied_discount = Decimal(str(client_option["discount_percent"])) if client_option else _discount_for(db, payload.service_code, quantity)[0]
+        applied_discount = Decimal(str(client_option["discount_percent"])) if client_option else _discount_for(db, payload.service_code, quantity, certification_mode)[0]
         discount_overridden = False
     else:
         applied_discount = Decimal(str(payload.discount_percent))
@@ -976,12 +1007,18 @@ def _apply_work_payload(db: Session, row: OrderWork, payload: WizardWork) -> Non
     row.discount_percent = applied_discount
     row.discount_overridden = discount_overridden
     row.tariff_ids = client_option["key"] if client_option else ",".join(standard_ids)
-    row.character_count = payload.character_count if not definition or "character_count" in active_fields else None
+    row.character_count = payload.character_count if uses_characters else None
+    row.character_count_source = payload.character_count_source if uses_characters and row.character_count is not None else ""
+    row.measured_character_count = payload.measured_character_count if uses_characters else None
+    final_characters = payload.final_character_count if uses_characters else None
+    if final_characters != row.final_character_count:
+        row.final_volume_at = utcnow() if final_characters is not None else None
+    row.final_character_count = final_characters
     row.page_count = (
         quantity
         if (not definition or "page_count" in active_fields)
         and resolved_unit == "CONDITIONAL_PAGE"
-        and row.character_count is not None
+        and billed_characters is not None
         else (payload.page_count if not definition or "page_count" in active_fields else None)
     )
     row.word_count = payload.word_count if not definition else None
@@ -990,6 +1027,9 @@ def _apply_work_payload(db: Session, row: OrderWork, payload: WizardWork) -> Non
     row.hour_count = payload.hour_count if not definition or "hour_count" in active_fields else None
     row.start_date = payload.start_date if not definition or "start_date" in active_fields else None
     row.start_time = payload.start_time if not definition or "start_time" in active_fields else ""
+    keeps_names = not definition or "document_names" in active_fields
+    row.document_names = payload.document_names if keeps_names else ""
+    row.document_names_source = payload.document_names_source if keeps_names and payload.document_names else ""
     row.certification_mode = certification_mode
     row.billing_unit = resolved_unit
     row.client_rate = resolved_rate
@@ -1397,16 +1437,63 @@ def edit_language(language_id: str, payload: LanguagePayload, db: DB, context: A
     db.commit()
     return view(row)
 
+class TopicPayload(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    name: str = Field(min_length=1, max_length=120)
+    active: bool = True
+    sort_order: int = Field(default=100, ge=0, le=100000)
+
+
+@router.get("/topics")
+def topics(db: DB, context: Read, include_inactive: bool = Query(False)):
+    query = select(TopicCatalog)
+    if not include_inactive:
+        query = query.where(TopicCatalog.active.is_(True))
+    rows = db.scalars(query.order_by(TopicCatalog.sort_order, TopicCatalog.name)).all()
+    return {"items": [view(row) for row in rows]}
+
+
+def _topic_name_taken(db: Session, name: str, exclude_id: str | None = None) -> bool:
+    rows = db.scalars(select(TopicCatalog).where(*([TopicCatalog.id != exclude_id] if exclude_id else []))).all()
+    return any(row.name.casefold() == name.casefold() for row in rows)
+
+
+@router.post("/topics", status_code=201)
+def create_topic(payload: TopicPayload, db: DB, context: AdminWrite):
+    if _topic_name_taken(db, payload.name):
+        raise HTTPException(409, "Такая тематика уже есть в справочнике")
+    row = TopicCatalog(**payload.model_dump())
+    db.add(row)
+    db.commit()
+    return view(row)
+
+
+@router.patch("/topics/{topic_id}")
+def edit_topic(topic_id: str, payload: TopicPayload, db: DB, context: AdminWrite):
+    row = db.get(TopicCatalog, topic_id)
+    if not row:
+        raise HTTPException(404, "Тематика не найдена")
+    if _topic_name_taken(db, payload.name, topic_id):
+        raise HTTPException(409, "Такая тематика уже есть в справочнике")
+    # works store the topic name: a rename applies to new works only, existing ones keep their text
+    for key, value in payload.model_dump().items():
+        setattr(row, key, value)
+    row.updated_at = utcnow()
+    db.commit()
+    return view(row)
+
+
 @router.post("/pricing/options")
 def pricing_options(payload: QuoteRequest, db: DB, context: Read):
     service = db.scalar(select(ServiceType).where(ServiceType.code == payload.service_code, ServiceType.active.is_(True)))
     if not service:
         raise HTTPException(422, "Услуга не найдена или отключена")
     candidates: list[tuple[list[Tariff], str]] = []
-    auto_tariffs, auto_resolution = (_resolve_translation_tariff(db, payload) if payload.service_code == "written_translation" else ([], "direct"))
+    written_grid = _tariff_service(payload.service_code) == "written_translation"
+    auto_tariffs, auto_resolution = (_resolve_translation_tariff(db, payload) if written_grid else ([], "direct"))
     if auto_tariffs and not _tariff_matches_request(auto_tariffs, payload):
         auto_tariffs, auto_resolution = [], "not_found"
-    if payload.service_code != "written_translation":
+    if not written_grid:
         query = _active_tariff_query(payload.service_code)
         expected_unit = billing_unit_for(payload.service_code, payload.certification_mode)
         if expected_unit:
@@ -1417,7 +1504,7 @@ def pricing_options(payload: QuoteRequest, db: DB, context: Read):
         if matching_rows and not auto_tariffs:
             auto_tariffs = [matching_rows[0]]
     else:
-        base = _active_tariff_query(payload.service_code)
+        base = _active_tariff_query("written_translation")
         rows = db.scalars(base.order_by(Tariff.active_from.desc().nullslast())).all()
         for row in rows:
             if _tariff_matches_request([row], payload):
@@ -1438,7 +1525,7 @@ def pricing_options(payload: QuoteRequest, db: DB, context: Read):
             continue
         seen.add(ids)
         evaluated = _quote_from_tariffs(payload, tariffs, resolution)
-        discount_percent, discount_name = _discount_for(db, payload.service_code, Decimal(str(evaluated["quantity"])))
+        discount_percent, discount_name = _discount_for(db, payload.service_code, Decimal(str(evaluated["quantity"])), payload.certification_mode)
         before_discount = Decimal(str(evaluated["before_discount"]))
         amount = money(before_discount * (Decimal("1") - discount_percent / Decimal("100")))
         discount_amount = money(before_discount * discount_percent / Decimal("100"))
@@ -1485,7 +1572,7 @@ def pricing_quote(payload: QuoteRequest, db: DB, context: Read):
         raise HTTPException(422, "Услуга не найдена или отключена")
     tariffs: list[Tariff] = []
     resolution = "direct"
-    if payload.service_code == "written_translation":
+    if _tariff_service(payload.service_code) == "written_translation":
         tariffs, resolution = _resolve_translation_tariff(db, payload)
         if tariffs and not _tariff_matches_request(tariffs, payload):
             tariffs, resolution = [], "not_found"
@@ -1505,7 +1592,7 @@ def pricing_quote(payload: QuoteRequest, db: DB, context: Read):
     evaluated = _quote_from_tariffs(payload, tariffs, resolution)
     unit = evaluated["unit"]
     rate = evaluated["rate"]
-    discount_percent, discount_name = _discount_for(db, payload.service_code, Decimal(str(evaluated["quantity"])))
+    discount_percent, discount_name = _discount_for(db, payload.service_code, Decimal(str(evaluated["quantity"])), payload.certification_mode)
     before_discount = Decimal(str(evaluated["before_discount"]))
     discount_amount = money(before_discount * discount_percent / Decimal("100"))
     total = money(before_discount - discount_amount)
@@ -1518,6 +1605,7 @@ def pricing_quote(payload: QuoteRequest, db: DB, context: Read):
         "discount_amount": discount_amount, "amount": total,
         "components": _tariff_components(tariffs),
         "formula": " + ".join(str(t.amount) for t in tariffs) + f" ₽ × {evaluated['quantity']}",
+        "rate_note": (definition_for(payload.service_code) or {}).get("pricing_basis", {}).get("label", ""),
     }
 
 
@@ -1881,6 +1969,12 @@ def order_detail(order_id: str, db: DB, context: Read):
         client_name=client.name if client else "",
         contact_name=contact.name if contact else "",
         manager_name=manager.display_name if manager else "",
+        # «Депозит, р.» of the payment block: what the ledger debited for this order (read-only)
+        deposit_applied=money(-(db.scalar(
+            select(func.coalesce(func.sum(ClientDepositTransaction.amount), 0)).where(
+                ClientDepositTransaction.order_id == order_id, ClientDepositTransaction.kind == "ORDER_DEBIT",
+            )
+        ) or 0)),
     )
     return result
 
@@ -2037,8 +2131,20 @@ def duplicate_crm_work(order_id: str, work_id: str, db: DB, context: Write):
         discount_overridden=source.discount_overridden,
         tariff_ids=source.tariff_ids,
         character_count=source.character_count,
+        character_count_source=source.character_count_source,
+        measured_character_count=source.measured_character_count,
+        final_character_count=source.final_character_count,
+        final_volume_at=source.final_volume_at,
         page_count=source.page_count,
         word_count=source.word_count,
+        document_count=source.document_count,
+        duration_seconds=source.duration_seconds,
+        hour_count=source.hour_count,
+        start_date=source.start_date,
+        start_time=source.start_time,
+        certification_mode=source.certification_mode,
+        document_names=source.document_names,
+        document_names_source=source.document_names_source,
         billing_unit=source.billing_unit,
         client_rate=source.client_rate,
         auto_price=source.auto_price,
@@ -2264,9 +2370,13 @@ def analyze_preview(upload: UploadFile, context: Write):
 
 
 @router.post("/orders/{order_id}/files/analyze", status_code=201)
-def upload_and_analyze(order_id: str, upload: UploadFile, db: DB, context: Write):
+def upload_and_analyze(order_id: str, upload: UploadFile, db: DB, context: Write, work_id: Annotated[str | None, Form()] = None):
     order = db.get(Order, order_id)
     if not order or order.archived: raise HTTPException(404, "Активный заказ не найден")
+    if work_id:
+        work = db.get(OrderWork, work_id)
+        if not work or work.order_id != order_id or work.archived:
+            raise HTTPException(422, "Работа не найдена в этом заказе")
     settings = get_settings(); storage = storage_from_settings(settings.application_storage_path, settings.application_file_max_bytes)
     try:
         stored = storage.save(order_id, upload.filename or "", upload.file)
@@ -2275,7 +2385,7 @@ def upload_and_analyze(order_id: str, upload: UploadFile, db: DB, context: Write
     path = storage.resolve(stored.storage_key)
     metrics = analyze_document(path, stored.original_name)
     try:
-        row = OrderFile(order_id=order_id, uploaded_by=context.user.id, **asdict(stored), **metrics)
+        row = OrderFile(order_id=order_id, work_id=work_id or None, uploaded_by=context.user.id, **asdict(stored), **metrics)
         db.add(row); db.add(OperationalActivity(order_id=order_id, actor_user_id=context.user.id, action="file.analyzed")); db.commit()
     except Exception:
         db.rollback(); storage.delete(stored.storage_key); raise

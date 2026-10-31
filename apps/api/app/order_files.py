@@ -11,6 +11,8 @@ class OrderFile(Base):
     __tablename__ = "order_files"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
     order_id: Mapped[str] = mapped_column(ForeignKey("orders.id", ondelete="RESTRICT"), index=True)
+    # client documents attached to a specific work (DOCX v3); NULL = order-level file
+    work_id: Mapped[str | None] = mapped_column(ForeignKey("order_works.id", ondelete="RESTRICT"), nullable=True, index=True)
     storage_key: Mapped[str] = mapped_column(String(500), unique=True)
     original_name: Mapped[str] = mapped_column(String(255))
     mime_type: Mapped[str] = mapped_column(String(120))

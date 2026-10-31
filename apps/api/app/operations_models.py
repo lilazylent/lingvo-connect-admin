@@ -100,6 +100,12 @@ class OrderWork(RecordMixin, Base):
     discount_overridden: Mapped[bool] = mapped_column(Boolean, default=False)
     tariff_ids: Mapped[str] = mapped_column(Text, default="")
     character_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # «Количество знаков (А/З)»: AUTO = from document analysis, MANUAL = typed, '' = legacy/unknown
+    character_count_source: Mapped[str] = mapped_column(String(16), default="")
+    measured_character_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # final volume by the delivered translation; when set the client price is calculated from it
+    final_character_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    final_volume_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     page_count: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     word_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     document_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -107,6 +113,9 @@ class OrderWork(RecordMixin, Base):
     hour_count: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     start_time: Mapped[str] = mapped_column(String(5), default="")
+    # «Название документа (-ов) (А/З)»
+    document_names: Mapped[str] = mapped_column(Text, default="")
+    document_names_source: Mapped[str] = mapped_column(String(16), default="")
     certification_mode: Mapped[str] = mapped_column(String(20), default="")
     billing_unit: Mapped[str] = mapped_column(String(32), default="CUSTOM")
     client_rate: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"))

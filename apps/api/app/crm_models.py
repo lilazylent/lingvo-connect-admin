@@ -42,6 +42,19 @@ class LanguageCatalog(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class TopicCatalog(Base):
+    """«Тематика (РС)» dictionary. Works keep the topic name as before (no FK)."""
+
+    __tablename__ = "topic_catalog"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    name: Mapped[str] = mapped_column(String(120), unique=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=100)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class OrderStatusOption(Base):
     __tablename__ = "order_status_options"
 

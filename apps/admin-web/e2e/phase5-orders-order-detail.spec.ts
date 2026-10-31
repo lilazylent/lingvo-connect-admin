@@ -344,7 +344,7 @@ test("Phase 10.3 shows factual direct candidates and keeps manager selection man
   await card.getByRole("tab", { name: /Работы/ }).click();
   await card.getByRole("button", { name: "Изменить" }).first().click();
 
-  const matchingButton = card.getByRole("button", { name: "Подобрать исполнителя" });
+  const matchingButton = card.getByRole("button", { name: "Автоподбор" });
   await expect(matchingButton).toBeVisible();
   await matchingButton.click();
 

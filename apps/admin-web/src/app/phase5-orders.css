@@ -1150,3 +1150,67 @@
   .crm-wizard__head--summary .crm-wizard__title h2 { white-space: normal; }
   .deadline-time-field { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Paid package 2026-10-31 — work form as the DOCX v3 grid (4 columns; layout from the API). */
+.work-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--ui-space-3); min-width: 0; }
+.work-layout__row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--ui-space-3); align-items: start; min-width: 0; }
+.work-layout__cell { min-width: 0; }
+.work-layout__cell.span-2 { grid-column: span 2; }
+.work-layout__cell.span-4 { grid-column: 1 / -1; }
+.work-layout__cell .textarea { min-height: 44px; }
+.work-layout__cell .manual-switch { margin: 0; }
+.work-layout .service-form-intro { margin: 0; }
+
+.choice-pair { min-width: 0; margin: 0; padding: 0; border: 0; }
+.choice-pair__options { display: flex; flex-wrap: wrap; gap: var(--ui-space-2); }
+.choice-pair__option {
+  min-height: var(--ui-control-height);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  padding: 0 var(--ui-space-3);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--crm-surface);
+  color: var(--crm-text);
+  font-size: var(--ui-text-sm);
+  cursor: pointer;
+}
+.choice-pair__option.is-checked { border-color: var(--crm-accent); background: var(--crm-accent-soft); }
+.choice-pair__option input { width: 16px; height: 16px; margin: 0; accent-color: var(--crm-accent); }
+.choice-pair__option:has(input:focus-visible) { outline: 2px solid var(--crm-accent); outline-offset: 2px; }
+
+.discount-field { display: grid; gap: 4px; min-width: 0; }
+.discount-field__reset { justify-self: start; padding: 0; border: 0; background: none; color: var(--crm-accent); font-size: var(--ui-text-xs); cursor: pointer; }
+.discount-field__reset:focus-visible { outline: 2px solid var(--crm-accent); outline-offset: 2px; }
+
+.work-files { display: grid; gap: var(--ui-space-2); min-width: 0; }
+.file-drop.file-drop--compact { position: relative; min-height: 72px; padding: var(--ui-space-2) var(--ui-space-3); border-radius: var(--ui-radius-control); text-align: center; }
+.file-drop--compact strong { margin-top: 2px; font-weight: 500; }
+.work-files__list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.work-files__list li { display: flex; align-items: center; justify-content: space-between; gap: var(--ui-space-2); min-width: 0; padding: 6px 10px; border: 1px solid var(--crm-border); border-radius: var(--ui-radius-control); background: var(--crm-surface-raised); }
+.work-files__list li > div { display: grid; min-width: 0; }
+.work-files__list :is(strong, a) { overflow: hidden; color: var(--crm-text); font-size: var(--ui-text-sm); text-overflow: ellipsis; white-space: nowrap; }
+.work-files__list small { color: var(--crm-text-secondary); font-size: var(--ui-text-xs); }
+
+.work-timing { border-top: 1px solid var(--crm-border); padding-top: var(--ui-space-2); }
+.work-timing > summary { color: var(--crm-text-secondary); font-size: var(--ui-text-sm); cursor: pointer; }
+.work-timing > .work-layout__row { margin-top: var(--ui-space-2); }
+.work-final-volume { padding-top: var(--ui-space-3); border-top: 1px dashed var(--crm-border); }
+.work-final-volume__summary { display: grid; gap: 4px; align-self: center; }
+.work-final-volume__summary strong { color: var(--crm-text); font-size: var(--ui-text-sm); }
+.work-tariff-picker { display: grid; gap: 4px; min-width: 0; }
+.work-tariff-picker > .button { justify-self: start; }
+
+@media (max-width: 900px) {
+  .work-layout__row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .work-layout__cell.span-4 { grid-column: 1 / -1; }
+}
+@media (max-width: 620px) {
+  .work-layout__row { grid-template-columns: minmax(0, 1fr); }
+  .work-layout__cell.span-2 { grid-column: auto; }
+}
+/* the work grid may shrink to the wizard width (long service names, language placeholders) */
+.wizard-work-list { grid-template-columns: minmax(0, 1fr); }
+.wizard-work-list > .work-draft,
+.work-edit-module .work-draft { min-width: 0; }
