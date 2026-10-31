@@ -121,6 +121,19 @@ def test_client_documents_attach_to_a_work(client, create_user):
     assert sorted((f["original_name"], f["work_id"]) for f in files) == [("brief.txt", None), ("passport.txt", work_id)]
 
 
+def test_scan_is_priced_per_actual_page(client, create_user):
+    headers = setup(client, create_user)
+    assert client.post("/api/admin/crm/services", headers=headers, json={"code": "scan", "name": "Скан", "billing_mode": "PER_PAGE"}).status_code == 201
+    assert client.post("/api/admin/crm/tariffs", headers=headers, json={"service_code": "scan", "unit": "PER_PAGE", "amount": "40"}).status_code == 201
+    definition = next(s for s in client.get("/api/admin/crm/services").json() if s["code"] == "scan")["definition"]
+    assert definition["billing_unit"] == "PER_PAGE" and definition["layout"][0] == ["service:2", "page_count:2"]
+    order = _order(client, headers, works=[{"service_code": "scan", "page_count": 7, "character_count": 9000, "source_language": "Английский"}])
+    work = order["works"][0]
+    # pages as counted, no character conversion; fields of another service are not kept
+    assert (work["billing_unit"], D(work["page_count"]), D(work["price"])) == ("PER_PAGE", D("7"), D("280.00"))
+    assert work["character_count"] is None and work["source_language"] == ""
+
+
 def test_topic_dictionary_crud_without_duplicates(client, create_user):
     headers = setup(client, create_user)
     created = client.post("/api/admin/crm/topics", headers=headers, json={"name": "юридическая", "sort_order": 10})

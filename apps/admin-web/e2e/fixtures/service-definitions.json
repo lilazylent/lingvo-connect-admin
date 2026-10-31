@@ -635,12 +635,61 @@
   }
  },
  {
+  "id": "svc-scan",
+  "code": "scan",
+  "name": "Скан",
+  "billing_mode": "PER_PAGE",
+  "active": true,
+  "sort_order": 120,
+  "definition": {
+   "category": "layout",
+   "fields": [
+    "page_count",
+    "markup",
+    "discount",
+    "deadline",
+    "deadline_time",
+    "status",
+    "notes"
+   ],
+   "billing_unit": "PER_PAGE",
+   "allowed_billing_units": [
+    "PER_PAGE"
+   ],
+   "page_from_characters": false,
+   "matching_mode": "SERVICE_ONLY",
+   "supports_routing": false,
+   "labels": {
+    "page_count": "Количество страниц (фактических)"
+   },
+   "layout": [
+    [
+     "service:2",
+     "page_count:2"
+    ],
+    [
+     "markup",
+     "discount",
+     "tariff",
+     "price"
+    ],
+    [
+     "client_billable:2",
+     "status:2"
+    ],
+    [
+     "notes:4"
+    ]
+   ]
+  }
+ },
+ {
   "id": "svc-delivery",
   "code": "delivery",
   "name": "Доставка",
   "billing_mode": "FIXED",
   "active": true,
-  "sort_order": 120,
+  "sort_order": 130,
   "definition": {
    "category": "additional",
    "fields": [
@@ -692,7 +741,7 @@
   "name": "Аудирование",
   "billing_mode": "PER_SECOND",
   "active": true,
-  "sort_order": 130,
+  "sort_order": 140,
   "definition": {
    "category": "audio_video",
    "fields": [
@@ -736,7 +785,7 @@
   "name": "Транскрибация",
   "billing_mode": "CONDITIONAL_PAGE",
   "active": true,
-  "sort_order": 140,
+  "sort_order": 150,
   "definition": {
    "category": "audio_video",
    "fields": [
@@ -795,7 +844,7 @@
   "name": "Последовательный перевод",
   "billing_mode": "HOURLY",
   "active": true,
-  "sort_order": 150,
+  "sort_order": 160,
   "definition": {
    "category": "interpreting",
    "fields": [
@@ -867,7 +916,7 @@
   "name": "Синхронный перевод",
   "billing_mode": "HOURLY",
   "active": true,
-  "sort_order": 160,
+  "sort_order": 170,
   "definition": {
    "category": "interpreting",
    "fields": [

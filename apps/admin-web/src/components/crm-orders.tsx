@@ -2830,7 +2830,7 @@ function WorkDraft({
       case "page_count":
         return (
           <Input
-            label={pageFromCharacters ? "Количество условных страниц (А)" : "Количество страниц"}
+            label={pageFromCharacters ? "Количество условных страниц (А)" : label("page_count", "Количество страниц")}
             hint={pageFromCharacters ? "По количеству знаков: вверх до 0,1, минимум 1" : undefined}
             type="number"
             min="0"

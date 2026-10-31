@@ -201,6 +201,19 @@ SERVICE_DEFINITIONS: dict[str, dict[str, Any]] = {
         "supports_routing": False,
         "layout": [["service:2", "page_count:2"], *_SIMPLE_TAIL],
     },
+    # «Скан» (owner 2026-10-31): priced per actual page, same fields as «Распознавание».
+    # The service stays disabled until the owner activates it in the settings.
+    "scan": {
+        "category": "layout",
+        "fields": ["page_count", *_SIMPLE_FIELDS],
+        "billing_unit": "PER_PAGE",
+        "allowed_billing_units": ["PER_PAGE"],
+        "page_from_characters": False,
+        "matching_mode": "SERVICE_ONLY",
+        "supports_routing": False,
+        "labels": {"page_count": "Количество страниц (фактических)"},
+        "layout": [["service:2", "page_count:2"], *_SIMPLE_TAIL],
+    },
     "delivery": {
         "category": "additional",
         "fields": ["start_date", "start_time", *_SIMPLE_FIELDS],
