@@ -127,9 +127,15 @@ export function CrmStatistics() {
         <h1>Статистика</h1>
         <p>Заказы, выручка, выплаты исполнителям и прибыль по периодам, клиентам, исполнителям и услугам. Учитываются принятые заказы; рассчитанные и отменённые — нет.</p>
       </div>
-      <a className="button button--primary" href={apiDownloadUrl(`/api/admin/crm/statistics/export.xlsx?${apiParams}`)}>
-        <Icon name="download" size={17} /> Выгрузить в Excel
-      </a>
+      <div className="crm-statistics__exports">
+        {/* Oleg's reconciliation sheet: the underlined columns, one row per executor slice; same filters */}
+        <a className="button button--secondary" href={apiDownloadUrl(`/api/admin/crm/statistics/executor-reconciliation.xlsx?${apiParams}`)}>
+          <Icon name="download" size={17} /> Сверка с исполнителями
+        </a>
+        <a className="button button--primary" href={apiDownloadUrl(`/api/admin/crm/statistics/export.xlsx?${apiParams}`)}>
+          <Icon name="download" size={17} /> Выгрузить в Excel
+        </a>
+      </div>
     </header>
 
     <section className="phase5-orders-command crm-statistics__filters" aria-label="Фильтры статистики">

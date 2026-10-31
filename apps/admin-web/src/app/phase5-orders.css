@@ -1247,3 +1247,10 @@
   .payment-block__row,
   .payment-block__invoice > .payment-block__row { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Paid package 2026-10-31 — statistics: second export for reconciling with executors. */
+.crm-statistics__exports { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--ui-space-2); }
+@media (max-width: 620px) {
+  .crm-statistics__exports { justify-content: stretch; }
+  .crm-statistics__exports > .button { flex: 1 1 100%; justify-content: center; }
+}

@@ -1958,6 +1958,18 @@ def statistics_export(
     return _xlsx(crm_stats.workbook(ds, period), f"statistics_{date.today():%Y-%m-%d}.xlsx")
 
 
+@router.get("/statistics/executor-reconciliation.xlsx")
+def executor_reconciliation_export(
+    db: DB, context: Read, date_from: date | None = None, date_to: date | None = None,
+    client_id: str = "", executor_id: str = "", service_code: str = "",
+):
+    """Sheet for reconciling with translators: Oleg's underlined columns, one row per executor slice."""
+    period = f"{date_from:%d.%m.%y} — {date_to:%d.%m.%y}" if date_from and date_to else "весь период"
+    ds = _stats_dataset(db, date_from, date_to, client_id, executor_id, service_code, "")
+    rows = crm_stats.reconciliation_rows(db, ds, executor_id)
+    return _xlsx(crm_stats.reconciliation_workbook(rows, period), f"executor_reconciliation_{date.today():%Y-%m-%d}.xlsx")
+
+
 @router.get("/orders/{order_id}")
 def order_detail(order_id: str, db: DB, context: Read):
     order = db.get(Order, order_id)

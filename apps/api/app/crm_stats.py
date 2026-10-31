@@ -273,3 +273,67 @@ def workbook(ds: Dataset, title: str) -> bytes:
     buf = BytesIO()
     wb.save(buf)
     return buf.getvalue()
+
+
+# ---------------------------------------------------------------- executor reconciliation (paid package 2026-10-31)
+# The underlined headers of Oleg's order-registration sheet («Заказы 2026», row 2): the
+# executor's own slice of every work, one row per executor assignment.
+RECONCILIATION_HEADER = [
+    "№ заказа", "Дата", "Язык (с)", "Язык (на)", "Тематика", "Исполнитель", "Дата сдачи", "Комментарий",
+    "Ставка", "Кол-во знаков", "Кол-во стр.", "К оплате", "Наименование документа",
+]
+
+
+def reconciliation_rows(db: Session, ds: Dataset, executor_id: str = "") -> list[list]:
+    """Executor-side figures only (rate, volume and calculated payable amount — not «paid»).
+
+    Archived and cancelled works/assignments are left out; a routed work gives one row per
+    stage with the stage languages. Legacy works without assignment rows use their
+    single-executor fields.
+    """
+    works = [r.work for r in ds.works if r.work.status != "CANCELLED"]
+    orders = {r.order.id: r.order for r in ds.works}
+    work_ids = [w.id for w in works]
+    assignments = list(db.scalars(
+        select(ExecutorAssignment).where(ExecutorAssignment.work_id.in_(work_ids), ExecutorAssignment.archived.is_(False))
+        .order_by(ExecutorAssignment.sort_order)
+    ).all()) if work_ids else []
+    by_work: dict[str, list[ExecutorAssignment]] = defaultdict(list)
+    for a in assignments:
+        if a.status != "CANCELLED" and (not executor_id or a.executor_id == executor_id):
+            by_work[a.work_id].append(a)
+    names = {e.id: e.name for e in db.scalars(select(Executor)).all()}
+    rows: list[list] = []
+    for w in sorted(works, key=lambda item: (orders[item.order_id].created_at, orders[item.order_id].number, item.sort_order)):
+        order = orders[w.order_id]
+        common = [order.number, order.created_at.date()]
+        if any(a.work_id == w.id for a in assignments):
+            for a in by_work.get(w.id, []):
+                rows.append([
+                    *common, a.route_source_language or w.source_language, a.route_target_language or w.target_language,
+                    w.topic, names.get(a.executor_id, ""), a.deadline, a.notes, money(a.rate),
+                    a.character_count, Decimal(str(a.page_count)) if a.page_count is not None else None, money(a.cost), w.document_names,
+                ])
+        elif w.executor_id and (not executor_id or w.executor_id == executor_id):
+            rows.append([
+                *common, w.source_language, w.target_language, w.topic, names.get(w.executor_id, ""), w.executor_deadline, "",
+                money(w.executor_rate), w.character_count, Decimal(str(w.page_count)) if w.page_count is not None else None,
+                money(w.executor_cost), w.document_names,
+            ])
+    return rows
+
+
+def reconciliation_workbook(rows: list[list], title: str) -> bytes:
+    wb = Workbook()
+    ws = _sheet(wb, "Сверка с исполнителями", RECONCILIATION_HEADER, rows, [10, 11, 14, 14, 18, 26, 12, 30, 10, 13, 11, 13, 40], first=True)
+    for column in ("B", "G"):
+        for cell in ws[column][1:]:
+            cell.number_format = "DD.MM.YY"
+    info = wb.create_sheet("Параметры")
+    info.append(["Выборка", title])
+    info.append(["«К оплате»", "Расчётная сумма исполнителю по CRM; факт выплаты в этой выгрузке не отражается"])
+    info.column_dimensions["A"].width = 14
+    info.column_dimensions["B"].width = 90
+    buf = BytesIO()
+    wb.save(buf)
+    return buf.getvalue()

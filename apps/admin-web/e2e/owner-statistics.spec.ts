@@ -51,6 +51,8 @@ test("statistics page shows totals, breakdowns, URL filters and a filtered expor
   await expect(page.getByRole("tab", { name: "По месяцам" })).toHaveAttribute("aria-selected", "true");
   await expect(page.locator(".crm-statistics__table tbody")).toContainText("Сентябрь 2026");
   await expect(page.getByRole("link", { name: "Выгрузить в Excel" })).toHaveAttribute("href", /statistics\/export\.xlsx\?.*client_id=client-alpha/);
+  // paid package: the reconciliation sheet for executors uses the same filters
+  await expect(page.getByRole("link", { name: "Сверка с исполнителями" })).toHaveAttribute("href", /statistics\/executor-reconciliation\.xlsx\?.*client_id=client-alpha/);
   await page.getByRole("tab", { name: "По исполнителям" }).click();
   await expect(page.locator(".crm-statistics__table tbody")).toContainText("Мария Переводчик");
   if (process.env.CAPTURE_OWNER_QA) await page.screenshot({ path: "test-results/owner-statistics-light.png", fullPage: true });
