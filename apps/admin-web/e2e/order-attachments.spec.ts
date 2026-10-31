@@ -83,7 +83,7 @@ test("order wizard keeps every picked document and uploads all of them after cre
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/admin/orders");
   await page.getByRole("button", { name: /Новый заказ/ }).first().click();
-  await page.getByRole("button", { name: /03\s*Документы/ }).click();
+  await page.getByRole("button", { name: /02\s*Работы/ }).click();
   const input = page.locator(".document-step input[type=file]");
   await expect(input).toHaveAttribute("multiple", "");
 
@@ -95,7 +95,7 @@ test("order wizard keeps every picked document and uploads all of them after cre
   await page.getByRole("button", { name: "Убрать документ diploma.txt" }).click();
   await expect(page.locator(".analysis-result--file")).toHaveCount(2);
 
-  await page.getByRole("button", { name: /06\s*Проверка/ }).click();
+  await page.getByRole("button", { name: /05\s*Обзор/ }).click();
   await expect(page.getByText("Файлы (2) будут загружены")).toBeVisible();
   await page.getByRole("button", { name: "Создать заказ" }).click();
   await expect.poll(() => state.uploads).toEqual(["passport.txt", "contract.txt"]);

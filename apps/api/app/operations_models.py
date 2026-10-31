@@ -75,6 +75,12 @@ class Order(RecordMixin, Base):
         ForeignKey("applications.id", ondelete="RESTRICT"), nullable=True, unique=True
     )
     deadline: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # True when the owner set the order deadline in «Общее и Клиент»; otherwise the
+    # deadline is derived from the works (historical behaviour).
+    deadline_manual: Mapped[bool] = mapped_column(Boolean, default=False)
+    # '' = not specified (legacy), DURING_DAY = «в течение дня», BY = «до …», EXACT = «точно»
+    deadline_time_mode: Mapped[str] = mapped_column(String(16), default="")
+    deadline_time: Mapped[str] = mapped_column(String(5), default="")
     status: Mapped[str] = mapped_column(String(32), default="NEW", index=True)
     notes: Mapped[str] = mapped_column(Text, default="")
 

@@ -112,7 +112,7 @@ test("wizard prices template documents per document and offers the client tariff
   await page.goto("/admin/orders");
   await page.getByRole("button", { name: /Новый заказ/ }).click();
   const wizard = page.locator(".crm-wizard");
-  await wizard.getByLabel("Найти клиента").fill("Паспорт");
+  await wizard.getByLabel("Клиент", { exact: true }).fill("Паспорт");
   await page.getByRole("option", { name: /Паспортный стол/ }).first().click();
 
   await wizard.locator(".wizard-steps button").filter({ hasText: "02" }).click();
@@ -123,7 +123,7 @@ test("wizard prices template documents per document and offers the client tariff
   await expect(work.getByLabel("Количество знаков")).toHaveCount(0);
   await work.getByLabel("Количество документов").fill("2");
 
-  await wizard.locator(".wizard-steps button").filter({ hasText: "04" }).click();
+  await wizard.locator(".wizard-steps button").filter({ hasText: "03" }).click();
   await expect.poll(() => requests.find((r) => r.path.endsWith("/crm/pricing/options"))?.body).toContain('"client_id":"client-passport"');
   const quote = JSON.parse(requests.find((r) => r.path.endsWith("/crm/pricing/options"))!.body);
   expect(quote).toMatchObject({ certification_mode: "DOCUMENT", document_count: 2 });

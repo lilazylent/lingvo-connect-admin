@@ -286,7 +286,7 @@ test("Phase 07 aligns calculation controls and clarifies the Review finance summ
   await gotoWithCrmTheme(page, "/admin/orders", "dark");
   await page.getByRole("button", { name: /Новый заказ/ }).click();
   const wizard = page.locator(".crm-wizard");
-  await wizard.locator(".wizard-steps button").filter({ hasText: "04" }).click();
+  await wizard.locator(".wizard-steps button").filter({ hasText: "03" }).click();
   await expect(wizard.getByText("Ставка вручную", { exact: true })).toBeVisible();
 
   const labels = ["Тариф", "Единица тарифа", "Ставка вручную", "Ручной итог", "Авторасчёт"];
@@ -299,7 +299,7 @@ test("Phase 07 aligns calculation controls and clarifies the Review finance summ
   }
   expect(Math.max(...y) - Math.min(...y)).toBeLessThanOrEqual(8);
 
-  await wizard.locator(".wizard-steps button").filter({ hasText: "06" }).click();
+  await wizard.locator(".wizard-steps button").filter({ hasText: "05" }).click();
   await expect(wizard.locator(".review-hero")).toContainText("Стоимость для клиента");
   await expect(wizard.locator(".review-hero")).toContainText("Выплаты исполнителям");
   await expect(wizard.locator(".review-hero")).toContainText("Маржинальность");

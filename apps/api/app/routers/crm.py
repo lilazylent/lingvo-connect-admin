@@ -479,6 +479,10 @@ class WizardPayment(BaseModel):
     notes: str = Field(default="", max_length=5000)
 
 
+DeadlineTimeMode = Literal["", "DURING_DAY", "BY", "EXACT"]
+TIME_PATTERN = r"^$|^([01][0-9]|2[0-3]):[0-5][0-9]$"
+
+
 class WizardOrder(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
     title: str = Field(default="", max_length=200)
@@ -488,6 +492,10 @@ class WizardOrder(BaseModel):
     application_id: str | None = None
     status: str = Field(default="NEW", min_length=2, max_length=32, pattern=r"^[A-Z0-9_]+$")
     notes: str = Field(default="", max_length=10000)
+    # «Дата окончания» / «Время окончания» of the whole order (DOCX v3); empty = derive from works
+    deadline: date | None = None
+    deadline_time_mode: DeadlineTimeMode = ""
+    deadline_time: str = Field(default="", max_length=5, pattern=TIME_PATTERN)
     works: list[WizardWork] = Field(default_factory=list, max_length=100)
     payment: WizardPayment = Field(default_factory=WizardPayment)
     # owner may set the public number and the order date by hand; empty = automatic
@@ -506,6 +514,10 @@ class OrderCoreEdit(BaseModel):
     notes: str = Field(default="", max_length=10000)
     number: str | None = Field(default=None, max_length=32)   # None = keep current
     order_date: date | None = None                           # None = keep current
+    # sent only by forms that edit the order deadline (omitted = keep current)
+    deadline: date | None = None
+    deadline_time_mode: DeadlineTimeMode = ""
+    deadline_time: str = Field(default="", max_length=5, pattern=TIME_PATTERN)
     version: int = Field(ge=1)
 
 
@@ -710,8 +722,9 @@ def _sync_order_totals(db: Session, order: Order) -> None:
     works = db.scalars(
         select(OrderWork).where(OrderWork.order_id == order.id, OrderWork.archived.is_(False))
     ).all()
-    deadlines = [work.deadline for work in works if work.deadline]
-    order.deadline = max(deadlines) if deadlines else None
+    if not order.deadline_manual:
+        deadlines = [work.deadline for work in works if work.deadline]
+        order.deadline = max(deadlines) if deadlines else None
     order.updated_at = utcnow()
     order.version += 1
     payment = db.scalar(select(ClientPayment).where(ClientPayment.order_id == order.id))
@@ -1655,7 +1668,8 @@ def crm_orders(
     rows = db.scalars(
         select(Order)
         .where(*filters)
-        .order_by(Order.created_at.desc(), Order.id)
+        # YY-NNNN is zero-padded: string order is numeric order, newest number first
+        .order_by(Order.number.desc(), Order.created_at.desc(), Order.id)
         .offset((page - 1) * page_size)
         .limit(page_size)
     ).all()
@@ -1679,6 +1693,17 @@ def crm_orders(
         "page": page,
         "pages": max(1, (total + page_size - 1) // page_size),
     }
+
+
+def _deadline_mode(mode: str, time_value: str) -> str:
+    """«в течение дня» is the v3 default; «до»/«точно» without a time means «в течение дня»."""
+    if mode in {"BY", "EXACT"} and not time_value:
+        return "DURING_DAY"
+    return mode or "DURING_DAY"
+
+
+def _deadline_time(mode: str, time_value: str) -> str:
+    return time_value if mode in {"BY", "EXACT"} else ""
 
 
 def order_date_timestamp(day: date) -> datetime:
@@ -1708,7 +1733,7 @@ def create_order_wizard(payload: WizardOrder, db: DB, context: Write):
     if payload.application_id and db.scalar(select(Order).where(Order.application_id == payload.application_id)):
         raise HTTPException(409, "Для этой заявки уже создан заказ")
     deadlines = [w.deadline for w in payload.works if w.deadline]
-    order_deadline = max(deadlines) if deadlines else None
+    order_deadline = payload.deadline or (max(deadlines) if deadlines else None)
     number = (
         claim_explicit_order_number(db, payload.number)
         if payload.number and payload.number.strip()
@@ -1718,6 +1743,9 @@ def create_order_wizard(payload: WizardOrder, db: DB, context: Write):
         number=number, title=number, client_id=payload.client_id,
         contact_id=payload.contact_id, manager_id=payload.manager_id,
         application_id=payload.application_id, deadline=order_deadline,
+        deadline_manual=payload.deadline is not None,
+        deadline_time_mode=_deadline_mode(payload.deadline_time_mode, payload.deadline_time),
+        deadline_time=_deadline_time(payload.deadline_time_mode, payload.deadline_time),
         status=payload.status, notes=payload.notes,
     )
     if payload.order_date and payload.order_date != date.today():
@@ -1732,6 +1760,12 @@ def create_order_wizard(payload: WizardOrder, db: DB, context: Write):
         )
         db.add(work)
         db.flush()
+        if payload.deadline and not item.deadline:
+            # works without their own deadline follow the order deadline (matching uses it)
+            item = item.model_copy(update={
+                "deadline": payload.deadline,
+                "deadline_time": order.deadline_time if order.deadline_time_mode in {"BY", "EXACT"} else item.deadline_time,
+            })
         _apply_work_payload(db, work, item)
         if work.client_billable:
             total += Decimal(str(work.price))
@@ -1895,6 +1929,23 @@ def edit_order_core(order_id: str, payload: OrderCoreEdit, db: DB, context: Writ
     if payload.order_date and payload.order_date != order.created_at.date():
         order.created_at = order_date_timestamp(payload.order_date)
         changed.append("order_date")
+    if "deadline" in payload.model_fields_set:
+        mode = _deadline_mode(payload.deadline_time_mode, payload.deadline_time)
+        time_value = _deadline_time(payload.deadline_time_mode, payload.deadline_time)
+        current = (order.deadline if order.deadline_manual else None, order.deadline_time_mode, order.deadline_time)
+        if (payload.deadline, mode, time_value) != current:
+            order.deadline_manual = payload.deadline is not None
+            order.deadline_time_mode = mode
+            order.deadline_time = time_value
+            if payload.deadline is not None:
+                order.deadline = payload.deadline
+            else:
+                # cleared by the owner: back to the deadline derived from the works
+                deadlines = [w.deadline for w in db.scalars(
+                    select(OrderWork).where(OrderWork.order_id == order.id, OrderWork.archived.is_(False))
+                ).all() if w.deadline]
+                order.deadline = max(deadlines) if deadlines else None
+            changed.append("deadline")
     for field in ("client_id", "contact_id", "manager_id", "notes"):
         value = getattr(payload, field)
         if getattr(order, field) != value:

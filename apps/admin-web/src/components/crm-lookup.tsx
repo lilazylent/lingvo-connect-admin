@@ -3,7 +3,7 @@
 import { useEffect, useId, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 
-type LookupItem = {
+export type LookupItem = {
   id: string;
   name: string;
   email?: string;
@@ -23,7 +23,8 @@ export function CrmLookup({ label, path, value, onChange, disabled = false, plac
   label: string;
   path: string;
   value: string;
-  onChange: (id: string) => void;
+  // the chosen record is passed along so callers can show its name without another request
+  onChange: (id: string, item?: LookupItem | null) => void;
   disabled?: boolean;
   placeholder?: string;
   createOptions?: LookupCreateOption[];
@@ -69,7 +70,7 @@ export function CrmLookup({ label, path, value, onChange, disabled = false, plac
   };
   const choose = (item: LookupItem) => {
     setSelected(item);
-    onChange(item.id);
+    onChange(item.id, item);
     setQuery("");
     setOpen(false);
   };
@@ -113,7 +114,7 @@ export function CrmLookup({ label, path, value, onChange, disabled = false, plac
             else if (e.key === "Escape") setOpen(false);
           }}
         />
-        {value && <button type="button" className="crm-combobox__clear" aria-label={`Очистить поле ${label}`} onClick={() => { onChange(""); setSelected(null); setQuery(""); setOpen(false); }}>×</button>}
+        {value && <button type="button" className="crm-combobox__clear" aria-label={`Очистить поле ${label}`} onClick={() => { onChange("", null); setSelected(null); setQuery(""); setOpen(false); }}>×</button>}
       </div>
       {selectedLabel && <span className="crm-combobox__selected">Выбрано: <strong>{selectedLabel}</strong></span>}
       {error && <span className="field__error">{error}</span>}

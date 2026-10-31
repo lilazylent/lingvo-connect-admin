@@ -20,6 +20,7 @@ import {
 } from "./ui";
 import { CrmLookup, type LookupCreateOption } from "./crm-lookup";
 import { LanguageCombobox } from "./language-combobox";
+import { useAuth } from "./auth-provider";
 import { OrderRecords } from "./crm-order-records";
 import { Icon, Pictogram } from "./icons";
 
@@ -55,6 +56,9 @@ type Order = {
   manager_id: string | null;
   application_id: string | null;
   deadline: string | null;
+  deadline_manual?: boolean;
+  deadline_time_mode?: DeadlineTimeMode;
+  deadline_time?: string;
   status: string;
   notes: string;
   version: number;
@@ -65,6 +69,7 @@ type Order = {
   manager_name?: string;
   financial?: Financial;
 };
+type DeadlineTimeMode = "" | "DURING_DAY" | "BY" | "EXACT";
 type ExecutorAssignment = {
   id: string;
   executor_id: string;
@@ -669,6 +674,43 @@ const contactCreateOptions = (clientId: string): LookupCreateOption[] => [
   { label: (name) => `Добавить контакт «${name}»`, create: (name) => api<{ id: string; name: string }>(`/api/admin/companies/${clientId}/representatives`, { method: "POST", body: JSON.stringify({ name }) }) },
 ];
 const orderDateValue = (createdAt: string | null | undefined) => (createdAt ? new Date(createdAt).toLocaleDateString("sv-SE") : "");
+// DOCX v3 «Время окончания»: «в течение дня» (default) / «до …» / «точно»
+const deadlineTimeModes = [
+  ["DURING_DAY", "В течение дня"],
+  ["BY", "До …"],
+  ["EXACT", "Точно"],
+] as const;
+const deadlineTimeLabel = (mode: DeadlineTimeMode | undefined, time: string | undefined) =>
+  mode === "BY" && time ? `до ${time}` : mode === "EXACT" && time ? `точно в ${time}` : mode === "DURING_DAY" || mode === "BY" || mode === "EXACT" ? "в течение дня" : "";
+
+function DeadlineTimeField({ mode, time, onChange }: { mode: DeadlineTimeMode; time: string; onChange: (mode: DeadlineTimeMode, time: string) => void }) {
+  const needsTime = mode === "BY" || mode === "EXACT";
+  return (
+    <div className="deadline-time-field">
+      <Select label="Время окончания" value={mode || "DURING_DAY"} onChange={(e) => onChange(e.target.value as DeadlineTimeMode, e.target.value === "DURING_DAY" ? "" : time)}>
+        {deadlineTimeModes.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+      </Select>
+      {needsTime && (
+        <Input label={mode === "BY" ? "До, время" : "Точно, время"} type="time" value={time} onChange={(e) => onChange(mode, e.target.value)} />
+      )}
+    </div>
+  );
+}
+
+// Compact facts of the order in the wizard header, right of «Регистрация заказа»
+// (owner correction: one top area, not a separate sidebar). Values come from the step-1 state.
+function OrderHeaderSummary({ items }: { items: { label: string; value: string; hint?: string }[] }) {
+  return (
+    <dl className="order-header-summary" aria-label="Сводка заказа">
+      {items.map((item) => (
+        <div key={item.label} className={item.value ? "" : "is-empty"}>
+          <dt>{item.label}</dt>
+          <dd title={item.hint}>{item.value || "—"}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
 const ASSIGNMENT_VOLUME_KEYS = ["character_count", "page_count", "document_count", "duration_seconds", "hour_count"] as const;
 const emptyAssignment = (): DraftExecutorAssignment => ({
   key: newKey(),
@@ -1392,12 +1434,22 @@ function OrderWizard({
   onClose: () => void;
   onCreated: (id: string, uploadError?: string) => void;
 }) {
+  const user = useAuth().state?.user;
   const [step, setStep] = useState(1);
   const [client, setClient] = useState("");
   const [contact, setContact] = useState("");
-  const [manager, setManager] = useState("");
+  // display names of the chosen records (for the header summary only)
+  const [clientName, setClientName] = useState("");
+  const [contactName, setContactName] = useState("");
+  // Ответственный (А/РС): a manual choice (including «Не назначен») wins, then the
+  // application's responsible manager, then the current employee (new orders only)
+  const [managerChoice, setManagerChoice] = useState<string | null>(null);
+  const [applicationManager, setApplicationManager] = useState("");
   const [notes, setNotes] = useState("");
   const [status, setStatus] = useState("NEW");
+  const [deadline, setDeadline] = useState("");
+  const [deadlineMode, setDeadlineMode] = useState<DeadlineTimeMode>("DURING_DAY");
+  const [deadlineTime, setDeadlineTime] = useState("");
   const [works, setWorks] = useState<DraftWork[]>([emptyWork()]);
   const [services, setServices] = useState<Service[]>([]);
   const [managers, setManagers] = useState<UserSummary[]>([]);
@@ -1443,22 +1495,21 @@ function OrderWizard({
     }>(`/api/admin/applications/${applicationId}`)
       .then((a) => {
         setNotes(a.internal_summary || a.message);
-        setManager(a.responsible_manager?.id || "");
-        if (a.desired_date)
-          setWorks((ws) =>
-            ws.map((w, i) =>
-              i === 0 ? { ...w, deadline: a.desired_date || "" } : w,
-            ),
-          );
+        // the application's responsible manager is more specific than the current user
+        setApplicationManager(a.responsible_manager?.id || "");
+        if (a.desired_date) setDeadline((current) => current || a.desired_date || "");
       })
       .catch((e) => setError(e.message));
   }, [applicationId]);
+  const currentManager = user && managers.some((item) => item.id === user.id) ? user.id : "";
+  const manager = managerChoice ?? (applicationManager || currentManager);
   const draftExecutionYear = useMemo(() => {
-    const years = works
-      .map((work) => (work.deadline ? Number(work.deadline.slice(0, 4)) : 0))
+    // the backend numbers by the order deadline when it is set, else by the latest work deadline
+    const years = (deadline ? [deadline] : works.map((work) => work.deadline))
+      .map((value) => (value ? Number(value.slice(0, 4)) : 0))
       .filter((year) => Number.isInteger(year) && year >= 2000 && year <= 9999);
     return years.length ? Math.max(...years) : null;
-  }, [works]);
+  }, [works, deadline]);
   useEffect(() => {
     let controller: AbortController | undefined;
     const timer = window.setTimeout(() => {
@@ -1694,6 +1745,9 @@ function OrderWizard({
         // an untouched field keeps automatic numbering (no race between two open wizards)
         number: manualNumber.trim() && manualNumber.trim() !== orderNumberPreview ? manualNumber.trim() : null,
         order_date: orderDate || null,
+        deadline: deadline || null,
+        deadline_time_mode: deadlineMode,
+        deadline_time: deadlineMode === "DURING_DAY" ? "" : deadlineTime,
         works: works.map((w) => ({
           service_code: w.service_code,
           work_type: w.work_type,
@@ -1780,7 +1834,7 @@ function OrderWizard({
     }
   }
   useEffect(() => {
-    if (step !== 4) return;
+    if (step !== 3) return;
     works.forEach((w) => {
       if (
         w.service_code &&
@@ -1794,28 +1848,38 @@ function OrderWizard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
   const canNext = true;
+  const stepLabels = ["Общее и Клиент", "Работы", "Расчёт", "Исполнители", "Обзор"];
+  const typedNumber = manualNumber.trim();
+  const numberIsManual = Boolean(typedNumber && typedNumber !== orderNumberPreview);
+  const deadlineSummary = [formatCrmDate(deadline, ""), deadline ? deadlineTimeLabel(deadlineMode, deadlineTime) : ""].filter(Boolean).join(", ");
   return (
     <section className="crm-wizard" ref={wizardRef} tabIndex={-1} aria-label="Регистрация заказа">
-      <header className="crm-wizard__head">
-        <div>
-          <span className="overline">Новый заказ{orderNumberPreview ? ` · ${manualNumber || orderNumberPreview}` : ""}</span>
+      <header className="crm-wizard__head crm-wizard__head--summary">
+        <div className="crm-wizard__title">
+          <span className="overline">Новый заказ</span>
           <h2>Регистрация заказа</h2>
-          <p>Шесть коротких шагов вместо одной длинной формы.</p>
         </div>
-        <Button variant="quiet" onClick={onClose}>
+        <OrderHeaderSummary
+          items={[
+            {
+              label: numberIsManual ? "Номер" : "Номер · предв.",
+              value: numberIsManual ? typedNumber : orderNumberPreview,
+              hint: numberIsManual ? undefined : "Следующий свободный номер; закрепляется при создании заказа",
+            },
+            { label: "Дата", value: formatCrmDate(orderDate, "") },
+            { label: "Клиент", value: client ? clientName : "" },
+            { label: "Контактное лицо", value: contact ? contactName : "" },
+            { label: "Срок", value: deadlineSummary },
+            { label: "Статус", value: statusLabel(status, statuses) },
+          ]}
+        />
+        <Button variant="quiet" className="crm-wizard__close" onClick={onClose}>
           Закрыть
         </Button>
       </header>
       {error && <ErrorState message={error} />}
       <nav className="wizard-steps">
-        {[
-          "Клиент",
-          "Работы",
-          "Документы",
-          "Расчёт",
-          "Исполнители",
-          "Проверка",
-        ].map((label, i) => (
+        {stepLabels.map((label, i) => (
           <button
             key={label}
             className={
@@ -1830,35 +1894,12 @@ function OrderWizard({
       </nav>
       <div className="wizard-panel">
         {step === 1 && (
-          <div className="wizard-grid">
+          <div className="order-general-step">
             <div className="wizard-draft-note">
               Можно перейти дальше и создать заказ с любым объёмом известной
               информации — недостающие данные редактируются позже.
             </div>
-            <CrmLookup
-              label="Найти клиента"
-              placeholder="Имя, компания, телефон или email"
-              path="/api/admin/companies"
-              value={client}
-              onChange={(id) => {
-                setClient(id);
-                // the client may have its own price list: quotes are recalculated for the new client
-                setWorks((items) => items.map((item) => (item.manualPrice ? item : { ...item, ...resetQuotePatch })));
-                setContact("");
-              }}
-              createOptions={clientCreateOptions}
-            />
-            {client && (
-              <CrmLookup
-                label="Контактное лицо"
-                placeholder="Имя, должность, телефон или email"
-                path={`/api/admin/companies/${client}/representatives`}
-                value={contact}
-                onChange={setContact}
-                createOptions={contactCreateOptions(client)}
-              />
-            )}
-            <div className="wizard-number-row">
+            <div className="order-general-grid">
               <Input
                 label="Номер заказа"
                 value={manualNumber || orderNumberPreview}
@@ -1866,38 +1907,80 @@ function OrderWizard({
                 hint={manualNumber && manualNumber !== orderNumberPreview ? `Автоматический номер: ${orderNumberPreview}` : "Подставлен автоматически, можно изменить"}
                 placeholder="ГГ-NNNN"
               />
-              <Input label="Дата заказа" type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} />
-            </div>
-            <Select
-              label="Ответственный"
-              value={manager}
-              onChange={(e) => setManager(e.target.value)}
-            >
-              <option value="">Не назначен</option>
-              {managers.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.display_name}
-                </option>
-              ))}
-            </Select>
-            <Select
-              label="Статус"
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-            >
-              {statuses
-                .filter((s) => s.active && s.board === "MAIN")
-                .map((s) => (
-                  <option key={s.code} value={s.code}>
-                    {s.name}
+              <Input label="Дата заказа" type="date" value={orderDate} hint="По умолчанию — дата заполнения" onChange={(e) => setOrderDate(e.target.value)} />
+              <Select
+                label="Статус"
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+              >
+                {statuses
+                  .filter((s) => s.active && s.board === "MAIN")
+                  .map((s) => (
+                    <option key={s.code} value={s.code}>
+                      {s.name}
+                    </option>
+                  ))}
+              </Select>
+              <CrmLookup
+                label="Клиент"
+                placeholder="Имя, компания, телефон или email"
+                path="/api/admin/companies"
+                value={client}
+                onChange={(id, item) => {
+                  setClient(id);
+                  setClientName(item?.name || "");
+                  // the client may have its own price list: quotes are recalculated for the new client
+                  setWorks((items) => items.map((item) => (item.manualPrice ? item : { ...item, ...resetQuotePatch })));
+                  setContact("");
+                  setContactName("");
+                }}
+                createOptions={clientCreateOptions}
+              />
+              {client ? (
+                <CrmLookup
+                  key={client}
+                  label="Контактное лицо"
+                  placeholder="Имя, должность, телефон или email"
+                  path={`/api/admin/companies/${client}/representatives`}
+                  value={contact}
+                  onChange={(id, item) => {
+                    setContact(id);
+                    setContactName(item?.name || "");
+                  }}
+                  createOptions={contactCreateOptions(client)}
+                />
+              ) : (
+                <Input label="Контактное лицо" value="" disabled placeholder="Сначала выберите клиента" onChange={() => undefined} />
+              )}
+              <Select
+                label="Ответственный"
+                value={manager}
+                hint="По умолчанию — тот, кто заполняет заказ"
+                onChange={(e) => setManagerChoice(e.target.value)}
+              >
+                <option value="">Не назначен</option>
+                {managers.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.display_name}
                   </option>
                 ))}
-            </Select>
-            <Textarea
-              label="Внутренний комментарий"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
+              </Select>
+              <Input label="Дата окончания" type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+              <DeadlineTimeField
+                mode={deadlineMode}
+                time={deadlineTime}
+                onChange={(mode, time) => {
+                  setDeadlineMode(mode);
+                  setDeadlineTime(time);
+                }}
+              />
+              <Textarea
+                label="Комментарий"
+                rows={2}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+            </div>
             <Link className="client-directory-action" href="/admin/clients">
               ＋ Быстро добавить клиента в справочник ↗
             </Link>
@@ -1934,7 +2017,7 @@ function OrderWizard({
             </Button>
           </div>
         )}
-        {step === 3 && (
+        {step === 2 && (
           <div className="document-step">
             <label className="file-drop">
               <input
@@ -1986,7 +2069,7 @@ function OrderWizard({
             </p>
           </div>
         )}
-        {step === 4 && (
+        {step === 3 && (
           <div className="pricing-step">
             {works.map((w, i) => {
               const service = services.find((item) => item.code === w.service_code);
@@ -2261,7 +2344,7 @@ function OrderWizard({
             </div>
           </div>
         )}
-        {step === 5 && (
+        {step === 4 && (
           <div className="executor-step">
             {works.map((w, i) => (
               <article className="executor-row" key={w.key}>
@@ -2283,7 +2366,7 @@ function OrderWizard({
             ))}
           </div>
         )}
-        {step === 6 && (
+        {step === 5 && (
           <div className="review-step">
             <div className="review-hero">
               <div>
@@ -2366,8 +2449,8 @@ function OrderWizard({
         >
           ← Назад
         </Button>
-        <span>Шаг {step} из 6</span>
-        {step < 6 && (
+        <span>Шаг {step} из {stepLabels.length}</span>
+        {step < stepLabels.length && (
           <Button disabled={!canNext || busy} onClick={() => setStep(step + 1)}>
             Продолжить →
           </Button>
@@ -3449,6 +3532,19 @@ function draftFromWork(work: Work): DraftWork {
 }
 
 
+const detailDraftFrom = (order: Order | null) => ({
+  client_id: order?.client_id ?? "",
+  contact_id: order?.contact_id ?? "",
+  manager_id: order?.manager_id ?? "",
+  notes: order?.notes ?? "",
+  number: order?.number ?? "",
+  order_date: orderDateValue(order?.created_at),
+  deadline: order?.deadline ?? "",
+  deadline_time_mode: (order?.deadline_time_mode || "DURING_DAY") as DeadlineTimeMode,
+  deadline_time: order?.deadline_time ?? "",
+  deadline_touched: false,
+});
+
 type WorkEditorState = {
   mode: "new" | "edit";
   workId?: string;
@@ -3492,14 +3588,7 @@ function OrderCard({
   const workEditorRef = useRef<HTMLElement>(null);
   // keyed by the opened work, so draft edits re-render without scrolling again
   useRevealOnOpen(workEditorRef, activeTab === "works" && workEditor ? `${workEditor.mode}:${workEditor.workId ?? ""}:${workEditor.openedAt ?? 0}` : null);
-  const [detailDraft, setDetailDraft] = useState({
-    client_id: "",
-    contact_id: "",
-    manager_id: "",
-    notes: "",
-    number: "",
-    order_date: "",
-  });
+  const [detailDraft, setDetailDraft] = useState(() => detailDraftFrom(null));
 
   const load = useCallback(async () => {
     try {
@@ -3513,14 +3602,7 @@ function OrderCard({
         paid_at: detail.payment?.paid_at ?? "",
         notes: detail.payment?.notes ?? "",
       });
-      setDetailDraft({
-        client_id: detail.client_id ?? "",
-        contact_id: detail.contact_id ?? "",
-        manager_id: detail.manager_id ?? "",
-        notes: detail.notes ?? "",
-        number: detail.number ?? "",
-        order_date: orderDateValue(detail.created_at),
-      });
+      setDetailDraft(detailDraftFrom(detail));
       setError("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось загрузить заказ");
@@ -3729,6 +3811,14 @@ function OrderCard({
           notes: detailDraft.notes,
           number: detailDraft.number.trim() && detailDraft.number.trim() !== order.number ? detailDraft.number.trim() : null,
           order_date: detailDraft.order_date && detailDraft.order_date !== orderDateValue(order.created_at) ? detailDraft.order_date : null,
+          // the deadline keys are sent only when edited: otherwise the backend keeps it as is
+          ...(detailDraft.deadline_touched
+            ? {
+                deadline: detailDraft.deadline || null,
+                deadline_time_mode: detailDraft.deadline_time_mode || "DURING_DAY",
+                deadline_time: detailDraft.deadline_time_mode === "BY" || detailDraft.deadline_time_mode === "EXACT" ? detailDraft.deadline_time : "",
+              }
+            : {}),
           version: order.version,
         }),
       });
@@ -4011,8 +4101,22 @@ function OrderCard({
                     onChange={(e) => setDetailDraft({ ...detailDraft, order_date: e.target.value })}
                   />
                 </div>
+                <div className="wizard-number-row">
+                  <Input
+                    label="Дата окончания"
+                    type="date"
+                    value={detailDraft.deadline}
+                    hint={order.deadline_manual || detailDraft.deadline_touched ? undefined : "Сейчас — по самому позднему сроку работ"}
+                    onChange={(e) => setDetailDraft({ ...detailDraft, deadline: e.target.value, deadline_touched: true })}
+                  />
+                  <DeadlineTimeField
+                    mode={detailDraft.deadline_time_mode || "DURING_DAY"}
+                    time={detailDraft.deadline_time}
+                    onChange={(mode, time) => setDetailDraft({ ...detailDraft, deadline_time_mode: mode, deadline_time: time, deadline_touched: true })}
+                  />
+                </div>
                 <Textarea
-                  label="Внутренний комментарий"
+                  label="Комментарий"
                   value={detailDraft.notes}
                   onChange={(e) =>
                     setDetailDraft({ ...detailDraft, notes: e.target.value })
@@ -4028,14 +4132,7 @@ function OrderCard({
                 variant="quiet"
                 onClick={() => {
                   setDetailsEdit(false);
-                  setDetailDraft({
-                    client_id: order.client_id ?? "",
-                    contact_id: order.contact_id ?? "",
-                    manager_id: order.manager_id ?? "",
-                    notes: order.notes ?? "",
-                    number: order.number ?? "",
-                    order_date: orderDateValue(order.created_at),
-                  });
+                  setDetailDraft(detailDraftFrom(order));
                 }}
               >
                 Отмена
@@ -4057,8 +4154,8 @@ function OrderCard({
               <strong>{order.manager_name || "Не назначен"}</strong>
             </div>
             <div>
-              <span>Дедлайн</span>
-              <strong>{formatCrmDate(order.deadline, "Не указан")}</strong>
+              <span>Дата окончания</span>
+              <strong>{[formatCrmDate(order.deadline, "Не указана"), order.deadline ? deadlineTimeLabel(order.deadline_time_mode, order.deadline_time) : ""].filter(Boolean).join(", ")}</strong>
             </div>
             <div>
               <span>Создан</span>

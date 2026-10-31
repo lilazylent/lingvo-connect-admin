@@ -170,22 +170,19 @@ test("manual character count survives document analysis and is editable on «Р�
   const work = wizard.locator(".work-draft").first();
   await pick(page, work, "Услуга", "Письменный перевод");
 
-  // the analysed value is marked «А»
-  await wizard.locator(".wizard-steps button").filter({ hasText: "03" }).click();
+  // the analysed value is marked «А» (documents are attached on the «Работы» step)
   await wizard.locator(".file-drop input[type=file]").setInputFiles({ name: "contract.txt", mimeType: "text/plain", buffer: Buffer.from("x") });
   await expect(wizard.locator(".analysis-result")).toContainText("5");
-  await wizard.locator(".wizard-steps button").filter({ hasText: "02" }).click();
   await expect(work.getByLabel("Количество знаков (А)")).toHaveValue("5000");
 
   // the manager corrects it («З»); a later document no longer overwrites the correction
   await work.getByLabel("Количество знаков (А)").fill("4100");
   await expect(work.getByLabel("Количество знаков (З)")).toHaveValue("4100");
-  await wizard.locator(".wizard-steps button").filter({ hasText: "03" }).click();
   await wizard.locator(".file-drop input[type=file]").setInputFiles({ name: "annex.txt", mimeType: "text/plain", buffer: Buffer.from("y") });
   await expect(wizard.locator(".analysis-result")).toHaveCount(2);
 
   // «Расчёт» shows the manual value and allows correcting it again; pages follow
-  await wizard.locator(".wizard-steps button").filter({ hasText: "04" }).click();
+  await wizard.locator(".wizard-steps button").filter({ hasText: "03" }).click();
   const row = wizard.locator(".price-row").first();
   await expect(row.getByLabel("Количество знаков (З)")).toHaveValue("4100");
   await row.getByLabel("Количество знаков (З)").fill("9000");

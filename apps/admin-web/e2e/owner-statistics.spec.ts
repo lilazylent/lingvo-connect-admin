@@ -105,7 +105,7 @@ test("new order wizard creates a typed client inline and keeps the number editab
   await page.getByLabel("Номер заказа").fill("26-0800");
   await expect(page.getByText("Автоматический номер: 26-0670")).toBeVisible();
   await expect(page.getByLabel("Дата заказа")).toHaveValue(/^\d{4}-\d{2}-\d{2}$/);
-  await page.getByLabel("Найти клиента").fill("Новый клиент Олега");
+  await page.getByLabel("Клиент", { exact: true }).fill("Новый клиент Олега");
   const create = page.getByRole("button", { name: /Создать частное лицо «Новый клиент Олега»/ });
   await expect(create).toBeVisible();
   if (process.env.CAPTURE_OWNER_QA) await page.screenshot({ path: "test-results/owner-wizard-create.png" });
