@@ -1214,3 +1214,36 @@
 .wizard-work-list { grid-template-columns: minmax(0, 1fr); }
 .wizard-work-list > .work-draft,
 .work-edit-module .work-draft { min-width: 0; }
+
+/* Paid package 2026-10-31 — payment block of «Расчёт» (DOCX v3 tables 18–20). */
+.payment-block { display: grid; gap: var(--ui-space-3); min-width: 0; }
+.payment-block__row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--ui-space-3); align-items: start; min-width: 0; }
+.payment-block__row > * { min-width: 0; }
+.payment-block__row--details { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.payment-block__value { display: grid; gap: 4px; min-width: 0; padding: 8px 12px; border: 1px solid var(--crm-border); border-radius: var(--ui-radius-control); background: var(--crm-surface-raised); }
+.payment-block__value span { color: var(--crm-text-secondary); font-size: var(--ui-text-xs); }
+.payment-block__value strong { overflow-wrap: anywhere; color: var(--crm-text); font-size: var(--ui-text-md); }
+.payment-block__value small { color: var(--crm-text-secondary); font-size: var(--ui-text-xs); }
+.payment-block__value--notes strong { font-size: var(--ui-text-sm); font-weight: 500; white-space: pre-line; }
+.payment-block__value--remaining.is-open strong { color: var(--crm-warning-text); }
+.payment-block__invoice > summary { color: var(--crm-text-secondary); font-size: var(--ui-text-sm); cursor: pointer; }
+.payment-block__invoice > .payment-block__row { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: var(--ui-space-2); }
+.payment-block__invoice > small { display: block; margin-top: 4px; color: var(--crm-text-secondary); font-size: var(--ui-text-xs); }
+.payment-block__invoice-line { margin: 0; color: var(--crm-text-secondary); font-size: var(--ui-text-sm); }
+/* inside the order card the legacy `.order-side-card > div` row style must not apply */
+.order-side-card > .payment-block,
+.order-side-card > .payment-edit__actions { padding: 0; border-bottom: 0; font-size: inherit; }
+.order-side-card > .payment-block { display: grid; }
+.order-side-card > .payment-edit__actions { display: flex; justify-content: flex-end; gap: var(--ui-space-2); margin-top: var(--ui-space-3); }
+.order-side-card .payment-block__value span { color: var(--crm-text-secondary); }
+.order-side-card .payment-block__value strong { color: var(--crm-text); text-align: left; }
+.order-side-card .payment-block__value--remaining.is-open strong { color: var(--crm-warning-text); }
+
+@media (max-width: 900px) {
+  .payment-block__row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .payment-block__row--details { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 430px) {
+  .payment-block__row,
+  .payment-block__invoice > .payment-block__row { grid-template-columns: minmax(0, 1fr); }
+}

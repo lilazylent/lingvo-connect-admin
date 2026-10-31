@@ -261,3 +261,163 @@ for (const width of [1280, 390]) {
     if (process.env.CAPTURE_OWNER_QA) await work.screenshot({ path: `../../test-results/paid-v3/work-written-${width}.png` });
   });
 }
+
+// ---------------------------------------------------------------- S3: payment layouts, tariff choice, volumes
+const option = (key: string, extra: Record<string, unknown> = {}) => ({
+  key, tariff_ids: [key], resolution: "direct", rate: 500, unit: "PER_DOCUMENT", amount: 1000, quantity: 2, base_amount: 1000,
+  surcharge_multiplier: 1, before_discount: 1000, discount_percent: 0, discount_amount: 0, source_language: "", target_language: "",
+  directions: [], components: [], is_auto: true, ...extra,
+});
+
+test("«Расчёт»: cash and deposit layouts share one payment state", async ({ page }) => {
+  const requests: Request[] = [];
+  const wizard = await openWizard(page, requests, {
+    services,
+    extra: (path) =>
+      path.endsWith("/companies/client-1/deposit") ? { company_id: "client-1", balance: 300, transactions: [] }
+        : path.endsWith("/crm/pricing/options") ? { options: [option("t-apostille")], auto_key: "t-apostille", resolution: "direct", message: "" }
+          : undefined,
+  });
+  await wizard.getByLabel("Клиент", { exact: true }).fill("Спектр");
+  await page.getByRole("option", { name: /ООО Спектр/ }).click();
+  await wizard.locator(".wizard-steps button").filter({ hasText: "02" }).click();
+  const work = wizard.locator(".work-draft").first();
+  await pick(page, work, "Услуга", "Апостиль");
+  await work.getByLabel("Количество документов").fill("2");
+  await wizard.locator(".wizard-steps button").filter({ hasText: "03" }).click();
+
+  const block = wizard.locator(".payment-block");
+  await expect(block.getByLabel("Способ оплаты")).toContainText("Не выбран");
+  await expect(block).toContainText("Стоимость заказа, р.");
+  await expect(block).toContainText("1 000 ₽");
+  await block.getByLabel("Оплачено, р.").fill("200");
+  await expect(block.locator(".payment-block__value--remaining")).toContainText("500 ₽");
+  // invoice number/date stay available but folded away
+  await expect(block.locator(".payment-block__invoice")).not.toHaveAttribute("open", "");
+
+  await pick(page, block, "Способ оплаты", "Депозит");
+  await expect(block.getByLabel("Оплачено, р.")).toHaveCount(0);
+  await expect(block).toContainText("Депозит, р.");
+  await expect(block).toContainText("300 ₽");
+  await block.getByLabel("Комментарий").fill("Счёт 757 от 28.01 — 300 р. из депозита");
+  await pick(page, block, "Способ оплаты", "Безналичный расчёт");
+  // switching the layout keeps the same values
+  await expect(block.getByLabel("Оплачено, р.")).toHaveValue("200");
+  await pick(page, block, "Способ оплаты", "Депозит");
+  if (process.env.CAPTURE_OWNER_QA) await block.screenshot({ path: "../../test-results/paid-v3/payment-deposit.png" });
+
+  await wizard.locator(".wizard-steps button").filter({ hasText: "05" }).click();
+  await wizard.getByRole("button", { name: "Создать заказ" }).click();
+  await expect.poll(() => requests.find((r) => r.path.endsWith("/crm/orders/wizard"))?.body).toBeTruthy();
+  expect(JSON.parse(requests.find((r) => r.path.endsWith("/crm/orders/wizard"))!.body).payment).toMatchObject({
+    payment_method: "deposit", amount_paid: 200, notes: "Счёт 757 от 28.01 — 300 р. из депозита", invoice_number: "",
+  });
+});
+
+const cardWork = {
+  id: "work-1", work_type: "written_translation", service_code: "written_translation", source_language: "Английский", target_language: "Русский",
+  topic: "", character_count: 3600, character_count_source: "AUTO", measured_character_count: 3600, final_character_count: null, final_volume_at: null,
+  page_count: 2, word_count: null, document_count: null, duration_seconds: null, hour_count: null, billing_unit: "CONDITIONAL_PAGE",
+  client_rate: 500, auto_price: 1000, price: 1000, urgent: false, urgency_multiplier: 1, native_speaker: false, discount_percent: 0, discount_overridden: false,
+  price_overridden: false, price_override_reason: "", client_billable: true, deadline: "2026-11-10", deadline_time: "", start_date: null, start_time: "",
+  document_names: "", document_names_source: "", certification_mode: "CHARACTERS", tariff_ids: "t-standard", status: "NEW", executor_id: null,
+  executor_rate: 0, executor_billing_unit: "CONDITIONAL_PAGE", executor_cost: 0, executor_cost_overridden: false, executor_deadline: null,
+  executor_deadline_time: "", executor_assignments: [], notes: "", version: 3, sort_order: 10,
+};
+const cardDetail = (files: unknown[] = []) => ({
+  id: "card-order", number: "26-0710", title: "26-0710", client_id: "client-1", contact_id: null, manager_id: user.id, application_id: null,
+  deadline: "2026-11-10", deadline_manual: true, deadline_time_mode: "BY", deadline_time: "15:00", status: "NEW", notes: "", version: 2,
+  archived: false, created_at: "2026-10-31T09:00:00Z", client_name: "ООО Спектр", contact_name: "", manager_name: user.display_name,
+  works: [cardWork], files,
+  payment: { id: "pay-1", amount_due: 1000, amount_paid: 300, payment_method: "deposit", invoice_number: "757", invoice_date: "2026-10-28", paid_at: null, notes: "", version: 4 },
+  deposit_applied: 300,
+  financial: { revenue: 1000, executor_cost: 0, profit: 1000, margin_percent: 100, client_paid: 300, client_debt: 700, payment_state: "DEPOSIT", executor_breakdown: [] },
+});
+
+test("order card: deposit layout, then cash layout keeps the structured invoice", async ({ page }) => {
+  const requests: Request[] = [];
+  await fixtures(page, requests, { services, detail: cardDetail() });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/admin/orders?open=card-order");
+  const card = page.locator(".phase5-order-card");
+  await expect(card.locator(".order-context-strip")).toContainText("10.11.26, до 15:00");
+  await card.getByRole("tab", { name: "Расчёт" }).click();
+  const payment = card.locator(".order-payment-card");
+  await expect(payment).toContainText("Депозит, р.");
+  await expect(payment).toContainText("300 ₽");
+  await expect(payment.locator(".payment-block__value--remaining")).toContainText("700 ₽");
+  await expect(payment).toContainText("Счёт: 757 от 28.10.26");
+
+  await payment.getByRole("button", { name: "Изменить" }).click();
+  await pick(page, payment, "Способ оплаты", "Наличные");
+  await expect(payment.getByLabel("Оплачено, р.")).toHaveValue("300");
+  await payment.getByLabel("Оплачено, р.").fill("1000");
+  await expect(payment.locator(".payment-block__value--remaining")).toContainText("0 ₽");
+  await expect(payment.locator(".payment-block__invoice")).toHaveAttribute("open", "");
+  await payment.getByRole("button", { name: "Сохранить оплату" }).click();
+  await expect.poll(() => requests.find((r) => r.method === "PATCH" && r.path.endsWith("/payment"))?.body).toBeTruthy();
+  expect(JSON.parse(requests.find((r) => r.method === "PATCH" && r.path.endsWith("/payment"))!.body)).toMatchObject({
+    payment_method: "cash", amount_paid: 1000, invoice_number: "757", invoice_date: "2026-10-28", version: 4,
+  });
+  if (process.env.CAPTURE_OWNER_QA) await payment.screenshot({ path: "../../test-results/paid-v3/payment-card.png" });
+});
+
+test("order card: another allowed tariff, final volume and documents of the work", async ({ page }) => {
+  const requests: Request[] = [];
+  const uploaded = { id: "file-1", work_id: "work-1", original_name: "Договор поставки.pdf", page_count: 3, character_count: 4200, word_count: 600, analysis_status: "DONE", analysis_note: "", created_at: "2026-10-31T10:00:00Z" };
+  let files: unknown[] = [];
+  await fixtures(page, requests, {
+    services,
+    extra: (path, _url, request) => {
+      if (path.endsWith("/crm/orders/card-order")) return cardDetail(files);
+      if (path.endsWith("/crm/orders/card-order/files/analyze")) {
+        files = [uploaded];
+        return uploaded;
+      }
+      if (path.endsWith("/crm/pricing/options")) return {
+        options: [
+          option("client:ct1", { tariff_ids: ["client:ct1"], unit: "CONDITIONAL_PAGE", rate: 450, amount: 900, is_auto: true, client_tariff: { client_name: "ООО Спектр", tier_id: "ct1", quantity_from: 1, tiers: 1 } }),
+          option("t-standard", { unit: "CONDITIONAL_PAGE", rate: 500, is_auto: false, source_language: "Английский", target_language: "Русский", resolution: "to_russian" }),
+        ],
+        auto_key: "client:ct1", resolution: "client_tariff", message: "",
+      };
+      if (path.includes("/works/work-1") && request.method === "PATCH") return cardWork;
+      return undefined;
+    },
+  });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/admin/orders?open=card-order");
+  const card = page.locator(".phase5-order-card");
+  await card.getByRole("tab", { name: /Работы/ }).click();
+  await card.locator(".order-work-card").first().getByRole("button", { name: "Изменить", exact: true }).click();
+  const editor = card.locator(".work-inline-editor");
+  const form = editor.locator(".work-draft");
+  await expect(form.getByLabel("Количество знаков (А)")).toHaveValue("3600");
+
+  // 5.1: the saved work can switch to another allowed tariff (client / standard)
+  await expect(form.locator(".work-tariff-picker")).toContainText("Стандартный тариф");
+  await form.getByRole("button", { name: "Выбрать другой тариф" }).click();
+  await form.getByLabel("Тариф", { exact: true }).click();
+  await page.getByRole("option", { name: /Тариф клиента «ООО Спектр»/ }).click();
+  await expect(form.locator(".work-tariff-picker")).toContainText("Сейчас: Тариф клиента");
+
+  // documents of this work: uploaded with work_id, the measured volume and names land in the form
+  await form.locator(".work-files input[type=file]").setInputFiles([{ name: "Договор поставки.pdf", mimeType: "application/pdf", buffer: Buffer.from("x") }]);
+  await expect(form.locator(".work-files__list")).toContainText("Договор поставки.pdf");
+  await expect(form.getByLabel("Количество знаков (А)")).toHaveValue("4200");
+  await expect(form.getByLabel("Название документа (-ов) (А)")).toHaveValue("Договор поставки");
+
+  // 5.2: the final volume by the delivered translation; the preliminary one stays visible
+  await expect(form.locator(".work-final-volume")).toContainText("4 200 знаков (А)");
+  await form.getByLabel("Окончательный объём, знаков").fill("5400");
+  await expect(form.getByLabel("Количество условных страниц (А)")).toHaveValue("3");
+
+  await editor.getByRole("button", { name: "Сохранить работу" }).click();
+  await expect.poll(() => requests.find((r) => r.method === "PATCH" && r.path.endsWith("/works/work-1"))?.body).toBeTruthy();
+  expect(JSON.parse(requests.find((r) => r.method === "PATCH" && r.path.endsWith("/works/work-1"))!.body)).toMatchObject({
+    tariff_ids: ["client:ct1"], client_rate: 0, character_count: 4200, character_count_source: "AUTO", measured_character_count: 4200,
+    final_character_count: 5400, document_names: "Договор поставки", document_names_source: "AUTO", version: 3,
+  });
+  const upload = requests.find((r) => r.path.endsWith("/files/analyze"))!;
+  expect(upload.body).toContain("work-1");
+});

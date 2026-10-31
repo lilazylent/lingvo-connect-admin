@@ -2329,71 +2329,20 @@ function OrderWizard({
                 </article>
               );
             })}
-            <div className="wizard-total">
-              <div>
-                <span>Итоговая стоимость заказа</span>
-                <small>{rub(clientTotal)}</small>
-              </div>
-              <div>
-                <span>Уже оплачено</span>
-                <small>{rub(paidAmount)}</small>
-              </div>
-              <div className="wizard-total__primary">
-                <span>Остаток к оплате</span>
-                <strong>{rub(remainingTotal)}</strong>
-              </div>
-            </div>
             {client && <div className="client-deposit-preview">
               <div><span>Депозит клиента</span><strong>{rub(depositBalance)}</strong></div>
               <div><span>Будет списано из депозита</span><strong>{rub(depositApplied)}</strong></div>
               <div><span>Останется на депозите</span><strong>{rub(depositAfterOrder)}</strong></div>
               <div className="client-deposit-preview__remaining"><span>Останется к оплате</span><strong>{rub(remainingAfterDeposit)}</strong></div>
             </div>}
-            <div className="wizard-grid">
-              <Input
-                label="Уже оплачено, ₽"
-                type="number"
-                min="0"
-                step="0.01"
-                value={payment.amount_paid}
-                onChange={(e) =>
-                  setPayment({ ...payment, amount_paid: e.target.value })
-                }
-              />
-              <Select
-                label="Способ оплаты"
-                value={payment.payment_method}
-                onChange={(e) => setPayment({ ...payment, payment_method: e.target.value })}
-              >
-                <option value="">Не выбран</option>
-                <option value="cash">Наличные</option>
-                <option value="cashless">Безналичный расчёт</option>
-                <option value="deposit">Депозит</option>
-              </Select>
-              <Input
-                label="№ счёта"
-                value={payment.invoice_number}
-                onChange={(e) =>
-                  setPayment({ ...payment, invoice_number: e.target.value })
-                }
-              />
-              <Input
-                label="Дата счёта"
-                type="date"
-                value={payment.invoice_date}
-                onChange={(e) =>
-                  setPayment({ ...payment, invoice_date: e.target.value })
-                }
-              />
-              <Input
-                label="Дата оплаты"
-                type="date"
-                value={payment.paid_at}
-                onChange={(e) =>
-                  setPayment({ ...payment, paid_at: e.target.value })
-                }
-              />
-            </div>
+            <PaymentBlock
+              value={payment}
+              onChange={setPayment}
+              total={clientTotal}
+              deposit={depositApplied}
+              remaining={remainingAfterDeposit}
+              depositHint={client ? "Спишется из депозита клиента при создании заказа" : "Выберите клиента, чтобы использовать депозит"}
+            />
           </div>
         )}
         {step === 4 && (
@@ -2600,6 +2549,88 @@ function WorkTariffPicker({ work, service, clientId, patch }: { work: DraftWork;
         <option value="">{options.length ? "Выберите тариф" : "Подходящих тарифов нет"}</option>
         {options.map((option) => <option key={option.key} value={option.key}>{tariffOptionLabel(service, option)}</option>)}
       </Select>
+    </div>
+  );
+}
+
+type PaymentDraft = { amount_paid: string; payment_method: string; invoice_number: string; invoice_date: string; paid_at: string; notes: string };
+const paymentMethods = [
+  ["", "Не выбран"],
+  ["cash", "Наличные"],
+  ["cashless", "Безналичный расчёт"],
+  ["deposit", "Депозит"],
+] as const;
+
+/**
+ * One payment state, three layouts (DOCX v3): cash / not chosen and cashless show «Оплачено»,
+ * deposit shows what the client deposit ledger covers. Nothing is debited by rendering;
+ * the deposit amount is read-only. Invoice number/date stay structured, folded away.
+ */
+function PaymentBlock({
+  value,
+  onChange,
+  total,
+  deposit,
+  remaining,
+  depositHint,
+  editable = true,
+}: {
+  value: PaymentDraft;
+  onChange?: (next: PaymentDraft) => void;
+  total: number;
+  deposit: number;
+  remaining: number;
+  depositHint: string;
+  editable?: boolean;
+}) {
+  const set = (patch: Partial<PaymentDraft>) => onChange?.({ ...value, ...patch });
+  const isDeposit = value.payment_method === "deposit";
+  const methodLabel = paymentMethods.find(([code]) => code === value.payment_method)?.[1] ?? "Не выбран";
+  const hasInvoice = Boolean(value.invoice_number || value.invoice_date);
+  return (
+    <div className={`payment-block payment-block--${value.payment_method || "none"}`}>
+      <div className="payment-block__row">
+        {editable ? (
+          <Select label="Способ оплаты" value={value.payment_method} onChange={(e) => set({ payment_method: e.target.value })}>
+            {paymentMethods.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+          </Select>
+        ) : (
+          <div className="payment-block__value"><span>Способ оплаты</span><strong>{methodLabel}</strong></div>
+        )}
+        <div className="payment-block__value"><span>Стоимость заказа, р.</span><strong>{rub(total)}</strong></div>
+        {isDeposit ? (
+          <div className="payment-block__value"><span>Депозит, р.</span><strong>{rub(deposit)}</strong><small>{depositHint}</small></div>
+        ) : editable ? (
+          <Input label="Оплачено, р." type="number" min="0" step="0.01" value={value.amount_paid} onChange={(e) => set({ amount_paid: e.target.value })} />
+        ) : (
+          <div className="payment-block__value"><span>Оплачено, р.</span><strong>{rub(value.amount_paid)}</strong></div>
+        )}
+        <div className={`payment-block__value payment-block__value--remaining${remaining > 0 ? " is-open" : ""}`}><span>Осталось к оплате, р.</span><strong>{rub(remaining)}</strong></div>
+      </div>
+      <div className="payment-block__row payment-block__row--details">
+        {editable ? (
+          <Input label="Дата оплаты" type="date" value={value.paid_at} onChange={(e) => set({ paid_at: e.target.value })} />
+        ) : (
+          <div className="payment-block__value"><span>Дата оплаты</span><strong>{formatCrmDate(value.paid_at, "—")}</strong></div>
+        )}
+        {editable ? (
+          <Textarea label="Комментарий" rows={2} placeholder="Например: счёт № 757 от 28.01 — 50 000 р.; счёт № 763 — остаток" value={value.notes} onChange={(e) => set({ notes: e.target.value })} />
+        ) : (
+          <div className="payment-block__value payment-block__value--notes"><span>Комментарий</span><strong>{value.notes || "—"}</strong></div>
+        )}
+      </div>
+      {editable ? (
+        <details className="payment-block__invoice" open={hasInvoice}>
+          <summary>Номер и дата счёта{hasInvoice ? ` · ${[value.invoice_number, formatCrmDate(value.invoice_date, "")].filter(Boolean).join(" от ")}` : " (если один счёт)"}</summary>
+          <div className="payment-block__row">
+            <Input label="№ счёта" value={value.invoice_number} onChange={(e) => set({ invoice_number: e.target.value })} />
+            <Input label="Дата счёта" type="date" value={value.invoice_date} onChange={(e) => set({ invoice_date: e.target.value })} />
+          </div>
+          <small>Несколько счетов частями удобнее перечислить в комментарии.</small>
+        </details>
+      ) : hasInvoice ? (
+        <p className="payment-block__invoice-line">Счёт: {[value.invoice_number, formatCrmDate(value.invoice_date, "")].filter(Boolean).join(" от ")}</p>
+      ) : null}
     </div>
   );
 }
@@ -3784,6 +3815,15 @@ function draftFromWork(work: Work): DraftWork {
 }
 
 
+const paymentDraftFrom = (payment: Payment | null | undefined): PaymentDraft => ({
+  amount_paid: String(payment?.amount_paid ?? 0),
+  payment_method: payment?.payment_method ?? "",
+  invoice_number: payment?.invoice_number ?? "",
+  invoice_date: payment?.invoice_date ?? "",
+  paid_at: payment?.paid_at ?? "",
+  notes: payment?.notes ?? "",
+});
+
 const detailDraftFrom = (order: Order | null) => ({
   client_id: order?.client_id ?? "",
   contact_id: order?.contact_id ?? "",
@@ -3827,14 +3867,7 @@ function OrderCard({
   const [copiedClientSummary, setCopiedClientSummary] = useState(false);
   const [activeTab, setActiveTab] = useState<"core" | "works" | "executors" | "finance" | "files" | "history">("core");
   const [paymentEdit, setPaymentEdit] = useState(false);
-  const [paymentDraft, setPaymentDraft] = useState({
-    amount_paid: "0",
-    payment_method: "",
-    invoice_number: "",
-    invoice_date: "",
-    paid_at: "",
-    notes: "",
-  });
+  const [paymentDraft, setPaymentDraft] = useState<PaymentDraft>(() => paymentDraftFrom(null));
   const [managers, setManagers] = useState<UserSummary[]>([]);
   const [detailsEdit, setDetailsEdit] = useState(false);
   const coreEditorRef = useRef<HTMLElement>(null);
@@ -3848,14 +3881,7 @@ function OrderCard({
     try {
       const detail = await api<OrderDetail>(`/api/admin/crm/orders/${orderId}`);
       setOrder(detail);
-      setPaymentDraft({
-        amount_paid: String(detail.payment?.amount_paid ?? 0),
-        payment_method: detail.payment?.payment_method ?? "",
-        invoice_number: detail.payment?.invoice_number ?? "",
-        invoice_date: detail.payment?.invoice_date ?? "",
-        paid_at: detail.payment?.paid_at ?? "",
-        notes: detail.payment?.notes ?? "",
-      });
+      setPaymentDraft(paymentDraftFrom(detail.payment));
       setDetailDraft(detailDraftFrom(detail));
       setError("");
     } catch (e) {
@@ -4943,116 +4969,41 @@ function OrderCard({
                 {paymentEdit ? "Свернуть" : "Изменить"}
               </Button>
             </div>
-            {paymentEdit ? (
-              <div className="payment-edit">
-                <Input
-                  label="Оплачено, ₽"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={paymentDraft.amount_paid}
-                  onChange={(e) =>
-                    setPaymentDraft({
-                      ...paymentDraft,
-                      amount_paid: e.target.value,
-                    })
-                  }
-                />
-                <Select
-                  label="Способ оплаты"
-                  value={paymentDraft.payment_method}
-                  onChange={(e) => setPaymentDraft({ ...paymentDraft, payment_method: e.target.value })}
-                >
-                  <option value="">Не выбран</option>
-                  <option value="cash">Наличные</option>
-                  <option value="cashless">Безналичный расчёт</option>
-                  <option value="deposit">Депозит</option>
-                </Select>
-                <Input
-                  label="№ счёта"
-                  value={paymentDraft.invoice_number}
-                  onChange={(e) =>
-                    setPaymentDraft({
-                      ...paymentDraft,
-                      invoice_number: e.target.value,
-                    })
-                  }
-                />
-                <Input
-                  label="Дата счёта"
-                  type="date"
-                  value={paymentDraft.invoice_date}
-                  onChange={(e) =>
-                    setPaymentDraft({
-                      ...paymentDraft,
-                      invoice_date: e.target.value,
-                    })
-                  }
-                />
-                <Input
-                  label="Дата оплаты"
-                  type="date"
-                  value={paymentDraft.paid_at}
-                  onChange={(e) =>
-                    setPaymentDraft({
-                      ...paymentDraft,
-                      paid_at: e.target.value,
-                    })
-                  }
-                />
-                <Textarea
-                  label="Комментарий"
-                  rows={3}
-                  value={paymentDraft.notes}
-                  onChange={(e) =>
-                    setPaymentDraft({ ...paymentDraft, notes: e.target.value })
-                  }
-                />
-                <div className="payment-edit__actions">
-                  <Button
-                    type="button"
-                    variant="quiet"
-                    onClick={() => {
-                      setPaymentEdit(false);
-                      setPaymentDraft({
-                        amount_paid: String(order.payment?.amount_paid ?? 0),
-                        payment_method: order.payment?.payment_method ?? "",
-                        invoice_number: order.payment?.invoice_number ?? "",
-                        invoice_date: order.payment?.invoice_date ?? "",
-                        paid_at: order.payment?.paid_at ?? "",
-                        notes: order.payment?.notes ?? "",
-                      });
-                    }}
-                  >
-                    Отмена
-                  </Button>
-                  <Button type="button" onClick={() => void savePayment()}>
-                    Сохранить оплату
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="payment-summary">
-                <div>
-                  <span>К оплате</span>
-                  <strong>
-                    {rub(order.payment?.amount_due ?? order.financial.revenue)}
-                  </strong>
-                </div>
-                <div>
-                  <span>Оплачено</span>
-                  <strong>{rub(order.payment?.amount_paid ?? 0)}</strong>
-                </div>
-                <div>
-                  <span>Счёт</span>
-                  <strong>{order.payment?.invoice_number || "—"}</strong>
-                </div>
-                <div>
-                  <span>Дата оплаты</span>
-                  <strong>{formatCrmDate(order.payment?.paid_at, "—")}</strong>
-                </div>
-              </div>
-            )}
+            {(() => {
+              const total = Number(order.payment?.amount_due ?? order.financial.revenue);
+              const depositApplied = Number(order.deposit_applied ?? 0);
+              const draftRemaining = Math.max(0, total - (Number(paymentDraft.amount_paid || 0) || 0));
+              return (
+                <>
+                  <PaymentBlock
+                    value={paymentDraft}
+                    onChange={setPaymentDraft}
+                    editable={paymentEdit}
+                    total={total}
+                    deposit={depositApplied}
+                    remaining={paymentEdit ? draftRemaining : Number(order.financial.client_debt)}
+                    depositHint={depositApplied > 0 ? "Списано из депозита клиента по этому заказу" : "По этому заказу из депозита ничего не списано"}
+                  />
+                  {paymentEdit && (
+                    <div className="payment-edit__actions">
+                      <Button
+                        type="button"
+                        variant="quiet"
+                        onClick={() => {
+                          setPaymentEdit(false);
+                          setPaymentDraft(paymentDraftFrom(order.payment));
+                        }}
+                      >
+                        Отмена
+                      </Button>
+                      <Button type="button" onClick={() => void savePayment()}>
+                        Сохранить оплату
+                      </Button>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </section>
           {order.application_id && activeTab === "core" && (
             <Link
