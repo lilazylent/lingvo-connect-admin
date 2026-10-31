@@ -421,3 +421,22 @@ test("order card: another allowed tariff, final volume and documents of the work
   const upload = requests.find((r) => r.path.endsWith("/files/analyze"))!;
   expect(upload.body).toContain("work-1");
 });
+
+test("new v3 surfaces have no light islands in Dark", async ({ page }) => {
+  const wizard = await openWizard(page, [], {
+    services,
+    extra: (path) => (path.endsWith("/users/me/preferences") ? { interface_theme: "dark" } : undefined),
+  });
+  await expect(page.locator("html")).toHaveAttribute("data-crm-theme", "dark");
+  await wizard.locator(".wizard-steps button").filter({ hasText: "02" }).click();
+  await pick(page, wizard.locator(".work-draft").first(), "Услуга", "Письменный перевод (полный)");
+  const light = async (selector: string) => wizard.locator(selector).evaluateAll((nodes) =>
+    nodes.filter((node) => {
+      const match = getComputedStyle(node).backgroundColor.match(/\d+/g)?.map(Number) ?? [0, 0, 0];
+      return match.length >= 3 && match[0] > 200 && match[1] > 200 && match[2] > 200 && (match[3] ?? 1) !== 0;
+    }).length);
+  expect(await light(".order-header-summary > div, .choice-pair__option, .work-files__list li, .file-drop--compact")).toBe(0);
+  if (process.env.CAPTURE_OWNER_QA) await wizard.screenshot({ path: "../../test-results/paid-v3/dark-work.png" });
+  await wizard.locator(".wizard-steps button").filter({ hasText: "03" }).click();
+  expect(await light(".payment-block__value")).toBe(0);
+});
