@@ -691,11 +691,13 @@ const volumeQuotePatch = (work: DraftWork): Partial<DraftWork> =>
     : resetQuotePatch;
 const billedCharacters = (work: Pick<DraftWork, "character_count" | "final_character_count">) =>
   work.final_character_count || work.character_count;
-// «Название документа (-ов) (А)»: file names without the extension
+// «Название документа (-ов)»: file names without the extension
 const documentNamesFrom = (files: { name: string }[]) =>
   files.map((file) => file.name.replace(/\.[^.\s]{1,8}$/, "")).filter(Boolean).join("; ");
-const charactersLabel = (source: DraftWork["charactersSource"]) =>
-  source === "AUTO" ? "Количество знаков (А)" : source === "MANUAL" ? "Количество знаков (З)" : "Количество знаков";
+const CHARACTERS_LABEL = "Количество знаков";
+// where the value came from (the А/З of Oleg's legend), shown under the field
+const charactersSourceHint = (source: DraftWork["charactersSource"]) =>
+  source === "AUTO" ? "Подсчитано по документам, можно исправить" : source === "MANUAL" ? "Введено вручную" : "";
 const serviceFieldPatch = (work: DraftWork, service: Service | undefined, variant = ""): Partial<DraftWork> => {
   if (!service) {
     return {
@@ -2145,8 +2147,8 @@ function OrderWizard({
                   {service && serviceHasField(service, "character_count", w.certification_mode) && (
                     <div className="price-row__volume">
                       <Input
-                        label={charactersLabel(w.charactersSource)}
-                        hint="Исправьте объём, если автоматический подсчёт неточен; расчёт обновится"
+                        label={CHARACTERS_LABEL}
+                        hint={`${charactersSourceHint(w.charactersSource) || "Объём"} — исправьте, если подсчёт неточен; расчёт обновится`}
                         type="number"
                         min="0"
                         value={w.character_count}
@@ -2155,7 +2157,8 @@ function OrderWizard({
                           patchWork(w.key, {
                             character_count,
                             charactersSource: "MANUAL",
-                            page_count: service.definition?.page_from_characters && character_count ? conditionalPages(character_count) : w.page_count,
+                            // an emptied count empties the derived pages instead of keeping the old ones
+                            page_count: service.definition?.page_from_characters ? conditionalPages(character_count) : w.page_count,
                             ...(w.manualPrice ? {} : volumeQuotePatch(w)),
                           });
                         }}
@@ -2487,7 +2490,7 @@ const tariffSourceLabel = (work: DraftWork) =>
           ? "Ставка вручную"
           : "Подбирается CRM при сохранении";
 
-/** «Тариф (А)» of a saved order: choose another allowed tariff (client / standard). */
+/** «Тариф» of a saved order: choose another allowed tariff (client / standard). */
 function WorkTariffPicker({ work, service, clientId, patch }: { work: DraftWork; service?: Service; clientId: string | null; patch: (p: Partial<DraftWork>) => void }) {
   const [options, setOptions] = useState<TariffOption[] | null>(null);
   const [message, setMessage] = useState("");
@@ -2513,7 +2516,7 @@ function WorkTariffPicker({ work, service, clientId, patch }: { work: DraftWork;
   if (!options)
     return (
       <div className="pricing-field work-tariff-picker">
-        <span className="field__label">Тариф (А)</span>
+        <span className="field__label">Тариф</span>
         <div className="calculated-value">
           <strong>{Number(work.client_rate || 0) > 0 ? formatRate(work.client_rate, work.billing_unit) : "—"}</strong>
           <small>{tariffSourceLabel(work)}</small>
@@ -2736,7 +2739,7 @@ function WorkDraft({
   services: Service[];
   patch: (p: Partial<DraftWork>) => void;
   remove: () => void;
-  // «Тариф (А)»: read-only in the wizard (chosen on «Расчёт»), a selector in the order card
+  // «Тариф»: a selector in the order card; the wizard chooses it on «Расчёт»
   tariffSlot?: ReactNode;
   // «Прикрепить документы клиента» of this work
   filesSlot?: ReactNode;
@@ -2812,8 +2815,8 @@ function WorkDraft({
       case "character_count":
         return (
           <Input
-            label={charactersLabel(work.charactersSource)}
-            hint={work.measured_character_count && work.charactersSource === "MANUAL" ? `По документам: ${Number(work.measured_character_count).toLocaleString("ru-RU")}` : pageFromCharacters ? "1800 знаков = 1 страница" : undefined}
+            label={CHARACTERS_LABEL}
+            hint={work.measured_character_count && work.charactersSource === "MANUAL" ? `Введено вручную; по документам: ${Number(work.measured_character_count).toLocaleString("ru-RU")}` : charactersSourceHint(work.charactersSource) || (pageFromCharacters ? "1800 знаков = 1 страница" : undefined)}
             type="number"
             min="0"
             value={work.character_count}
@@ -2822,7 +2825,8 @@ function WorkDraft({
               patchQuantity({
                 character_count,
                 charactersSource: "MANUAL",
-                page_count: pageFromCharacters && character_count ? conditionalPages(character_count) : work.page_count,
+                // an emptied count empties the derived pages instead of keeping the old ones
+                page_count: pageFromCharacters ? conditionalPages(character_count) : work.page_count,
               });
             }}
           />
@@ -2830,7 +2834,7 @@ function WorkDraft({
       case "page_count":
         return (
           <Input
-            label={pageFromCharacters ? "Количество условных страниц (А)" : label("page_count", "Количество страниц")}
+            label={pageFromCharacters ? "Количество условных страниц" : label("page_count", "Количество страниц")}
             hint={pageFromCharacters ? "По количеству знаков: вверх до 0,1, минимум 1" : undefined}
             type="number"
             min="0"
@@ -2851,25 +2855,18 @@ function WorkDraft({
       case "target_language":
         return <LanguageCombobox label="Язык перевода" value={work.target_language} onChange={(value) => patch({ target_language: value, ...resetQuotePatch })} />;
       case "tariff":
-        return tariffSlot ?? (
-          <div className="pricing-field">
-            <span className="field__label">Тариф (А)</span>
-            <div className="calculated-value">
-              <strong>{work.manualPrice ? "Итог вручную" : Number(work.client_rate || 0) > 0 ? formatRate(work.client_rate, work.billing_unit) : work.quoteRate && work.quoteAmount ? formatRate(work.quoteRate, work.quoteUnit || work.billing_unit) : "—"}</strong>
-              <small>{definition?.pricing_basis?.label || "Подбирается на шаге «Расчёт»"}</small>
-            </div>
-          </div>
-        );
+        return tariffSlot ?? null;
       case "price":
-        return (
+        // the cost is meaningful only where the tariff is chosen (order card); the wizard prices on «Расчёт»
+        return tariffSlot ? (
           <div className="pricing-field">
-            <span className="field__label">Стоимость (А)</span>
+            <span className="field__label">Стоимость</span>
             <div className="calculated-value">
               <strong>{work.manualPrice ? rub(work.price) : work.quoteAmount || Number(work.client_rate || 0) > 0 ? rub(localPrice(work)) : "—"}</strong>
               <small>{work.client_billable ? "Для клиента" : "Не входит в стоимость для клиента"}</small>
             </div>
           </div>
-        );
+        ) : null;
       case "translator_type":
         return (
           <ChoicePair
@@ -2947,8 +2944,8 @@ function WorkDraft({
       case "document_names":
         return (
           <Input
-            label={`Название документа (-ов)${work.documentNamesSource === "AUTO" ? " (А)" : work.documentNamesSource === "MANUAL" ? " (З)" : ""}`}
-            hint={work.documentNamesSource === "AUTO" ? "Из имён прикреплённых файлов, можно исправить" : undefined}
+            label="Название документа (-ов)"
+            hint={work.documentNamesSource === "AUTO" ? "Из имён прикреплённых файлов, можно исправить" : work.documentNamesSource === "MANUAL" ? "Введено вручную" : undefined}
             value={work.document_names ?? ""}
             onChange={(e) => patch({ document_names: e.target.value, documentNamesSource: "MANUAL" })}
           />
@@ -3009,14 +3006,14 @@ function WorkDraft({
                   const final_character_count = e.target.value;
                   patchQuantity({
                     final_character_count,
-                    page_count: pageFromCharacters && (final_character_count || work.character_count) ? conditionalPages(final_character_count || work.character_count) : work.page_count,
+                    page_count: pageFromCharacters ? conditionalPages(final_character_count || work.character_count) : work.page_count,
                   });
                 }}
               />
             </div>
             <div className="work-layout__cell span-2 work-final-volume__summary">
               <span className="field__label">Предварительный объём</span>
-              <strong>{work.character_count ? `${Number(work.character_count).toLocaleString("ru-RU")} знаков ${work.charactersSource === "AUTO" ? "(А)" : work.charactersSource === "MANUAL" ? "(З)" : "(источник не сохранён)"}` : "Не указан"}</strong>
+              <strong>{work.character_count ? `${Number(work.character_count).toLocaleString("ru-RU")} знаков · ${work.charactersSource === "AUTO" ? "по документам" : work.charactersSource === "MANUAL" ? "введено вручную" : "источник не сохранён"}` : "Не указан"}</strong>
             </div>
           </div>
         )}
@@ -3611,8 +3608,8 @@ function ExecutorAssignmentsEditor({
                     const character_count = e.target.value;
                     patchAssignment(assignment.key, {
                       character_count,
-                      page_count: pageFromCharacters && character_count
-                        ? conditionalPages(character_count)
+                      page_count: pageFromCharacters
+                        ? conditionalPages(character_count, false)
                         : assignment.page_count,
                     });
                   }}
@@ -3625,7 +3622,7 @@ function ExecutorAssignmentsEditor({
                   min="0"
                   step="0.1"
                   readOnly={pageFromCharacters}
-                  value={pageFromCharacters && assignment.character_count ? conditionalPages(assignment.character_count) : assignment.page_count}
+                  value={pageFromCharacters && assignment.character_count ? conditionalPages(assignment.character_count, false) : assignment.page_count}
                   onChange={(e) => !pageFromCharacters && patchAssignment(assignment.key, { page_count: e.target.value })}
                 />
               )}

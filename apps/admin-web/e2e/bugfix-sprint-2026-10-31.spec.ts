@@ -173,21 +173,23 @@ test("manual character count survives document analysis and is editable on «Р�
   // the analysed value is marked «А» (documents are attached on the «Работы» step)
   await wizard.locator(".file-drop input[type=file]").setInputFiles({ name: "contract.txt", mimeType: "text/plain", buffer: Buffer.from("x") });
   await expect(work.locator(".work-files__list")).toContainText("5");
-  await expect(work.getByLabel("Количество знаков (А)")).toHaveValue("5000");
+  await expect(work.getByLabel("Количество знаков")).toHaveValue("5000");
+  await expect(work.getByText("Подсчитано по документам, можно исправить")).toBeVisible();
 
   // the manager corrects it («З»); a later document no longer overwrites the correction
-  await work.getByLabel("Количество знаков (А)").fill("4100");
-  await expect(work.getByLabel("Количество знаков (З)")).toHaveValue("4100");
+  await work.getByLabel("Количество знаков").fill("4100");
+  await expect(work.getByLabel("Количество знаков")).toHaveValue("4100");
+  await expect(work.getByText("Введено вручную")).toBeVisible();
   await wizard.locator(".file-drop input[type=file]").setInputFiles({ name: "annex.txt", mimeType: "text/plain", buffer: Buffer.from("y") });
   await expect(work.locator(".work-files__list li")).toHaveCount(2);
 
   // «Расчёт» shows the manual value and allows correcting it again; pages follow
   await wizard.locator(".wizard-steps button").filter({ hasText: "03" }).click();
   const row = wizard.locator(".price-row").first();
-  await expect(row.getByLabel("Количество знаков (З)")).toHaveValue("4100");
-  await row.getByLabel("Количество знаков (З)").fill("9000");
+  await expect(row.getByLabel("Количество знаков")).toHaveValue("4100");
+  await row.getByLabel("Количество знаков").fill("9000");
   await expect(row).toContainText("5");
-  await row.getByLabel("Количество знаков (З)").blur();
+  await row.getByLabel("Количество знаков").blur();
   await expect.poll(() => requests.filter((r) => r.path.endsWith("/crm/pricing/options")).map((r) => JSON.parse(r.body).character_count)).toContain(9000);
   if (process.env.CAPTURE_OWNER_QA) {
     for (const [width, theme] of [[1440, "light"], [390, "light"], [1440, "dark"]] as const) {

@@ -135,17 +135,17 @@ for (const width of [1440, 1280, 768, 390]) {
 // The services come from the real backend metadata (apps/api/app/service_definitions.py).
 
 const TEXT_TAIL = ["Тип переводчика", "Статус", "Тематика", "Комментарий", "Наценка / Срочность", "Скидка, %", "Прикрепить документы клиента", "Не учитывать в расчёте для клиента", "Название документа (-ов)"];
-const WRITTEN = ["Услуга", "Количество знаков", "Количество условных страниц (А)", "Язык оригинала", "Язык перевода", "Тариф (А)", "Стоимость (А)", ...TEXT_TAIL];
-const SIMPLE_TAIL = ["Наценка / Срочность", "Скидка, %", "Тариф (А)", "Стоимость (А)", "Не учитывать в расчёте для клиента", "Статус", "Комментарий"];
+const WRITTEN = ["Услуга", "Количество знаков", "Количество условных страниц", "Язык оригинала", "Язык перевода", ...TEXT_TAIL];
+const SIMPLE_TAIL = ["Наценка / Срочность", "Скидка, %", "Не учитывать в расчёте для клиента", "Статус", "Комментарий"];
 // 16 logical work types of DOCX v3, in Oleg's order: picker entry → field labels in DOM order
 const V3_FORMS: [string, string[]][] = [
   ["Письменный перевод (полный)", WRITTEN],
   ["Письменный перевод (повторения)", WRITTEN],
-  ["Письменный перевод (шаблон)", ["Услуга", "Количество документов", "Язык оригинала", "Язык перевода", "Тариф (А)", "Стоимость (А)", ...TEXT_TAIL]],
+  ["Письменный перевод (шаблон)", ["Услуга", "Количество документов", "Язык оригинала", "Язык перевода", ...TEXT_TAIL]],
   ["Вычитка", WRITTEN],
-  ["Набор текста", ["Услуга", "Количество знаков", "Количество условных страниц (А)", "Язык оригинала", "Тариф (А)", "Стоимость (А)", ...TEXT_TAIL]],
+  ["Набор текста", ["Услуга", "Количество знаков", "Количество условных страниц", "Язык оригинала", ...TEXT_TAIL]],
   ["Нотариальное заверение", ["Услуга", "Количество документов", ...SIMPLE_TAIL]],
-  ["Заверение печатью «Лингво Коннект»", ["Услуга", "Количество документов", "Вариант заверения", "Тариф (А)", "Стоимость (А)", "Наценка / Срочность", "Скидка, %", "Статус", "Не учитывать в расчёте для клиента", "Комментарий"]],
+  ["Заверение печатью «Лингво Коннект»", ["Услуга", "Количество документов", "Вариант заверения", "Наценка / Срочность", "Скидка, %", "Статус", "Не учитывать в расчёте для клиента", "Комментарий"]],
   ["Апостиль", ["Услуга", "Количество документов", ...SIMPLE_TAIL]],
   ["Нотариальная копия", ["Услуга", "Количество страниц", ...SIMPLE_TAIL]],
   ["Вёрстка текста", ["Услуга", "Количество страниц", ...SIMPLE_TAIL]],
@@ -155,8 +155,8 @@ const V3_FORMS: [string, string[]][] = [
   ["Скан", ["Услуга", "Количество страниц (фактических)", ...SIMPLE_TAIL]],
   ["Доставка", ["Услуга", "Дата", "Время", ...SIMPLE_TAIL]],
   ["Аудирование", ["Услуга", "Длительность, секунд", ...SIMPLE_TAIL]],
-  ["Транскрибация", ["Услуга", "Количество знаков", "Количество условных страниц (А)", "Язык оригинала", "Тариф (А)", "Стоимость (А)", ...TEXT_TAIL]],
-  ["Устный перевод", ["Услуга", "Количество часов", "Тип перевода", "Тариф (А)", "Стоимость (А)", "Язык оригинала", "Язык перевода", "Статус", "Тип переводчика", "Комментарий", "Тематика", "Наценка / Срочность", "Скидка, %", "Прикрепить документы клиента", "Не учитывать в расчёте для клиента", "Название документа (-ов)"]],
+  ["Транскрибация", ["Услуга", "Количество знаков", "Количество условных страниц", "Язык оригинала", ...TEXT_TAIL]],
+  ["Устный перевод", ["Услуга", "Количество часов", "Тип перевода", "Язык оригинала", "Язык перевода", "Статус", "Тип переводчика", "Комментарий", "Тематика", "Наценка / Срочность", "Скидка, %", "Прикрепить документы клиента", "Не учитывать в расчёте для клиента", "Название документа (-ов)"]],
 ];
 const services = serviceDefinitions as unknown[];
 const topics = { items: [{ name: "юридическая" }, { name: "техническая" }] };
@@ -193,11 +193,15 @@ test("written variants, interpreting type, topic and per-work documents reach th
   await first.getByLabel("Носитель").check();
   await expect(first.getByLabel("Обычный")).not.toBeChecked();
   await first.locator(".work-files input[type=file]").setInputFiles([{ name: "Договор поставки.pdf", mimeType: "application/pdf", buffer: Buffer.from("x") }]);
-  await expect(first.getByLabel("Количество знаков (А)")).toHaveValue("3600");
-  await expect(first.getByLabel("Название документа (-ов) (А)")).toHaveValue("Договор поставки");
-  // a manual name («З») is kept
-  await first.getByLabel("Название документа (-ов) (А)").fill("Договор №5");
-  await expect(first.getByLabel("Название документа (-ов) (З)")).toHaveValue("Договор №5");
+  await expect(first.getByLabel("Количество знаков")).toHaveValue("3600");
+  await expect(first.getByText("Подсчитано по документам, можно исправить")).toBeVisible();
+  await expect(first.getByLabel("Название документа (-ов)")).toHaveValue("Договор поставки");
+  // a manual name is kept (the А/З of the legend is a hint, not part of the label)
+  await first.getByLabel("Название документа (-ов)").fill("Договор №5");
+  await expect(first.getByLabel("Название документа (-ов)")).toHaveValue("Договор №5");
+  await expect(first.locator(".work-layout__cell--document_names")).toContainText("Введено вручную");
+  // the wizard has no tariff/cost cells on «Работы»: the tariff is chosen on «Расчёт»
+  await expect(first.locator(".work-layout__cell--tariff, .work-layout__cell--price")).toHaveCount(0);
 
   await wizard.getByRole("button", { name: "Добавить работу +" }).click();
   const second = wizard.locator(".work-draft").nth(1);
@@ -394,7 +398,7 @@ test("order card: another allowed tariff, final volume and documents of the work
   await card.locator(".order-work-card").first().getByRole("button", { name: "Изменить", exact: true }).click();
   const editor = card.locator(".work-inline-editor");
   const form = editor.locator(".work-draft");
-  await expect(form.getByLabel("Количество знаков (А)")).toHaveValue("3600");
+  await expect(form.getByLabel("Количество знаков")).toHaveValue("3600");
 
   // 5.1: the saved work can switch to another allowed tariff (client / standard)
   await expect(form.locator(".work-tariff-picker")).toContainText("Стандартный тариф");
@@ -406,13 +410,13 @@ test("order card: another allowed tariff, final volume and documents of the work
   // documents of this work: uploaded with work_id, the measured volume and names land in the form
   await form.locator(".work-files input[type=file]").setInputFiles([{ name: "Договор поставки.pdf", mimeType: "application/pdf", buffer: Buffer.from("x") }]);
   await expect(form.locator(".work-files__list")).toContainText("Договор поставки.pdf");
-  await expect(form.getByLabel("Количество знаков (А)")).toHaveValue("4200");
-  await expect(form.getByLabel("Название документа (-ов) (А)")).toHaveValue("Договор поставки");
+  await expect(form.getByLabel("Количество знаков")).toHaveValue("4200");
+  await expect(form.getByLabel("Название документа (-ов)")).toHaveValue("Договор поставки");
 
   // 5.2: the final volume by the delivered translation; the preliminary one stays visible
-  await expect(form.locator(".work-final-volume")).toContainText("4 200 знаков (А)");
+  await expect(form.locator(".work-final-volume")).toContainText("4 200 знаков · по документам");
   await form.getByLabel("Окончательный объём, знаков").fill("5400");
-  await expect(form.getByLabel("Количество условных страниц (А)")).toHaveValue("3");
+  await expect(form.getByLabel("Количество условных страниц")).toHaveValue("3");
 
   await editor.getByRole("button", { name: "Сохранить работу" }).click();
   await expect.poll(() => requests.find((r) => r.method === "PATCH" && r.path.endsWith("/works/work-1"))?.body).toBeTruthy();
@@ -441,4 +445,16 @@ test("new v3 surfaces have no light islands in Dark", async ({ page }) => {
   if (process.env.CAPTURE_OWNER_QA) await wizard.screenshot({ path: "../../test-results/paid-v3/dark-work.png" });
   await wizard.locator(".wizard-steps button").filter({ hasText: "03" }).click();
   expect(await light(".payment-block__value")).toBe(0);
+});
+
+test("emptying the character count empties the derived pages (owner report 2026-10-31)", async ({ page }) => {
+  const wizard = await openWizard(page, [], { services });
+  await wizard.locator(".wizard-steps button").filter({ hasText: "02" }).click();
+  const work = wizard.locator(".work-draft").first();
+  await pick(page, work, "Услуга", "Письменный перевод (полный)");
+  await work.getByLabel("Количество знаков").fill("5400");
+  await expect(work.getByLabel("Количество условных страниц")).toHaveValue("3");
+  await expect(work.getByText("Введено вручную")).toBeVisible();
+  await work.getByLabel("Количество знаков").fill("");
+  await expect(work.getByLabel("Количество условных страниц")).toHaveValue("");
 });
