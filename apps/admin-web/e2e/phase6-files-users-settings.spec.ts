@@ -79,6 +79,7 @@ async function fixtures(page: Page) {
     else if (path.endsWith("/executors")) json = { items: [], total: 0, page: 1, pages: 1 };
     else if (path.endsWith("/crm/services")) json = services;
     else if (path.endsWith("/crm/languages")) json = { items: languages };
+    else if (path.endsWith("/crm/topics")) json = { items: [{ id: "topic-1", name: "юридическая", active: true, sort_order: 10 }] };
     else if (path.endsWith("/crm/tariffs")) json = [];
     else if (path.endsWith("/crm/pricing-rules")) json = [];
     else if (path.endsWith("/crm/order-statuses")) json = [{ code: "NEW", name: "Новый", color: "blue", board: "MAIN", active: true, sort_order: 10 }];

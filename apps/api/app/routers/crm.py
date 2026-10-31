@@ -1155,7 +1155,8 @@ def services(db: DB, context: Read, active: bool | None = Query(None)):
     query = select(ServiceType)
     if active is not None:
         query = query.where(ServiceType.active == active)
-    rows = db.scalars(query.order_by(ServiceType.sort_order, ServiceType.name)).all()
+    # owner request 2026-10-31: services in alphabetical order
+    rows = sorted(db.scalars(query).all(), key=lambda row: (row.name.casefold(), row.code))
     result = []
     for row in rows:
         item = view(row)
@@ -1347,14 +1348,26 @@ def edit_pricing_rule(rule_id: str, payload: PricingRulePayload, db: DB, context
     return view(row)
 
 
+# owner request 2026-10-31: Russian, English, then the rest alphabetically
+PRIORITY_LANGUAGES = ("Русский", "Английский")
+
+
+def language_priority(row) -> tuple[int, str]:
+    name = row.name
+    return (PRIORITY_LANGUAGES.index(name) if name in PRIORITY_LANGUAGES else len(PRIORITY_LANGUAGES), name.casefold())
+
+
 def rank_language_matches(rows, q: str):
-    """Exact, then prefix, then substring matches; catalog order within each group.
+    """Exact, then prefix, then substring matches; language priority within each group.
 
     The language combobox highlights the first match and Enter picks it, so "рус"
     must offer «Русский» before «Белорусский».
     """
     needle = q.strip().casefold()
-    return sorted(rows, key=lambda row: 0 if row.name.casefold() == needle else 1 if row.name.casefold().startswith(needle) else 2)
+    return sorted(rows, key=lambda row: (
+        0 if row.name.casefold() == needle else 1 if row.name.casefold().startswith(needle) else 2,
+        *language_priority(row),
+    ))
 
 
 @router.get("/languages")
@@ -1370,8 +1383,7 @@ def languages(
     if q.strip():
         query = query.where(LanguageCatalog.name.icontains(q.strip(), autoescape=True))
     rows = db.scalars(query.order_by(LanguageCatalog.sort_order, LanguageCatalog.name).limit(200)).all()
-    if q.strip():
-        rows = rank_language_matches(rows, q)
+    rows = rank_language_matches(rows, q) if q.strip() else sorted(rows, key=language_priority)
     if rows or (db.scalar(select(func.count()).select_from(LanguageCatalog)) or 0):
         return {"items": [view(row) for row in rows]}
 

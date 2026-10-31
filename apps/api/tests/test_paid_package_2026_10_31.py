@@ -68,3 +68,20 @@ def test_orders_list_sorted_by_number_newest_first(client, create_user):
         _order(client, headers, number=number)
     numbers = [item["number"] for item in client.get("/api/admin/crm/orders").json()["items"]]
     assert numbers == ["26-0100", "26-0009", "25-0500"]
+
+
+def test_directories_are_alphabetical_and_languages_put_russian_and_english_first(client, create_user):
+    headers = setup(client, create_user)
+    for name in ["Яковлев", "Абрамова", "Мельник"]:
+        assert client.post("/api/admin/executors", headers=headers, json={"name": name}).status_code == 201
+    assert [row["name"] for row in client.get("/api/admin/executors").json()["items"]] == ["Абрамова", "Мельник", "Яковлев"]
+
+    for code, name in [("zz", "Апостиль"), ("aa", "Вычитка"), ("mm", "Набор текста")]:
+        assert client.post("/api/admin/crm/services", headers=headers, json={"code": code, "name": name, "billing_mode": "FIXED"}).status_code == 201
+    assert [row["name"] for row in client.get("/api/admin/crm/services").json()] == ["Апостиль", "Вычитка", "Набор текста"]
+
+    for name, order in [("Белорусский", 10), ("Немецкий", 20), ("Английский", 30), ("Арабский", 40), ("Русский", 50)]:
+        assert client.post("/api/admin/crm/languages", headers=headers, json={"name": name, "sort_order": order}).status_code == 201
+    assert [row["name"] for row in client.get("/api/admin/crm/languages").json()["items"]] == [
+        "Русский", "Английский", "Арабский", "Белорусский", "Немецкий",
+    ]

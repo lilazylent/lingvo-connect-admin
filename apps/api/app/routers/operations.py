@@ -190,12 +190,12 @@ def commit(db):
         raise HTTPException(409, "Запись уже существует или связанные данные изменены.") from exc
 
 
-def paginate(db, model, filters, page, page_size, serializer=view):
+def paginate(db, model, filters, page, page_size, serializer=view, order_by=None):
     total = db.scalar(select(func.count()).select_from(model).where(*filters)) or 0
     rows = db.scalars(
         select(model)
         .where(*filters)
-        .order_by(model.created_at.desc(), model.id)
+        .order_by(*(order_by or (model.created_at.desc(), model.id)))
         .offset((page - 1) * page_size)
         .limit(page_size)
     ).all()
@@ -416,7 +416,8 @@ def executors(
         if work_type:
             directions = directions.where(ExecutorDirection.work_type == work_type)
         filters.append(Executor.id.in_(directions))
-    return paginate(db, Executor, filters, page, page_size, lambda row: executor_view(db, row))
+    # owner request 2026-10-31: executors in alphabetical order
+    return paginate(db, Executor, filters, page, page_size, lambda row: executor_view(db, row), order_by=(Executor.name, Executor.id))
 
 
 @router.post("/executors", status_code=201)

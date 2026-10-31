@@ -18,8 +18,8 @@ def test_language_search_ranks_exact_and_prefix_matches_first():
     catalog = [SimpleNamespace(name=name) for name in ["Белорусский", "Русский", "Английский"]]
     assert [row.name for row in rank_language_matches(catalog[:2], "рус")] == ["Русский", "Белорусский"]
     assert [row.name for row in rank_language_matches(catalog[:2], " Русский ")] == ["Русский", "Белорусский"]
-    # substring-only matches keep the catalog order
-    assert [row.name for row in rank_language_matches(catalog, "ск")] == ["Белорусский", "Русский", "Английский"]
+    # substring-only matches: Russian, English, then alphabetically (owner request of the paid package)
+    assert [row.name for row in rank_language_matches(catalog, "ск")] == ["Русский", "Английский", "Белорусский"]
 
 
 def test_language_endpoint_puts_exact_match_first(client, create_user):
@@ -27,8 +27,8 @@ def test_language_endpoint_puts_exact_match_first(client, create_user):
     for name, order in [("Белорусский", 10), ("Русский", 20)]:
         assert client.post("/api/admin/crm/languages", headers=headers, json={"name": name, "sort_order": order}).status_code == 201
     # (the SQLite test DB matches Cyrillic case-sensitively; PostgreSQL ILIKE does not)
-    assert [item["name"] for item in client.get("/api/admin/crm/languages?q=усский").json()["items"]] == ["Белорусский", "Русский"]
-    assert [item["name"] for item in client.get("/api/admin/crm/languages").json()["items"]] == ["Белорусский", "Русский"]
+    assert [item["name"] for item in client.get("/api/admin/crm/languages?q=усский").json()["items"]] == ["Русский", "Белорусский"]
+    assert [item["name"] for item in client.get("/api/admin/crm/languages").json()["items"]] == ["Русский", "Белорусский"]
 
 
 def test_work_with_disabled_service_stays_editable(client, create_user):

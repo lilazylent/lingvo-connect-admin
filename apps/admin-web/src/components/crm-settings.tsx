@@ -102,7 +102,7 @@ const modules: {
   copy: string;
   adminOnly?: boolean;
 }[] = [
-  { id: "catalogs", number: "01", title: "Справочники", copy: "Языки и базовые справочники, которыми пользуются все рабочие модули CRM.", adminOnly: true },
+  { id: "catalogs", number: "01", title: "Справочники", copy: "Языки, тематики и базовые справочники, которыми пользуются все рабочие модули CRM.", adminOnly: true },
   { id: "tariffs", number: "02", title: "Тарифы", copy: "Ставки по услугам, языкам и единицам расчёта.", adminOnly: true },
   { id: "rules", number: "03", title: "Скидки и коэффициенты", copy: "Правила расчёта стоимости, скидки и надбавки.", adminOnly: true },
   { id: "appearance", number: "04", title: "Оформление", copy: "Персональная тема рабочего пространства." },
@@ -141,22 +141,25 @@ export function CrmSettings() {
   const [rules, setRules] = useState<PricingRule[] | null>(null);
   const [statuses, setStatuses] = useState<OrderStatusOption[] | null>(null);
   const [languages, setLanguages] = useState<Language[] | null>(null);
+  const [topics, setTopics] = useState<Language[] | null>(null);
   const [error, setError] = useState("");
   const load = useCallback(async () => {
     try {
       if (!admin) return;
-      const [s, t, r, os, languageResult] = await Promise.all([
+      const [s, t, r, os, languageResult, topicResult] = await Promise.all([
         api<Service[]>("/api/admin/crm/services"),
         api<Tariff[]>("/api/admin/crm/tariffs"),
         api<PricingRule[]>("/api/admin/crm/pricing-rules"),
         api<OrderStatusOption[]>("/api/admin/crm/order-statuses"),
         api<{ items: Language[] }>("/api/admin/crm/languages?include_inactive=true"),
+        api<{ items: Language[] }>("/api/admin/crm/topics?include_inactive=true"),
       ]);
       setServices(s);
       setTariffs(t);
       setRules(r);
       setStatuses(os);
       setLanguages(languageResult.items);
+      setTopics(topicResult.items ?? []);
       setError("");
     } catch (e) {
       setError(
@@ -168,7 +171,7 @@ export function CrmSettings() {
     const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
   }, [load]);
-  const waiting = admin && (!services || !tariffs || !rules || !statuses || !languages);
+  const waiting = admin && (!services || !tariffs || !rules || !statuses || !languages || !topics);
   const visibleModules = modules.filter((item) => admin || !item.adminOnly);
   const active =
     visibleModules.find((item) => item.id === tab) ?? visibleModules[0];
@@ -227,8 +230,11 @@ export function CrmSettings() {
             <LoadingState />
           ) : tab === "appearance" ? (
             <Appearance />
-          ) : tab === "catalogs" && languages ? (
-            <Languages languages={languages} reload={load} />
+          ) : tab === "catalogs" && languages && topics ? (
+            <>
+              <Languages languages={languages} reload={load} />
+              <Topics topics={topics} reload={load} />
+            </>
           ) : tab === "services" && services ? (
             <Services services={services} reload={load} />
           ) : tab === "orders" && statuses ? (
@@ -419,6 +425,60 @@ function Languages({ languages, reload }: { languages: Language[]; reload: () =>
     {!visible.length && <p className="crm-empty">Языки по этому запросу не найдены.</p>}
     <SettingsPager page={safePage} pages={pages} total={filtered.length} onPage={setPage} />
   </section>;
+}
+
+// «Тематика (РС)» of the work form (DOCX v3). Works keep the topic text, so a rename or a
+// disabled topic never changes existing works.
+function Topics({ topics, reload }: { topics: Language[]; reload: () => void }) {
+  const [editing, setEditing] = useState<Language | null | undefined>(undefined);
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(8);
+  const needle = query.trim().toLocaleLowerCase("ru-RU");
+  const filtered = topics.filter((topic) => !needle || topic.name.toLocaleLowerCase("ru-RU").includes(needle));
+  const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, pages);
+  const visible = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
+  return <section className="settings-surface phase6-language-settings topic-settings">
+    <header><div><span className="overline">Работы заказа</span><h2>Тематики</h2></div><Button onClick={() => setEditing(null)}>Добавить тематику +</Button></header>
+    <p className="settings-head-copy">Список «Тематика» в работах заказа. Отключённая тематика не предлагается для новых работ, сохранённые работы её не теряют.</p>
+    <div className="settings-catalog-tools">
+      <Input label="Поиск тематики" placeholder="Название тематики" value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} />
+      <PageSizeControl value={pageSize} onChange={(size) => { setPageSize(size); setPage(1); }} />
+    </div>
+    {editing !== undefined && <SettingsDialog title={editing ? "Изменить тематику" : "Новая тематика"} copy="Тематика сразу появится в списке работ заказа." onClose={() => setEditing(undefined)}>
+      <TopicForm item={editing} onClose={() => setEditing(undefined)} onSaved={() => { setEditing(undefined); reload(); }} />
+    </SettingsDialog>}
+    <div className="table-wrap"><table><thead><tr><th>Тематика</th><th>Порядок</th><th>Статус</th><th /></tr></thead><tbody>
+      {visible.map((topic) => <tr key={topic.id}><td><strong>{topic.name}</strong></td><td>{topic.sort_order}</td><td><Badge tone={topic.active ? "success" : "neutral"}>{topic.active ? "Активна" : "Отключена"}</Badge></td><td><Button variant="quiet" onClick={() => setEditing(topic)}>Изменить</Button></td></tr>)}
+    </tbody></table></div>
+    {!visible.length && <p className="crm-empty">Тематики по этому запросу не найдены.</p>}
+    <SettingsPager page={safePage} pages={pages} total={filtered.length} onPage={setPage} />
+  </section>;
+}
+
+function TopicForm({ item, onClose, onSaved }: { item: Language | null; onClose: () => void; onSaved: () => void }) {
+  const [name, setName] = useState(item?.name || "");
+  const [sortOrder, setSortOrder] = useState(String(item?.sort_order ?? 100));
+  const [active, setActive] = useState(item?.active ?? true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  async function save(event: FormEvent) {
+    event.preventDefault(); setBusy(true); setError("");
+    try {
+      await api(`/api/admin/crm/topics${item ? `/${item.id}` : ""}`, { method: item ? "PATCH" : "POST", body: JSON.stringify({ name: name.trim(), active, sort_order: Number(sortOrder || 0) }) });
+      onSaved();
+    } catch (nextError) { setError(nextError instanceof Error ? nextError.message : "Не удалось сохранить тематику"); } finally { setBusy(false); }
+  }
+  return <form className="crm-editor compact-settings-form" onSubmit={save}>
+    {error && <ErrorState message={error} />}
+    <fieldset className="wizard-grid" disabled={busy}>
+      <Input label="Название тематики" hint={item ? "Новое название применяется к новым работам; сохранённые работы сохраняют прежний текст." : undefined} value={name} onChange={(event) => setName(event.target.value)} required maxLength={120} />
+      <Input label="Порядок" type="number" min="0" value={sortOrder} onChange={(event) => setSortOrder(event.target.value)} />
+      <label className="manual-switch"><input type="checkbox" checked={active} onChange={(event) => setActive(event.target.checked)} /><span>Доступна для выбора</span></label>
+    </fieldset>
+    <div className="form-actions"><Button disabled={busy}>{busy ? "Сохраняем…" : "Сохранить тематику"}</Button><Button type="button" variant="quiet" onClick={onClose}>Отмена</Button></div>
+  </form>;
 }
 
 function LanguageForm({ item, onClose, onSaved }: { item: Language | null; onClose: () => void; onSaved: () => void }) {
