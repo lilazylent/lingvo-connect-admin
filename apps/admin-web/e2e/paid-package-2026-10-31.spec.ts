@@ -135,17 +135,18 @@ for (const width of [1440, 1280, 768, 390]) {
 // The services come from the real backend metadata (apps/api/app/service_definitions.py).
 
 const TEXT_TAIL = ["Тип переводчика", "Статус", "Тематика", "Комментарий", "Наценка / Срочность", "Скидка, %", "Прикрепить документы клиента", "Не учитывать в расчёте для клиента", "Название документа (-ов)"];
-const WRITTEN = ["Услуга", "Количество знаков", "Количество условных страниц", "Язык оригинала", "Язык перевода", ...TEXT_TAIL];
-const SIMPLE_TAIL = ["Наценка / Срочность", "Скидка, %", "Не учитывать в расчёте для клиента", "Статус", "Комментарий"];
+const PRICE = ["Тариф", "Стоимость"];
+const WRITTEN = ["Услуга", "Количество знаков", "Количество условных страниц", "Язык оригинала", "Язык перевода", ...PRICE, ...TEXT_TAIL];
+const SIMPLE_TAIL = ["Наценка / Срочность", "Скидка, %", ...PRICE, "Не учитывать в расчёте для клиента", "Статус", "Комментарий"];
 // 16 logical work types of DOCX v3, in Oleg's order: picker entry → field labels in DOM order
 const V3_FORMS: [string, string[]][] = [
   ["Письменный перевод (полный)", WRITTEN],
   ["Письменный перевод (повторения)", WRITTEN],
-  ["Письменный перевод (шаблон)", ["Услуга", "Количество документов", "Язык оригинала", "Язык перевода", ...TEXT_TAIL]],
+  ["Письменный перевод (шаблон)", ["Услуга", "Количество документов", "Язык оригинала", "Язык перевода", ...PRICE, ...TEXT_TAIL]],
   ["Вычитка", WRITTEN],
-  ["Набор текста", ["Услуга", "Количество знаков", "Количество условных страниц", "Язык оригинала", ...TEXT_TAIL]],
+  ["Набор текста", ["Услуга", "Количество знаков", "Количество условных страниц", "Язык оригинала", ...PRICE, ...TEXT_TAIL]],
   ["Нотариальное заверение", ["Услуга", "Количество документов", ...SIMPLE_TAIL]],
-  ["Заверение печатью «Лингво Коннект»", ["Услуга", "Количество документов", "Вариант заверения", "Наценка / Срочность", "Скидка, %", "Статус", "Не учитывать в расчёте для клиента", "Комментарий"]],
+  ["Заверение печатью «Лингво Коннект»", ["Услуга", "Количество документов", "Вариант заверения", ...PRICE, "Наценка / Срочность", "Скидка, %", "Статус", "Не учитывать в расчёте для клиента", "Комментарий"]],
   ["Апостиль", ["Услуга", "Количество документов", ...SIMPLE_TAIL]],
   ["Нотариальная копия", ["Услуга", "Количество страниц", ...SIMPLE_TAIL]],
   ["Вёрстка текста", ["Услуга", "Количество страниц", ...SIMPLE_TAIL]],
@@ -155,8 +156,8 @@ const V3_FORMS: [string, string[]][] = [
   ["Скан", ["Услуга", "Количество страниц (фактических)", ...SIMPLE_TAIL]],
   ["Доставка", ["Услуга", "Дата", "Время", ...SIMPLE_TAIL]],
   ["Аудирование", ["Услуга", "Длительность, секунд", ...SIMPLE_TAIL]],
-  ["Транскрибация", ["Услуга", "Количество знаков", "Количество условных страниц", "Язык оригинала", ...TEXT_TAIL]],
-  ["Устный перевод", ["Услуга", "Количество часов", "Тип перевода", "Язык оригинала", "Язык перевода", "Статус", "Тип переводчика", "Комментарий", "Тематика", "Наценка / Срочность", "Скидка, %", "Прикрепить документы клиента", "Не учитывать в расчёте для клиента", "Название документа (-ов)"]],
+  ["Транскрибация", ["Услуга", "Количество знаков", "Количество условных страниц", "Язык оригинала", ...PRICE, ...TEXT_TAIL]],
+  ["Устный перевод", ["Услуга", "Количество часов", "Тип перевода", ...PRICE, "Язык оригинала", "Язык перевода", "Статус", "Тип переводчика", "Комментарий", "Тематика", "Наценка / Срочность", "Скидка, %", "Прикрепить документы клиента", "Не учитывать в расчёте для клиента", "Название документа (-ов)"]],
 ];
 const services = serviceDefinitions as unknown[];
 const topics = { items: [{ name: "юридическая" }, { name: "техническая" }] };
@@ -200,8 +201,7 @@ test("written variants, interpreting type, topic and per-work documents reach th
   await first.getByLabel("Название документа (-ов)").fill("Договор №5");
   await expect(first.getByLabel("Название документа (-ов)")).toHaveValue("Договор №5");
   await expect(first.locator(".work-layout__cell--document_names")).toContainText("Введено вручную");
-  // the wizard has no tariff/cost cells on «Работы»: the tariff is chosen on «Расчёт»
-  await expect(first.locator(".work-layout__cell--tariff, .work-layout__cell--price")).toHaveCount(0);
+
 
   await wizard.getByRole("button", { name: "Добавить работу +" }).click();
   const second = wizard.locator(".work-draft").nth(1);
@@ -457,4 +457,48 @@ test("emptying the character count empties the derived pages (owner report 2026-
   await expect(work.getByText("Введено вручную")).toBeVisible();
   await work.getByLabel("Количество знаков").fill("");
   await expect(work.getByLabel("Количество условных страниц")).toHaveValue("");
+});
+
+test("«Работы»: the tariff is picked as soon as the work is filled, changeable there and on «Расчёт»", async ({ page }) => {
+  const requests: Request[] = [];
+  const pricing = {
+    options: [
+      { key: "t-en", tariff_ids: ["t-en"], resolution: "to_russian", rate: 500, unit: "CONDITIONAL_PAGE", amount: 1000, quantity: 2, base_amount: 1000, surcharge_multiplier: 1, before_discount: 1000, discount_percent: 0, discount_amount: 0, source_language: "Английский", target_language: "Русский", directions: ["TO_RUSSIAN"], components: [], is_auto: true },
+      { key: "client:c1", tariff_ids: ["client:c1"], resolution: "client_tariff", rate: 400, unit: "CONDITIONAL_PAGE", amount: 800, quantity: 2, base_amount: 800, surcharge_multiplier: 1, before_discount: 800, discount_percent: 0, discount_amount: 0, source_language: "Английский", target_language: "Русский", directions: [], components: [], is_auto: false, client_tariff: { client_name: "ООО Спектр", tier_id: "c1", quantity_from: 1, tiers: 1 } },
+    ],
+    auto_key: "t-en", resolution: "to_russian", message: "",
+  };
+  const wizard = await openWizard(page, requests, {
+    services,
+    extra: (path) => path.endsWith("/crm/pricing/options") ? pricing
+      : path.endsWith("/crm/languages") ? { items: [{ id: "en", name: "Английский", active: true, sort_order: 1 }, { id: "ru", name: "Русский", active: true, sort_order: 2 }] }
+        : undefined,
+  });
+  await wizard.locator(".wizard-steps button").filter({ hasText: "02" }).click();
+  const work = wizard.locator(".work-draft").first();
+  await pick(page, work, "Услуга", "Письменный перевод (полный)");
+  await work.getByLabel("Количество знаков").fill("3600");
+  // quoted automatically once the work is filled: tariff and cost are real values, not placeholders
+  // price per unit and for the whole work are visible at once (owner, 2026-11-01)
+  await expect(work.locator(".work-layout__cell--tariff")).toContainText("подобран CRM");
+  await expect(work.locator(".work-layout__cell--tariff .field__hint")).toContainText("500");
+  await expect(work.locator(".work-layout__cell--price .calculated-value--total")).toBeVisible();
+  await expect(work.locator(".work-layout__cell--price")).toContainText("1 000 ₽");
+  const quotes = () => requests.filter((r) => r.path.endsWith("/crm/pricing/options")).length;
+  const settled = quotes();
+  await page.waitForTimeout(700);
+  expect(quotes()).toBe(settled); // no re-quoting loop
+
+  // change the tariff on «Работы» → the same choice is shown on «Расчёт», and vice versa
+  await work.getByLabel("Тариф", { exact: true }).click();
+  await page.getByRole("option", { name: /Тариф клиента «ООО Спектр»/ }).click();
+  await expect(work.locator(".work-layout__cell--price")).toContainText("800 ₽");
+  await wizard.locator(".wizard-steps button").filter({ hasText: "03" }).click();
+  const row = wizard.locator(".price-row").first();
+  await expect(row.getByLabel("Тариф", { exact: true })).toContainText("Тариф клиента «ООО Спектр»");
+  await row.getByLabel("Тариф", { exact: true }).click();
+  await page.getByRole("option", { name: /рекомендован/ }).click();
+  await wizard.locator(".wizard-steps button").filter({ hasText: "02" }).click();
+  await expect(work.locator(".work-layout__cell--price")).toContainText("1 000 ₽");
+  if (process.env.CAPTURE_OWNER_QA) await work.screenshot({ path: "../../test-results/paid-v3/works-tariff.png" });
 });

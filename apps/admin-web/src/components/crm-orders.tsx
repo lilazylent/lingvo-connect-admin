@@ -640,6 +640,17 @@ const tariffMessage = (option: TariffOption, automatic = option.is_auto) => {
       : "";
   return `${automatic ? "Тариф подобран CRM" : "Тариф выбран менеджером"}: ${formatRate(option.rate, option.unit)} × ${billingQuantityLabel(option.unit, quantity)}${multiplier > 1 ? ` × ${multiplier} срочность` : ""}${discount > 0 ? ` − ${discount}% ${option.client_tariff ? "скидка клиента" : "скидка"}` : ""} · ${route}${components}`;
 };
+const quotePatchFromOption = (work: DraftWork, option: TariffOption, automatic = false): Partial<DraftWork> => ({
+  tariff_ids: option.tariff_ids,
+  client_rate: "0",
+  quoteAmount: String(option.amount),
+  quoteBeforeDiscount: String(option.before_discount ?? option.amount),
+  quoteAutoDiscount: String(option.discount_percent ?? 0),
+  discount_percent: work.manualDiscount ? work.discount_percent : String(option.discount_percent ?? 0),
+  quoteRate: String(option.rate),
+  quoteUnit: option.unit,
+  quoteMessage: tariffMessage(option, automatic),
+});
 const newKey = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const conditionalPages = (value: string | number | null | undefined, minimum = true) => {
   const chars = Number(value || 0);
@@ -1712,6 +1723,26 @@ function OrderWizard({
       ),
     [works],
   );
+  // «Тариф» and «Стоимость» are filled on the «Работы» step already: a work is quoted again only
+  // when its pricing inputs change (a tariff that was not found is not requested in a loop)
+  const quotedInputs = useRef<Record<string, string>>({});
+  const [quoting, setQuoting] = useState<string[]>([]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      works.forEach((w) => {
+        if (!w.service_code || w.manualPrice || Number(w.client_rate || 0) > 0) return;
+        const inputs = [w.service_code, w.certification_mode, w.source_language, w.target_language, billedCharacters(w), w.page_count,
+          w.document_count, w.duration_seconds, w.hour_count, w.urgent, w.urgency_multiplier, w.native_speaker, client].join("|");
+        if (quotedInputs.current[w.key] === inputs) return;
+        quotedInputs.current[w.key] = inputs;
+        setQuoting((keys) => [...keys, w.key]);
+        void resolveTariff(w).finally(() => setQuoting((keys) => keys.filter((key) => key !== w.key)));
+      });
+    }, 450);
+    return () => window.clearTimeout(timer);
+    // resolveTariff reads the work it is given; re-running on its identity would re-quote every render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [works, client]);
   const patchWork = (key: string, patch: Partial<DraftWork>) =>
     setWorks((items) =>
       items.map((w) => (w.key === key ? { ...w, ...patch } : w)),
@@ -2087,6 +2118,15 @@ function OrderWizard({
                 remove={() =>
                   setWorks((items) => items.filter((x) => x.key !== w.key))
                 }
+                tariffSlot={
+                  <WizardTariffField
+                    work={w}
+                    service={services.find((item) => item.code === w.service_code)}
+                    options={tariffOptions[w.key]}
+                    loading={quoting.includes(w.key)}
+                    onPick={(option) => patchWork(w.key, quotePatchFromOption(w, option))}
+                  />
+                }
                 filesSlot={
                   <WorkFilesField
                     label={w.service_code ? "Прикрепить документы клиента" : "Документы клиента"}
@@ -2177,20 +2217,7 @@ function OrderWizard({
                           const option = options.find(
                             (item) => item.key === e.target.value,
                           );
-                          if (option)
-                            patchWork(w.key, {
-                              tariff_ids: option.tariff_ids,
-                              quoteAmount: String(option.amount),
-                              quoteBeforeDiscount: String(option.before_discount ?? option.amount),
-                              quoteAutoDiscount: String(option.discount_percent ?? 0),
-                              discount_percent: w.manualDiscount
-                                ? w.discount_percent
-                                : String(option.discount_percent ?? 0),
-                              quoteRate: String(option.rate),
-                              quoteUnit: option.unit,
-                              client_rate: "0",
-                              quoteMessage: tariffMessage(option, false),
-                            });
+                          if (option) patchWork(w.key, quotePatchFromOption(w, option));
                         }}
                       >
                         <option value="">
@@ -2490,6 +2517,38 @@ const tariffSourceLabel = (work: DraftWork) =>
           ? "Ставка вручную"
           : "Подбирается CRM при сохранении";
 
+/** «Тариф» on the wizard «Работы» step: the same choice as on «Расчёт» (one state). */
+function WizardTariffField({ work, service, options, loading, onPick }: { work: DraftWork; service?: Service; options: TariffOption[] | undefined; loading: boolean; onPick: (option: TariffOption) => void }) {
+  if (!work.service_code) return null;
+  if (work.manualPrice || Number(work.client_rate || 0) > 0)
+    return (
+      <div className="pricing-field">
+        <span className="field__label">Тариф</span>
+        <div className="calculated-value">
+          <strong>{work.manualPrice ? "Итог вручную" : formatRate(work.client_rate, work.billing_unit)}</strong>
+          <small>{work.manualPrice ? "Задан на шаге «Расчёт»" : "Ставка вручную"}</small>
+        </div>
+      </div>
+    );
+  const selectedKey = work.tariff_ids.join(",");
+  const selected = options?.find((option) => option.key === selectedKey);
+  return (
+    <Select
+      label="Тариф"
+      value={selected ? selectedKey : ""}
+      // the price per unit stays readable even when the option text is truncated
+      hint={loading ? "Подбираем тариф…" : selected ? `${formatRate(selected.rate, selected.unit)} · ${selected.client_tariff ? "тариф клиента" : selected.is_auto ? "подобран CRM" : "выбран вручную"}` : options && !options.length ? "Тариф не найден — ставку можно указать на шаге «Расчёт»" : "Заполните услугу, языки и объём"}
+      onChange={(e) => {
+        const option = options?.find((item) => item.key === e.target.value);
+        if (option) onPick(option);
+      }}
+    >
+      <option value="">{options?.length ? "Выберите тариф" : "—"}</option>
+      {(options ?? []).map((option) => <option key={option.key} value={option.key}>{tariffOptionLabel(service, option)}</option>)}
+    </Select>
+  );
+}
+
 /** «Тариф» of a saved order: choose another allowed tariff (client / standard). */
 function WorkTariffPicker({ work, service, clientId, patch }: { work: DraftWork; service?: Service; clientId: string | null; patch: (p: Partial<DraftWork>) => void }) {
   const [options, setOptions] = useState<TariffOption[] | null>(null);
@@ -2535,18 +2594,7 @@ function WorkTariffPicker({ work, service, clientId, patch }: { work: DraftWork;
         onChange={(e) => {
           const option = options.find((item) => item.key === e.target.value);
           if (!option) return;
-          patch({
-            tariff_ids: option.tariff_ids,
-            client_rate: "0",
-            manualPrice: false,
-            quoteAmount: String(option.amount),
-            quoteBeforeDiscount: String(option.before_discount ?? option.amount),
-            quoteAutoDiscount: String(option.discount_percent ?? 0),
-            discount_percent: work.manualDiscount ? work.discount_percent : String(option.discount_percent ?? 0),
-            quoteRate: String(option.rate),
-            quoteUnit: option.unit,
-            quoteMessage: tariffMessage(option, false),
-          });
+          patch({ ...quotePatchFromOption(work, option), manualPrice: false });
         }}
       >
         <option value="">{options.length ? "Выберите тариф" : "Подходящих тарифов нет"}</option>
@@ -2861,7 +2909,8 @@ function WorkDraft({
         return tariffSlot ? (
           <div className="pricing-field">
             <span className="field__label">Стоимость</span>
-            <div className="calculated-value">
+            {/* same look as the work total on «Расчёт» */}
+            <div className="calculated-value calculated-value--total">
               <strong>{work.manualPrice ? rub(work.price) : work.quoteAmount || Number(work.client_rate || 0) > 0 ? rub(localPrice(work)) : "—"}</strong>
               <small>{work.client_billable ? "Для клиента" : "Не входит в стоимость для клиента"}</small>
             </div>
