@@ -1086,3 +1086,16 @@
   .crm-statistics__caption .view-switch button,
   .crm-statistics__presets .view-switch button { flex: 0 0 auto; white-space: nowrap; }
 }
+
+/* Bug-fix sprint 2026-10-31: inline order forms are scrolled into view on open;
+   keep their start below the sticky topbar. */
+.crm-wizard,
+.work-inline-editor,
+.order-core-editor { scroll-margin-top: calc(var(--ui-topbar-height) + 16px); }
+.crm-wizard:focus,
+.work-inline-editor:focus,
+.order-core-editor:focus { outline: none; }
+
+/* Bug-fix sprint 2026-10-31: character count stays correctable on the «Расчёт» step. */
+.price-row__volume { display: grid; grid-template-columns: minmax(0, 380px); margin: 0 0 12px; }
+.price-row__volume > * { min-width: 0; }

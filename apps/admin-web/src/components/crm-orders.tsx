@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { api, apiDownloadUrl } from "@/lib/api";
 import { formatCrmDate } from "@/lib/format-date";
 import { formatBillingQuantity, formatRate } from "@/lib/billing-format";
@@ -338,6 +338,9 @@ type DraftWork = {
   manualDiscount: boolean;
   discount_percent: string;
   character_count: string;
+  // «Количество знаков (А/З)»: AUTO = taken from document analysis, MANUAL = typed by the
+  // manager; a manual value is never replaced by a later analysis result (UI-only flag)
+  charactersSource?: "AUTO" | "MANUAL";
   page_count: string;
   word_count: string;
   document_count: string;
@@ -607,6 +610,14 @@ const resetQuotePatch = {
   quoteUnit: "",
   quoteMessage: "",
 };
+// Volume-only edits keep a client price-list key (`client:<id>`): the backend keeps that
+// key stable and re-picks the quantity tier itself. Any other tariff is re-quoted.
+const volumeQuotePatch = (work: DraftWork): Partial<DraftWork> =>
+  work.tariff_ids.some((id) => id.startsWith("client:"))
+    ? { quoteAmount: "", quoteBeforeDiscount: "", quoteAutoDiscount: "", quoteMessage: "" }
+    : resetQuotePatch;
+const charactersLabel = (source: DraftWork["charactersSource"]) =>
+  source === "AUTO" ? "Количество знаков (А)" : source === "MANUAL" ? "Количество знаков (З)" : "Количество знаков";
 const serviceFieldPatch = (work: DraftWork, service: Service | undefined): Partial<DraftWork> => {
   if (!service) {
     return {
@@ -764,6 +775,26 @@ function localPrice(work: DraftWork, executor = false) {
 }
 
 
+// Inline forms (order wizard, work editor) open outside the viewport; bring the
+// form start under the sticky topbar (via scroll-margin-top) and move focus to the form.
+// Focus goes to the panel, not a field: a focused language combobox opens its list and
+// Enter would pick the first language.
+function useRevealOnOpen(ref: RefObject<HTMLElement | null>, openKey: string | null) {
+  useEffect(() => {
+    if (!openKey) return;
+    const frame = window.requestAnimationFrame(() => {
+      const panel = ref.current;
+      if (!panel) return;
+      panel.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        block: "start",
+      });
+      panel.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [ref, openKey]);
+}
+
 export function CrmOrders() {
   const searchParams = useSearchParams();
   const orderDetailRef = useRef<HTMLDivElement>(null);
@@ -781,6 +812,8 @@ export function CrmOrders() {
   const [statusOptions, setStatusOptions] =
     useState<StatusOption[]>(fallbackStatuses);
   const [wizard, setWizard] = useState(false);
+  // bumps on every «Новый заказ» click so an already open wizard is revealed again
+  const [wizardReveal, setWizardReveal] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [uploadNotice, setUploadNotice] = useState<{ orderId: string; message: string } | null>(null);
@@ -897,6 +930,7 @@ export function CrmOrders() {
           onClick={() => {
             setSelectedId(null);
             setWizard(true);
+            setWizardReveal((n) => n + 1);
           }}
         >
           <Icon name="plus" size={17} /> Новый заказ
@@ -1038,6 +1072,7 @@ export function CrmOrders() {
         <OrderWizard
           applicationId={applicationId}
           statuses={statusOptions}
+          revealKey={wizardReveal}
           onClose={() => setWizard(false)}
           onCreated={(id, uploadError) => {
             setWizard(false);
@@ -1347,11 +1382,13 @@ function OrdersKanban({
 function OrderWizard({
   applicationId,
   statuses,
+  revealKey,
   onClose,
   onCreated,
 }: {
   applicationId: string;
   statuses: StatusOption[];
+  revealKey: number;
   onClose: () => void;
   onCreated: (id: string, uploadError?: string) => void;
 }) {
@@ -1384,6 +1421,8 @@ function OrderWizard({
   const [tariffOptions, setTariffOptions] = useState<
     Record<string, TariffOption[]>
   >({});
+  const wizardRef = useRef<HTMLElement>(null);
+  useRevealOnOpen(wizardRef, `wizard:${revealKey}`);
   useEffect(() => {
     api<Service[]>("/api/admin/crm/services?active=true")
       .then(setServices)
@@ -1588,18 +1627,22 @@ function OrderWizard({
               const service = services.find((item) => item.code === w.service_code);
               const canUseCharacters = serviceHasField(service, "character_count", w.certification_mode);
               const canUsePages = serviceHasField(service, "page_count", w.certification_mode);
-              const character_count = canUseCharacters
-                ? result.character_count?.toString() ?? w.character_count
-                : w.character_count;
+              if (w.charactersSource === "MANUAL") return { ...w, word_count: result.word_count?.toString() ?? w.word_count };
+              const analysed = canUseCharacters ? result.character_count?.toString() : undefined;
+              const character_count = analysed ?? w.character_count;
+              const volumeChanged = character_count !== w.character_count;
               return {
                 ...w,
                 character_count,
+                charactersSource: analysed !== undefined ? "AUTO" : w.charactersSource,
                 page_count: canUsePages
                   ? service?.definition?.page_from_characters && character_count
                     ? conditionalPages(character_count)
                     : result.page_count?.toString() ?? w.page_count
                   : w.page_count,
                 word_count: result.word_count?.toString() ?? w.word_count,
+                // an old quote was priced for the previous volume
+                ...(volumeChanged && !w.manualPrice ? volumeQuotePatch(w) : {}),
               };
             })()
           : w,
@@ -1752,7 +1795,7 @@ function OrderWizard({
   }, [step]);
   const canNext = true;
   return (
-    <section className="crm-wizard">
+    <section className="crm-wizard" ref={wizardRef} tabIndex={-1} aria-label="Регистрация заказа">
       <header className="crm-wizard__head">
         <div>
           <span className="overline">Новый заказ{orderNumberPreview ? ` · ${manualNumber || orderNumberPreview}` : ""}</span>
@@ -1964,6 +2007,29 @@ function OrderWizard({
                       {!w.client_billable ? "Внутренняя работа · " : ""}{draftWorkDirectionLabel(w)} · {draftWorkVolumeLabel(w)}
                     </span>
                   </header>
+                  {service && serviceHasField(service, "character_count", w.certification_mode) && (
+                    <div className="price-row__volume">
+                      <Input
+                        label={charactersLabel(w.charactersSource)}
+                        hint="Исправьте объём, если автоматический подсчёт неточен; расчёт обновится"
+                        type="number"
+                        min="0"
+                        value={w.character_count}
+                        onChange={(e) => {
+                          const character_count = e.target.value;
+                          patchWork(w.key, {
+                            character_count,
+                            charactersSource: "MANUAL",
+                            page_count: service.definition?.page_from_characters && character_count ? conditionalPages(character_count) : w.page_count,
+                            ...(w.manualPrice ? {} : volumeQuotePatch(w)),
+                          });
+                        }}
+                        onBlur={() => {
+                          if (!w.manualPrice && !w.quoteAmount) void resolveTariff(w);
+                        }}
+                      />
+                    </div>
+                  )}
                   <div className="price-row__fields price-row__fields--tariff">
                     <div className="pricing-field pricing-field--tariff">
                       <Select
@@ -2329,7 +2395,7 @@ function WorkDraft({
   const fields = activeServiceFields(service, work.certification_mode);
   const has = (field: string) => !definition || fields.has(field);
   const pageFromCharacters = Boolean(definition?.page_from_characters);
-  const clearQuote = () => resetQuotePatch;
+  const clearQuote = () => volumeQuotePatch(work);
   const patchQuantity = (payload: Partial<DraftWork>) => patch({ ...payload, ...clearQuote() });
 
   return (
@@ -2352,8 +2418,8 @@ function WorkDraft({
           }}
         >
           <option value="">Выберите услугу</option>
-          {services.map((item) => (
-            <option key={item.code} value={item.code}>{item.name}</option>
+          {services.filter((item) => item.active !== false || item.code === work.service_code).map((item) => (
+            <option key={item.code} value={item.code}>{item.active === false ? `${item.name} (отключена)` : item.name}</option>
           ))}
         </Select></div>
 
@@ -2404,7 +2470,7 @@ function WorkDraft({
         )}
         {service && has("character_count") && (
           <div className="work-field work-field--chars"><Input
-            label="Количество знаков"
+            label={charactersLabel(work.charactersSource)}
             hint={pageFromCharacters ? "Страницы рассчитываются автоматически: 1800 знаков = 1 страница" : undefined}
             type="number"
             min="0"
@@ -2413,6 +2479,7 @@ function WorkDraft({
               const character_count = e.target.value;
               patchQuantity({
                 character_count,
+                charactersSource: "MANUAL",
                 page_count: pageFromCharacters && character_count ? conditionalPages(character_count) : work.page_count,
               });
             }}
@@ -3387,6 +3454,7 @@ type WorkEditorState = {
   workId?: string;
   version?: number;
   draft: DraftWork;
+  openedAt?: number;
 };
 
 function OrderCard({
@@ -3419,6 +3487,11 @@ function OrderCard({
   });
   const [managers, setManagers] = useState<UserSummary[]>([]);
   const [detailsEdit, setDetailsEdit] = useState(false);
+  const coreEditorRef = useRef<HTMLElement>(null);
+  useRevealOnOpen(coreEditorRef, activeTab === "core" && detailsEdit ? "details" : null);
+  const workEditorRef = useRef<HTMLElement>(null);
+  // keyed by the opened work, so draft edits re-render without scrolling again
+  useRevealOnOpen(workEditorRef, activeTab === "works" && workEditor ? `${workEditor.mode}:${workEditor.workId ?? ""}:${workEditor.openedAt ?? 0}` : null);
   const [detailDraft, setDetailDraft] = useState({
     client_id: "",
     contact_id: "",
@@ -3459,7 +3532,9 @@ function OrderCard({
     return () => window.clearTimeout(timer);
   }, [load]);
   useEffect(() => {
-    api<Service[]>("/api/admin/crm/services?active=true")
+    // all services: existing works may use a service disabled later (WorkDraft offers
+    // disabled ones only to the work that already has them)
+    api<Service[]>("/api/admin/crm/services")
       .then(setServices)
       .catch(() => {});
     api<UserSummary[]>("/api/admin/applications/managers")
@@ -3859,6 +3934,8 @@ function OrderCard({
       <section
         id="order-core"
         role="tabpanel"
+        ref={coreEditorRef}
+        tabIndex={-1}
         className={`order-core-editor phase5-order-panel${activeTab === "core" ? " is-active" : ""}${detailsEdit ? " is-editing" : ""}`}
       >
         {detailsEdit ? (
@@ -4111,7 +4188,7 @@ function OrderCard({
       </section>
 
       {activeTab === "works" && workEditor && (
-        <section className="work-inline-editor">
+        <section className="work-inline-editor" ref={workEditorRef} tabIndex={-1} aria-label={workEditor.mode === "edit" ? "Редактирование работы" : "Новая работа"}>
           <header>
             <div>
               <span className="overline">
@@ -4182,6 +4259,7 @@ function OrderCard({
               )}
               <Input
                 label="Тариф клиенту, ₽"
+                hint={workEditor.draft.tariff_ids.length ? "По выбранному тарифу; новая ставка заменит тариф ручной ставкой" : undefined}
                 type="number"
                 min="0"
                 step="0.01"
@@ -4189,7 +4267,9 @@ function OrderCard({
                 onChange={(e) =>
                   setWorkEditor({
                     ...workEditor,
-                    draft: { ...workEditor.draft, client_rate: e.target.value },
+                    // a typed rate replaces the tariff: with tariff_ids kept the backend
+                    // would silently price the work by the old tariff again
+                    draft: { ...workEditor.draft, client_rate: e.target.value, tariff_ids: [], quoteAmount: "", quoteBeforeDiscount: "", quoteAutoDiscount: "", quoteMessage: "" },
                   })
                 }
               />
@@ -4272,7 +4352,7 @@ function OrderCard({
               <Button
                 variant="secondary"
                 onClick={() =>
-                  setWorkEditor({ mode: "new", draft: emptyWork() })
+                  setWorkEditor({ mode: "new", draft: emptyWork(), openedAt: Date.now() })
                 }
               >
                 Добавить работу +
@@ -4337,6 +4417,7 @@ function OrderCard({
                           workId: w.id,
                           version: w.version,
                           draft: draftFromWork(w),
+                          openedAt: Date.now(),
                         })
                       }
                     >

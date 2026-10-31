@@ -853,11 +853,11 @@ def _apply_work_payload(db: Session, row: OrderWork, payload: WizardWork) -> Non
     _ensure_catalog_languages(db, source_language, target_language)
 
     if payload.service_code:
-        service = db.scalar(
-            select(ServiceType).where(
-                ServiceType.code == payload.service_code, ServiceType.active.is_(True)
-            )
-        )
+        service = db.scalar(select(ServiceType).where(ServiceType.code == payload.service_code))
+        # a disabled service is closed for new works, but a work that already uses it
+        # (historical rows, services retired later) must stay editable
+        if service and not service.active and payload.service_code != row.service_code:
+            service = None
         if not service:
             raise HTTPException(422, f"Неизвестная или отключённая услуга: {payload.service_code}")
 
@@ -1294,6 +1294,16 @@ def edit_pricing_rule(rule_id: str, payload: PricingRulePayload, db: DB, context
     return view(row)
 
 
+def rank_language_matches(rows, q: str):
+    """Exact, then prefix, then substring matches; catalog order within each group.
+
+    The language combobox highlights the first match and Enter picks it, so "рус"
+    must offer «Русский» before «Белорусский».
+    """
+    needle = q.strip().casefold()
+    return sorted(rows, key=lambda row: 0 if row.name.casefold() == needle else 1 if row.name.casefold().startswith(needle) else 2)
+
+
 @router.get("/languages")
 def languages(
     db: DB,
@@ -1307,6 +1317,8 @@ def languages(
     if q.strip():
         query = query.where(LanguageCatalog.name.icontains(q.strip(), autoescape=True))
     rows = db.scalars(query.order_by(LanguageCatalog.sort_order, LanguageCatalog.name).limit(200)).all()
+    if q.strip():
+        rows = rank_language_matches(rows, q)
     if rows or (db.scalar(select(func.count()).select_from(LanguageCatalog)) or 0):
         return {"items": [view(row) for row in rows]}
 
