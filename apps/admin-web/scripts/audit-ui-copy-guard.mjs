@@ -9,6 +9,8 @@ const forbidden = [
   { label: "unconfirmed-by-customer wording", re: /не\s+(подтверж|утверж|соглас).{0,80}(заказчик|клиент)/iu },
   { label: "developer uncertainty wording", re: /не\s+уверен/iu },
   { label: "not-implemented-yet wording", re: /пока\s+не\s+зашит/iu },
+  { label: "agreement/process note in UI", re: /согласован[а-яё]*\s+с\s+[А-ЯЁ]/u },
+  { label: "owner mentioned in UI", re: /владел(ец|ьц)/iu },
 ];
 
 const failures = [];

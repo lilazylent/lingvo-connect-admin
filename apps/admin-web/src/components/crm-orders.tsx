@@ -3052,7 +3052,7 @@ function WorkDraft({
         {!service && (
           <div className="service-form-intro" role="note">
             <strong>Сначала выберите услугу</strong>
-            <span>После выбора CRM покажет поля этой работы в порядке, согласованном с Олегом.</span>
+            <span>После выбора появятся поля этой работы.</span>
           </div>
         )}
         {service && showFinalVolume && has("character_count") && (
