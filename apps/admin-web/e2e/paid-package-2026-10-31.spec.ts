@@ -162,7 +162,8 @@ const V3_FORMS: [string, string[]][] = [
 const services = serviceDefinitions as unknown[];
 const topics = { items: [{ name: "юридическая" }, { name: "техническая" }] };
 const formLabels = (work: Locator) =>
-  work.locator(".work-layout > .work-layout__row").evaluateAll((rows) =>
+  // «Тип тарифа» heads every work; the service-specific fields follow it
+  work.locator(".work-layout > .work-layout__row:not(.work-layout__row--tariff-kind)").evaluateAll((rows) =>
     rows.flatMap((row) => [...row.querySelectorAll(".field__label, .manual-switch b, .file-drop > span")].map((node) => node.textContent?.trim() ?? "")),
   );
 
@@ -192,7 +193,7 @@ test("written variants, interpreting type, topic and per-work documents reach th
   await pick(page, first, "Услуга", "Письменный перевод (повторения)");
   await pick(page, first, "Тематика", "юридическая");
   await first.getByLabel("Носитель").check();
-  await expect(first.getByLabel("Обычный")).not.toBeChecked();
+  await expect(first.getByRole("group", { name: "Тип переводчика" }).getByLabel("Обычный")).not.toBeChecked();
   await first.locator(".work-files input[type=file]").setInputFiles([{ name: "Договор поставки.pdf", mimeType: "application/pdf", buffer: Buffer.from("x") }]);
   await expect(first.getByLabel("Количество знаков")).toHaveValue("3600");
   await expect(first.getByText("Подсчитано по документам, можно исправить")).toBeVisible();
@@ -297,14 +298,21 @@ test("«Расчёт»: cash and deposit layouts share one payment state", async
   await expect(block).toContainText("Стоимость заказа, р.");
   await expect(block).toContainText("1 000 ₽");
   await block.getByLabel("Оплачено, р.").fill("200");
-  await expect(block.locator(".payment-block__value--remaining")).toContainText("500 ₽");
+  // the deposit is used only by the «Депозит» payment method
+  await expect(block.locator(".payment-block__value--remaining")).toContainText("800 ₽");
   // invoice number/date stay available but folded away
   await expect(block.locator(".payment-block__invoice")).not.toHaveAttribute("open", "");
 
   await pick(page, block, "Способ оплаты", "Депозит");
   await expect(block.getByLabel("Оплачено, р.")).toHaveCount(0);
-  await expect(block).toContainText("Депозит, р.");
+  // deposit layout: debited after the order is completed; the balance it starts from and what remains
+  await expect(block).toContainText("Спишется из депозита клиента после выполнения заказа");
+  await expect(block).toContainText("Депозит на момент заказа, р.");
   await expect(block).toContainText("300 ₽");
+  await expect(block.locator(".payment-block__value--remaining")).toContainText("Остаток депозита, р.");
+  await expect(block).not.toContainText("при создании заказа");
+  await expect(block).not.toContainText("Осталось к оплате");
+  await expect(wizard.locator(".client-deposit-preview")).toHaveCount(0);
   await block.getByLabel("Комментарий").fill("Счёт 757 от 28.01 — 300 р. из депозита");
   await pick(page, block, "Способ оплаты", "Безналичный расчёт");
   // switching the layout keeps the same values
@@ -337,6 +345,7 @@ const cardDetail = (files: unknown[] = []) => ({
   works: [cardWork], files,
   payment: { id: "pay-1", amount_due: 1000, amount_paid: 300, payment_method: "deposit", invoice_number: "757", invoice_date: "2026-10-28", paid_at: null, notes: "", version: 4 },
   deposit_applied: 300,
+  deposit_at_order: 300,
   financial: { revenue: 1000, executor_cost: 0, profit: 1000, margin_percent: 100, client_paid: 300, client_debt: 700, payment_state: "DEPOSIT", executor_breakdown: [] },
 });
 
@@ -349,9 +358,10 @@ test("order card: deposit layout, then cash layout keeps the structured invoice"
   await expect(card.locator(".order-context-strip")).toContainText("10.11.26, до 15:00");
   await card.getByRole("tab", { name: "Расчёт" }).click();
   const payment = card.locator(".order-payment-card");
-  await expect(payment).toContainText("Депозит, р.");
-  await expect(payment).toContainText("300 ₽");
-  await expect(payment.locator(".payment-block__value--remaining")).toContainText("700 ₽");
+  await expect(payment).toContainText("Депозит на момент заказа, р.");
+  await expect(payment).toContainText("Списано из депозита клиента: 300 ₽");
+  await expect(payment.locator(".payment-block__value--remaining")).toContainText("Остаток депозита, р.");
+  await expect(payment.locator(".payment-block__value--remaining")).toContainText("Не хватает 700 ₽");
   await expect(payment).toContainText("Счёт: 757 от 28.10.26");
 
   await payment.getByRole("button", { name: "Изменить" }).click();
@@ -404,9 +414,11 @@ test("order card: another allowed tariff, final volume and documents of the work
   // the saved tariff is shown at once with its unit price; the cost is visible next to it
   await expect(form.locator(".work-tariff-picker")).toContainText("стандартный тариф");
   await expect(form.locator(".work-layout__cell--price .calculated-value--total")).toContainText("1 000 ₽");
-  await form.getByLabel("Тариф", { exact: true }).click();
-  await page.getByRole("option", { name: /Тариф клиента «ООО Спектр»/ }).click();
+  // «Тип тарифа»: the saved standard tariff shows «Обычный»; «Клиента» switches to the client price list
+  await expect(form.getByRole("group", { name: "Тип тарифа" }).getByLabel("Обычный", { exact: true })).toBeChecked();
+  await form.getByRole("group", { name: "Тип тарифа" }).getByLabel("Клиента", { exact: true }).check();
   await expect(form.locator(".work-tariff-picker")).toContainText("тариф клиента");
+  await expect(form.locator(".work-tariff-picker")).toContainText("450");
 
   // documents of this work: uploaded with work_id, the measured volume and names land in the form
   await form.locator(".work-files input[type=file]").setInputFiles([{ name: "Договор поставки.pdf", mimeType: "application/pdf", buffer: Buffer.from("x") }]);
@@ -491,15 +503,16 @@ test("«Работы»: the tariff is picked as soon as the work is filled, chan
   expect(quotes()).toBe(settled); // no re-quoting loop
 
   // change the tariff on «Работы» → the same choice is shown on «Расчёт», and vice versa
-  await work.getByLabel("Тариф", { exact: true }).click();
-  await page.getByRole("option", { name: /Тариф клиента «ООО Спектр»/ }).click();
+  // «Тип тарифа» Клиента → the client price list, shown as a number; the same choice is on «Расчёт»
+  await work.getByRole("group", { name: "Тип тарифа" }).getByLabel("Клиента", { exact: true }).check();
   await expect(work.locator(".work-layout__cell--price")).toContainText("800 ₽");
+  await expect(work.getByLabel("Тариф", { exact: true })).toContainText("₽");
+  await expect(work.getByLabel("Тариф", { exact: true })).not.toContainText("Тариф клиента");
   await wizard.locator(".wizard-steps button").filter({ hasText: "03" }).click();
   const row = wizard.locator(".price-row").first();
-  await expect(row.getByLabel("Тариф", { exact: true })).toContainText("Тариф клиента «ООО Спектр»");
-  await row.getByLabel("Тариф", { exact: true }).click();
-  await page.getByRole("option", { name: /рекомендован/ }).click();
+  await expect(row.locator(".tariff-resolution")).toContainText("Тариф клиента «ООО Спектр»");
   await wizard.locator(".wizard-steps button").filter({ hasText: "02" }).click();
+  await work.getByRole("group", { name: "Тип тарифа" }).getByLabel("Обычный", { exact: true }).check();
   await expect(work.locator(".work-layout__cell--price")).toContainText("1 000 ₽");
   if (process.env.CAPTURE_OWNER_QA) await work.screenshot({ path: "../../test-results/paid-v3/works-tariff.png" });
 });

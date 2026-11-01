@@ -171,8 +171,9 @@ type OrderDetail = Order & {
   client_name: string;
   contact_name: string;
   manager_name: string;
-  // what the client deposit ledger debited for this order (read-only)
+  // payment method «Депозит»: debited on completion; the client deposit before that debit
   deposit_applied?: Money;
+  deposit_at_order?: Money;
 };
 type FinanceExecutorAssignment = {
   assignment_id: string;
@@ -346,8 +347,13 @@ type DraftExecutorAssignment = {
   volumeLinked?: boolean;
 };
 
+type TariffKind = "STANDARD" | "CLIENT";
+type PricingOptions = { options: TariffOption[]; auto_key: string; standard_auto_key?: string; resolution?: string; message?: string };
+
 type DraftWork = {
   key: string;
+  // «Тип тарифа»: unset until the manager picks it, then follows the chosen tariff
+  tariffKind?: TariffKind;
   service_code: string;
   work_type: string;
   source_language: string;
@@ -603,7 +609,10 @@ const clientTariffLabel = (option: TariffOption) => {
   return `Тариф клиента «${option.client_tariff?.client_name ?? ""}»${tier}`;
 };
 const tariffOptionLabel = (service: Service | undefined, option: TariffOption) => {
-  if (option.client_tariff) return `${clientTariffLabel(option)} · ${formatRate(option.rate, option.unit)}${option.is_auto ? " · по умолчанию" : ""}`;
+  if (option.client_tariff) {
+    const from = Number(option.client_tariff.quantity_from) > 1 ? ` · от ${Number(option.client_tariff.quantity_from)}` : "";
+    return `${formatRate(option.rate, option.unit)}${from}`;
+  }
   const matchingMode = service?.definition?.matching_mode;
   const scope =
     matchingMode === "SERVICE_ONLY"
@@ -618,8 +627,20 @@ const tariffOptionLabel = (service: Service | undefined, option: TariffOption) =
         ? " · носитель"
         : "";
   const recommended = option.is_auto ? " · рекомендован" : "";
-  return `${scope} · ${formatRate(option.rate, option.unit)}${resolution}${recommended}`;
+  return `${formatRate(option.rate, option.unit)} · ${scope}${resolution}${recommended}`;
 };
+
+const tariffKindOf = (work: DraftWork): TariffKind =>
+  work.tariffKind ?? (work.tariff_ids.some((id) => id.startsWith("client:")) ? "CLIENT" : "STANDARD");
+/** Options of the chosen «Тип тарифа» and the one CRM picks among them. */
+const optionsOfKind = (result: PricingOptions, kind: TariffKind | undefined) => {
+  const all = result.options ?? [];
+  if (!kind) return { options: all, autoKey: result.auto_key };
+  const options = all.filter((option) => Boolean(option.client_tariff) === (kind === "CLIENT"));
+  const autoKey = kind === "CLIENT" ? options[0]?.key ?? "" : result.standard_auto_key || options[0]?.key || "";
+  return { options, autoKey };
+};
+const NO_CLIENT_TARIFF = "У клиента нет своего тарифа для этой работы — выберите тип «Обычный».";
 
 const tariffMessage = (option: TariffOption, automatic = option.is_auto) => {
   const quantity = Number(option.quantity ?? 0);
@@ -1698,10 +1719,11 @@ function OrderWizard({
   );
   const paidAmount = Math.max(0, Number(payment.amount_paid || 0) || 0);
   const remainingTotal = Math.max(0, clientTotal - paidAmount);
+  // payment method «Депозит»: the deposit is debited when the order is completed, not now
+  const payByDeposit = payment.payment_method === "deposit";
   const depositBalance = Math.max(0, Number(clientDeposit?.balance || 0) || 0);
-  const depositApplied = Math.min(depositBalance, remainingTotal);
+  const depositApplied = payByDeposit ? Math.min(depositBalance, clientTotal) : 0;
   const depositAfterOrder = Math.max(0, depositBalance - depositApplied);
-  const remainingAfterDeposit = Math.max(0, remainingTotal - depositApplied);
   const executorTotal = useMemo(
     () =>
       works.reduce(
@@ -1732,7 +1754,7 @@ function OrderWizard({
       works.forEach((w) => {
         if (!w.service_code || w.manualPrice || Number(w.client_rate || 0) > 0) return;
         const inputs = [w.service_code, w.certification_mode, w.source_language, w.target_language, billedCharacters(w), w.page_count,
-          w.document_count, w.duration_seconds, w.hour_count, w.urgent, w.urgency_multiplier, w.native_speaker, client].join("|");
+          w.document_count, w.duration_seconds, w.hour_count, w.urgent, w.urgency_multiplier, w.native_speaker, client, w.tariffKind].join("|");
         if (quotedInputs.current[w.key] === inputs) return;
         quotedInputs.current[w.key] = inputs;
         setQuoting((keys) => [...keys, w.key]);
@@ -1763,7 +1785,7 @@ function OrderWizard({
       return;
     }
     try {
-      const result = await api<{ options: TariffOption[]; auto_key: string; resolution?: string; message?: string }>(
+      const result = await api<PricingOptions>(
         "/api/admin/crm/pricing/options",
         {
           method: "POST",
@@ -1786,15 +1808,16 @@ function OrderWizard({
           }),
         },
       );
+      const { options, autoKey } = optionsOfKind(result, work.tariffKind);
       setTariffOptions((current) => ({
         ...current,
-        [work.key]: result.options,
+        [work.key]: options,
       }));
       const currentKey = work.tariff_ids.join(",");
       const selected =
-        result.options.find((option) => option.key === currentKey) ||
-        result.options.find((option) => option.key === result.auto_key) ||
-        result.options[0];
+        options.find((option) => option.key === currentKey) ||
+        options.find((option) => option.key === autoKey) ||
+        options[0];
       if (selected)
         patchWork(work.key, {
           tariff_ids: selected.tariff_ids,
@@ -1817,7 +1840,7 @@ function OrderWizard({
           quoteRate: "",
           quoteUnit: "",
           quoteMessage:
-            result.message || "Тариф по запросу / автоматический тариф не найден. Можно указать ставку вручную.",
+            work.tariffKind === "CLIENT" ? NO_CLIENT_TARIFF : result.message || "Тариф по запросу / автоматический тариф не найден. Можно указать ставку вручную.",
         });
     } catch (e) {
       setTariffOptions((current) => ({ ...current, [work.key]: [] }));
@@ -2359,19 +2382,13 @@ function OrderWizard({
                 </article>
               );
             })}
-            {client && <div className="client-deposit-preview">
-              <div><span>Депозит клиента</span><strong>{rub(depositBalance)}</strong></div>
-              <div><span>Будет списано из депозита</span><strong>{rub(depositApplied)}</strong></div>
-              <div><span>Останется на депозите</span><strong>{rub(depositAfterOrder)}</strong></div>
-              <div className="client-deposit-preview__remaining"><span>Останется к оплате</span><strong>{rub(remainingAfterDeposit)}</strong></div>
-            </div>}
             <PaymentBlock
               value={payment}
               onChange={setPayment}
               total={clientTotal}
-              deposit={depositApplied}
-              remaining={remainingAfterDeposit}
-              depositHint={client ? "Спишется из депозита клиента при создании заказа" : "Выберите клиента, чтобы использовать депозит"}
+              remaining={remainingTotal}
+              depositAtOrder={client ? depositBalance : null}
+              depositDebited={0}
             />
           </div>
         )}
@@ -2428,18 +2445,18 @@ function OrderWizard({
                     : "0%"}
                 </strong>
               </div>
-              {client && <>
+              {client && payByDeposit && <>
                 <div>
-                  <span>Депозит клиента</span>
+                  <span>Депозит на момент заказа</span>
                   <strong>{rub(depositBalance)}</strong>
                 </div>
                 <div>
-                  <span>После заказа</span>
+                  <span>Остаток депозита</span>
                   <strong>{rub(depositAfterOrder)}</strong>
                 </div>
               </>}
             </div>
-            {client && depositApplied > 0 && <p className="context-note">При создании заказа из депозита автоматически спишется {rub(depositApplied)}. Остаток к оплате после депозита: {rub(remainingAfterDeposit)}.</p>}
+            {client && payByDeposit && depositApplied > 0 && <p className="context-note">После выполнения заказа из депозита клиента спишется {rub(depositApplied)}.</p>}
             <div className="review-list">
               {works.map((w, i) => (
                 <div key={w.key}>
@@ -2526,7 +2543,7 @@ function WizardTariffField({ work, service, options, loading, onPick }: { work: 
       label="Тариф"
       value={selected ? selectedKey : ""}
       // the price per unit stays readable even when the option text is truncated
-      hint={loading ? "Подбираем тариф…" : selected ? `${formatRate(selected.rate, selected.unit)} · ${selected.client_tariff ? "тариф клиента" : selected.is_auto ? "подобран CRM" : "выбран вручную"}` : options && !options.length ? "Тариф не найден — ставку можно указать на шаге «Расчёт»" : "Заполните услугу, языки и объём"}
+      hint={loading ? "Подбираем тариф…" : selected ? `${formatRate(selected.rate, selected.unit)} · ${selected.client_tariff ? "тариф клиента" : selected.is_auto ? "подобран CRM" : "выбран вручную"}` : options && !options.length ? (work.tariffKind === "CLIENT" ? NO_CLIENT_TARIFF : "Тариф не найден — ставку можно указать на шаге «Расчёт»") : "Заполните услугу, языки и объём"}
       onChange={(e) => {
         const option = options?.find((item) => item.key === e.target.value);
         if (option) onPick(option);
@@ -2548,28 +2565,29 @@ function WorkTariffPicker({ work, service, clientId, patch }: { work: DraftWork;
   // Same as the wizard «Работы» step (owner, 2026-11-01): the tariff and the cost appear as soon as
   // the work is filled. Options are re-read only when the pricing inputs change.
   const inputs = [work.service_code, work.certification_mode, work.source_language, work.target_language, billedCharacters(work), work.page_count,
-    work.document_count, work.duration_seconds, work.hour_count, work.urgent, work.urgency_multiplier, work.native_speaker, clientId].join("|");
+    work.document_count, work.duration_seconds, work.hour_count, work.urgent, work.urgency_multiplier, work.native_speaker, clientId, work.tariffKind].join("|");
   useEffect(() => {
     if (!work.service_code) return;
     let active = true;
     const timer = window.setTimeout(async () => {
       setLoading(true);
       try {
-        const result = await api<{ options: TariffOption[]; auto_key: string; message?: string }>("/api/admin/crm/pricing/options", {
+        const result = await api<PricingOptions>("/api/admin/crm/pricing/options", {
           method: "POST",
           body: JSON.stringify(quoteRequestBody(work, clientId)),
         });
         if (!active) return;
-        setOptions(result.options);
-        setMessage(result.options.length ? "" : result.message || "Подходящих тарифов нет — укажите ставку вручную.");
+        const { options: kindOptions, autoKey } = optionsOfKind(result, work.tariffKind);
+        setOptions(kindOptions);
+        setMessage(kindOptions.length ? "" : work.tariffKind === "CLIENT" ? NO_CLIENT_TARIFF : result.message || "Подходящих тарифов нет — укажите ставку вручную.");
         if (work.manualPrice) return;
-        const current = result.options.find((option) => option.key === work.tariff_ids.join(","));
+        const current = kindOptions.find((option) => option.key === work.tariff_ids.join(","));
         if (current) {
           // the same tariff for a new volume: refresh the cost
           if (!work.quoteAmount) patch(quotePatchFromOption(work, current));
         } else if (!work.tariff_ids.length && Number(work.client_rate || 0) === 0) {
           // a work without a tariff (new, or its service/languages changed) gets the CRM choice
-          const auto = result.options.find((option) => option.key === result.auto_key) ?? result.options[0];
+          const auto = kindOptions.find((option) => option.key === autoKey) ?? kindOptions[0];
           if (auto) patch(quotePatchFromOption(work, auto, true));
         }
       } catch (e) {
@@ -2634,21 +2652,24 @@ function PaymentBlock({
   value,
   onChange,
   total,
-  deposit,
   remaining,
-  depositHint,
+  depositAtOrder,
+  depositDebited,
   editable = true,
 }: {
   value: PaymentDraft;
   onChange?: (next: PaymentDraft) => void;
   total: number;
-  deposit: number;
   remaining: number;
-  depositHint: string;
+  // the client deposit before this order is debited (null: no client chosen yet)
+  depositAtOrder: number | null;
+  // what the completed order already took from the deposit
+  depositDebited: number;
   editable?: boolean;
 }) {
   const set = (patch: Partial<PaymentDraft>) => onChange?.({ ...value, ...patch });
   const isDeposit = value.payment_method === "deposit";
+  const depositShortage = depositAtOrder == null ? 0 : Math.max(0, total - depositAtOrder);
   const methodLabel = paymentMethods.find(([code]) => code === value.payment_method)?.[1] ?? "Не выбран";
   const hasInvoice = Boolean(value.invoice_number || value.invoice_date);
   return (
@@ -2661,15 +2682,27 @@ function PaymentBlock({
         ) : (
           <div className="payment-block__value"><span>Способ оплаты</span><strong>{methodLabel}</strong></div>
         )}
-        <div className="payment-block__value"><span>Стоимость заказа, р.</span><strong>{rub(total)}</strong></div>
+        <div className="payment-block__value">
+          <span>Стоимость заказа, р.</span>
+          <strong>{rub(total)}</strong>
+          {isDeposit && <small>{depositDebited > 0 ? `Списано из депозита клиента: ${rub(depositDebited)}` : "Спишется из депозита клиента после выполнения заказа"}</small>}
+        </div>
         {isDeposit ? (
-          <div className="payment-block__value"><span>Депозит, р.</span><strong>{rub(deposit)}</strong><small>{depositHint}</small></div>
+          <div className="payment-block__value"><span>Депозит на момент заказа, р.</span><strong>{depositAtOrder == null ? "—" : rub(depositAtOrder)}</strong>{depositAtOrder == null && <small>Выберите клиента</small>}</div>
         ) : editable ? (
           <Input label="Оплачено, р." type="number" min="0" step="0.01" value={value.amount_paid} onChange={(e) => set({ amount_paid: e.target.value })} />
         ) : (
           <div className="payment-block__value"><span>Оплачено, р.</span><strong>{rub(value.amount_paid)}</strong></div>
         )}
-        <div className={`payment-block__value payment-block__value--remaining${remaining > 0 ? " is-open" : ""}`}><span>Осталось к оплате, р.</span><strong>{rub(remaining)}</strong></div>
+        {isDeposit ? (
+          <div className={`payment-block__value payment-block__value--remaining${depositShortage > 0 ? " is-open" : ""}`}>
+            <span>Остаток депозита, р.</span>
+            <strong>{depositAtOrder == null ? "—" : rub(Math.max(0, depositAtOrder - total))}</strong>
+            {depositShortage > 0 && <small>Не хватает {rub(depositShortage)}</small>}
+          </div>
+        ) : (
+          <div className={`payment-block__value payment-block__value--remaining${remaining > 0 ? " is-open" : ""}`}><span>Осталось к оплате, р.</span><strong>{rub(remaining)}</strong></div>
+        )}
       </div>
       <div className="payment-block__row payment-block__row--details">
         {editable ? (
@@ -3038,6 +3071,16 @@ function WorkDraft({
       </header>
 
       <div className="work-layout">
+        <div className="work-layout__row work-layout__row--tariff-kind">
+          <div className="work-layout__cell span-2">
+            <ChoicePair
+              label="Тип тарифа"
+              options={[["STANDARD", "Обычный"], ["CLIENT", "Клиента"]]}
+              value={tariffKindOf(work)}
+              onChange={(kind) => kind !== tariffKindOf(work) && patch({ tariffKind: kind as TariffKind, ...resetQuotePatch, manualPrice: false })}
+            />
+          </div>
+        </div>
         {layout.map((row, rowIndex) => {
           const cells = row
             .map((token) => {
@@ -5030,7 +5073,7 @@ function OrderCard({
             </div>
             {(() => {
               const total = Number(order.payment?.amount_due ?? order.financial.revenue);
-              const depositApplied = Number(order.deposit_applied ?? 0);
+              const depositDebited = Number(order.deposit_applied ?? 0);
               const draftRemaining = Math.max(0, total - (Number(paymentDraft.amount_paid || 0) || 0));
               return (
                 <>
@@ -5039,9 +5082,9 @@ function OrderCard({
                     onChange={setPaymentDraft}
                     editable={paymentEdit}
                     total={total}
-                    deposit={depositApplied}
                     remaining={paymentEdit ? draftRemaining : Number(order.financial.client_debt)}
-                    depositHint={depositApplied > 0 ? "Списано из депозита клиента по этому заказу" : "По этому заказу из депозита ничего не списано"}
+                    depositAtOrder={order.client_id ? Number(order.deposit_at_order ?? 0) : null}
+                    depositDebited={depositDebited}
                   />
                   {paymentEdit && (
                     <div className="payment-edit__actions">

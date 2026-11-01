@@ -1403,11 +1403,21 @@ def test_phase15_client_deposit_topup_and_order_auto_debit(client, create_user):
                     "price": "5000",
                 }
             ],
-            "payment": {"amount_paid": "0"},
+            "payment": {"amount_paid": "0", "payment_method": "deposit"},
         },
     )
     assert created.status_code == 201, created.text
-    payload = created.json()
+    # payment method «Депозит»: nothing is debited until the order is completed
+    assert Decimal(str(created.json()["financial"]["client_debt"])) == Decimal("5000.00")
+    assert Decimal(str(created.json()["deposit_at_order"])) == Decimal("12000.00")
+    assert Decimal(str(client.get(f"/api/admin/companies/{company['id']}/deposit").json()["balance"])) == Decimal("12000.00")
+    completed = client.patch(f"/api/admin/crm/orders/{created.json()['id']}/status", headers=headers, json={"status": "COMPLETED"})
+    assert completed.status_code == 200, completed.text
+    # completing it again (e.g. after reopening) never debits twice
+    client.patch(f"/api/admin/crm/orders/{created.json()['id']}/status", headers=headers, json={"status": "IN_PROGRESS"})
+    client.patch(f"/api/admin/crm/orders/{created.json()['id']}/status", headers=headers, json={"status": "COMPLETED"})
+    payload = client.get(f"/api/admin/crm/orders/{created.json()['id']}").json()
+    assert Decimal(str(payload["deposit_at_order"])) == Decimal("12000.00")
     assert Decimal(str(payload["financial"]["revenue"])) == Decimal("5000.00")
     assert Decimal(str(payload["financial"]["client_paid"])) == Decimal("5000.00")
     assert Decimal(str(payload["financial"]["client_debt"])) == Decimal("0.00")
@@ -1444,7 +1454,9 @@ def test_phase15_deposit_only_covers_available_balance(client, create_user):
         json={
             "title": "Заказ дороже депозита",
             "client_id": company["id"],
+            "status": "COMPLETED",
             "works": [{"service_code": "custom_service_2", "work_type": "custom_service_2", "billing_unit": "FIXED", "client_rate": "2500", "price": "2500"}],
+            "payment": {"payment_method": "deposit"},
         },
     )
     assert created.status_code == 201, created.text
@@ -1454,3 +1466,18 @@ def test_phase15_deposit_only_covers_available_balance(client, create_user):
     assert financial["payment_state"] == "DEPOSIT"
     deposit = client.get(f"/api/admin/companies/{company['id']}/deposit").json()
     assert Decimal(str(deposit["balance"])) == Decimal("0.00")
+
+
+def test_deposit_is_not_debited_for_other_payment_methods(client, create_user):
+    headers = setup(client, create_user)
+    company = client.post("/api/admin/companies", headers=headers, json={"name": "Депозит без списания"}).json()
+    assert client.post(f"/api/admin/companies/{company['id']}/deposit", headers=headers, json={"mode": "SET_BALANCE", "amount": "1000"}).status_code == 200
+    assert client.post("/api/admin/crm/services", headers=headers, json={"code": "custom_service_3", "name": "Дополнительная услуга 3", "billing_mode": "FIXED"}).status_code == 201
+    created = client.post("/api/admin/crm/orders/wizard", headers=headers, json={
+        "title": "Оплата наличными", "client_id": company["id"],
+        "works": [{"service_code": "custom_service_3", "work_type": "custom_service_3", "billing_unit": "FIXED", "client_rate": "700", "price": "700"}],
+        "payment": {"payment_method": "cash"},
+    })
+    assert created.status_code == 201, created.text
+    assert client.patch(f"/api/admin/crm/orders/{created.json()['id']}/status", headers=headers, json={"status": "COMPLETED"}).status_code == 200
+    assert Decimal(str(client.get(f"/api/admin/companies/{company['id']}/deposit").json()["balance"])) == Decimal("1000.00")

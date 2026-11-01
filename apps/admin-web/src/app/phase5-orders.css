@@ -1020,23 +1020,6 @@
   .work-draft.service-driven-work-draft .wizard-grid.service-driven-grid > .textarea { grid-column: 1; }
 }
 
-/* Phase 15 — deposit preview inside the order wizard. */
-.client-deposit-preview {
-  display: grid;
-  grid-template-columns: repeat(4,minmax(0,1fr));
-  gap: 1px;
-  margin-top: var(--ui-space-4);
-  overflow: hidden;
-  border: 1px solid var(--crm-border);
-  border-radius: var(--ui-radius-control);
-  background: var(--crm-border);
-}
-.client-deposit-preview > div { min-width: 0; display: grid; gap: 4px; padding: var(--ui-space-3); background: var(--crm-surface-raised); }
-.client-deposit-preview span { color: var(--crm-text-secondary); font-size: var(--ui-text-xs); }
-.client-deposit-preview strong { color: var(--crm-text); font-size: var(--ui-text-lg); overflow-wrap: anywhere; }
-.client-deposit-preview__remaining strong { color: var(--crm-accent-text); }
-@media (max-width: 900px) { .client-deposit-preview { grid-template-columns: repeat(2,minmax(0,1fr)); } }
-@media (max-width: 620px) { .client-deposit-preview { grid-template-columns: 1fr; } }
 
 /* Order wizard step 03: every attached client document keeps its own analysis row. */
 .analysis-result--file {

@@ -149,8 +149,11 @@ def test_order_detail_reports_deposit_debited_by_the_order(client, create_user):
     headers = setup(client, create_user)
     company = client.post("/api/admin/companies", headers=headers, json={"name": "Депозитный клиент"}).json()
     assert client.post(f"/api/admin/companies/{company['id']}/deposit", headers=headers, json={"mode": "TOP_UP", "amount": "300", "note": ""}).status_code == 200
-    order = _order(client, headers, client_id=company["id"], works=[{"work_type": "custom", "billing_unit": "FIXED", "client_rate": "500"}])
-    assert D(order["deposit_applied"]) == D("300.00")
+    order = _order(client, headers, client_id=company["id"], works=[{"work_type": "custom", "billing_unit": "FIXED", "client_rate": "500"}], payment={"payment_method": "deposit"})
+    assert D(order["deposit_applied"]) == D("0.00") and D(order["deposit_at_order"]) == D("300.00")
+    assert client.patch(f"/api/admin/crm/orders/{order['id']}/status", headers=headers, json={"status": "COMPLETED"}).status_code == 200
+    order = client.get(f"/api/admin/crm/orders/{order['id']}").json()
+    assert D(order["deposit_applied"]) == D("300.00") and D(order["deposit_at_order"]) == D("300.00")
     assert D(order["payment"]["amount_paid"]) == D("300.00")
     # reading the order again never debits twice
     again = client.get(f"/api/admin/crm/orders/{order['id']}").json()

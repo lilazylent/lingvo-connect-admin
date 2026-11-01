@@ -1554,6 +1554,8 @@ def pricing_options(payload: QuoteRequest, db: DB, context: Read):
             "is_auto": ids == tuple(t.id for t in auto_tariffs),
         })
     auto_key = ",".join(t.id for t in auto_tariffs) if auto_tariffs and options else ""
+    # the «Обычный» tariff type picks this one even when the client's own price list is the default
+    standard_auto_key = auto_key
     client = _client_for_quote(db, payload.client_id)
     client_option = _client_tariff_option(db, client, payload) if client else None
     if client_option:
@@ -1567,6 +1569,7 @@ def pricing_options(payload: QuoteRequest, db: DB, context: Read):
     return {
         "options": options,
         "auto_key": auto_key,
+        "standard_auto_key": standard_auto_key,
         "resolution": "client_tariff" if client_option and client_option["is_auto"] else auto_resolution,
         "message": "" if options else _unresolved_tariff_message(auto_resolution),
     }
@@ -1870,32 +1873,13 @@ def create_order_wizard(payload: WizardOrder, db: DB, context: Write):
         if work.client_billable:
             total += Decimal(str(work.price))
     amount_due = money(total)
-    manual_paid = money(payload.payment.amount_paid)
-    deposit_applied = Decimal("0")
-    if payload.client_id and amount_due > manual_paid:
-        client_row = db.scalar(select(Company).where(Company.id == payload.client_id).with_for_update())
-        if client_row:
-            available = max(Decimal("0"), money(client_row.deposit_balance or 0))
-            deposit_applied = money(min(available, amount_due - manual_paid))
-            if deposit_applied > 0:
-                next_balance = money(available - deposit_applied)
-                client_row.deposit_balance = next_balance
-                client_row.version += 1
-                client_row.updated_at = utcnow()
-                db.add(ClientDepositTransaction(
-                    company_id=client_row.id,
-                    order_id=order.id,
-                    actor_user_id=context.user.id,
-                    kind="ORDER_DEBIT",
-                    amount=-deposit_applied,
-                    balance_after=next_balance,
-                    note=f"Списание по заказу {order.number}",
-                ))
-    effective_paid = money(min(amount_due, manual_paid + deposit_applied))
-    payment_method = payload.payment.payment_method or ("deposit" if deposit_applied > 0 else "")
-    db.add(ClientPayment(order_id=order.id, amount_due=amount_due, amount_paid=effective_paid,
-                         payment_method=payment_method, invoice_number=payload.payment.invoice_number,
-                         invoice_date=payload.payment.invoice_date, paid_at=payload.payment.paid_at, notes=payload.payment.notes))
+    payment = ClientPayment(order_id=order.id, amount_due=amount_due, amount_paid=money(min(amount_due, money(payload.payment.amount_paid))),
+                            payment_method=payload.payment.payment_method, invoice_number=payload.payment.invoice_number,
+                            invoice_date=payload.payment.invoice_date, paid_at=payload.payment.paid_at, notes=payload.payment.notes)
+    db.add(payment)
+    db.flush()
+    if order.status == "COMPLETED":
+        _debit_deposit_for_completed_order(db, order, context.user.id)
     if payload.application_id:
         link = db.get(ApplicationClient, payload.application_id)
         if payload.client_id:
@@ -1993,12 +1977,9 @@ def order_detail(order_id: str, db: DB, context: Read):
         client_name=client.name if client else "",
         contact_name=contact.name if contact else "",
         manager_name=manager.display_name if manager else "",
-        # «Депозит, р.» of the payment block: what the ledger debited for this order (read-only)
-        deposit_applied=money(-(db.scalar(
-            select(func.coalesce(func.sum(ClientDepositTransaction.amount), 0)).where(
-                ClientDepositTransaction.order_id == order_id, ClientDepositTransaction.kind == "ORDER_DEBIT",
-            )
-        ) or 0)),
+        # payment method «Депозит»: what the ledger debited for this order (on completion) and the
+        # client deposit «на момент заказа» — before the debit, or the current balance until then
+        **_order_deposit_view(db, order_id, client),
     )
     return result
 
@@ -2329,6 +2310,63 @@ def update_executor_payment(
     return view(row)
 
 
+def _debit_deposit_for_completed_order(db: Session, order: Order, actor_user_id: str) -> Decimal:
+    """Payment method «Депозит»: the client deposit is debited once, when the order is completed.
+
+    Only what the balance covers is debited; the rest stays as the client debt. A later
+    status change never debits the same order again.
+    """
+    payment = db.scalar(select(ClientPayment).where(ClientPayment.order_id == order.id).with_for_update())
+    if not order.client_id or not payment or payment.payment_method != "deposit":
+        return Decimal("0")
+    already = db.scalar(select(ClientDepositTransaction.id).where(
+        ClientDepositTransaction.order_id == order.id, ClientDepositTransaction.kind == "ORDER_DEBIT",
+    ).limit(1))
+    if already:
+        return Decimal("0")
+    amount_due = money(finance(db, order.id)["revenue"])
+    paid = money(payment.amount_paid)
+    client_row = db.scalar(select(Company).where(Company.id == order.client_id).with_for_update())
+    if not client_row or amount_due <= paid:
+        return Decimal("0")
+    available = max(Decimal("0"), money(client_row.deposit_balance or 0))
+    debit = money(min(available, amount_due - paid))
+    if debit <= 0:
+        return Decimal("0")
+    next_balance = money(available - debit)
+    client_row.deposit_balance = next_balance
+    client_row.version += 1
+    client_row.updated_at = utcnow()
+    db.add(ClientDepositTransaction(
+        company_id=client_row.id,
+        order_id=order.id,
+        actor_user_id=actor_user_id,
+        kind="ORDER_DEBIT",
+        amount=-debit,
+        balance_after=next_balance,
+        note=f"Списание по заказу {order.number}",
+    ))
+    payment.amount_due = amount_due
+    payment.amount_paid = money(paid + debit)
+    payment.version += 1
+    payment.updated_at = utcnow()
+    return debit
+
+
+def _order_deposit_view(db: Session, order_id: str, client: Company | None) -> dict:
+    debit = db.scalar(select(ClientDepositTransaction).where(
+        ClientDepositTransaction.order_id == order_id, ClientDepositTransaction.kind == "ORDER_DEBIT",
+    ).order_by(ClientDepositTransaction.created_at).limit(1))
+    applied = money(-(db.scalar(select(func.coalesce(func.sum(ClientDepositTransaction.amount), 0)).where(
+        ClientDepositTransaction.order_id == order_id, ClientDepositTransaction.kind == "ORDER_DEBIT",
+    )) or 0))
+    if debit:
+        at_order = money(Decimal(str(debit.balance_after)) - Decimal(str(debit.amount)))
+    else:
+        at_order = money(client.deposit_balance or 0) if client else Decimal("0")
+    return {"deposit_applied": applied, "deposit_at_order": at_order}
+
+
 @router.patch("/orders/{order_id}/status")
 def update_order_status(order_id: str, payload: StatusEdit, db: DB, context: Write):
     row = db.get(Order, order_id)
@@ -2340,6 +2378,8 @@ def update_order_status(order_id: str, payload: StatusEdit, db: DB, context: Wri
     row.version += 1
     row.updated_at = utcnow()
     db.add(OperationalActivity(order_id=row.id, actor_user_id=context.user.id, action="order.status_changed"))
+    if payload.status == "COMPLETED":
+        _debit_deposit_for_completed_order(db, row, context.user.id)
     db.commit()
     return view(row)
 

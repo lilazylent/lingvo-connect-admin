@@ -229,7 +229,7 @@
     padding-bottom:max(34px, env(safe-area-inset-bottom)) !important;
   }
   .crm-commandbar, .crm-toolbar, .application-search, .filter-grid, .form-section__grid,
-  .operational-grid, .wizard-grid, .settings-modules, .client-deposit-preview {
+  .operational-grid, .wizard-grid, .settings-modules {
     grid-template-columns:minmax(0,1fr) !important;
   }
   .wizard-steps, .detail-sections, .order-section-nav, .settings-tabs, .settings-subtabs {
