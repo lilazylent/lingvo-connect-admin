@@ -202,7 +202,7 @@ SERVICE_DEFINITIONS: dict[str, dict[str, Any]] = {
         "layout": [["service:2", "page_count:2"], *_SIMPLE_TAIL],
     },
     # «Скан» (owner 2026-10-31): priced per actual page, same fields as «Распознавание».
-    # The service stays disabled until the owner activates it in the settings.
+    # Switched on by migration 0031 (owner request); can be disabled again in the settings.
     "scan": {
         "category": "layout",
         "fields": ["page_count", *_SIMPLE_FIELDS],
