@@ -401,11 +401,12 @@ test("order card: another allowed tariff, final volume and documents of the work
   await expect(form.getByLabel("Количество знаков")).toHaveValue("3600");
 
   // 5.1: the saved work can switch to another allowed tariff (client / standard)
-  await expect(form.locator(".work-tariff-picker")).toContainText("Стандартный тариф");
-  await form.getByRole("button", { name: "Выбрать другой тариф" }).click();
+  // the saved tariff is shown at once with its unit price; the cost is visible next to it
+  await expect(form.locator(".work-tariff-picker")).toContainText("стандартный тариф");
+  await expect(form.locator(".work-layout__cell--price .calculated-value--total")).toContainText("1 000 ₽");
   await form.getByLabel("Тариф", { exact: true }).click();
   await page.getByRole("option", { name: /Тариф клиента «ООО Спектр»/ }).click();
-  await expect(form.locator(".work-tariff-picker")).toContainText("Сейчас: Тариф клиента");
+  await expect(form.locator(".work-tariff-picker")).toContainText("тариф клиента");
 
   // documents of this work: uploaded with work_id, the measured volume and names land in the form
   await form.locator(".work-files input[type=file]").setInputFiles([{ name: "Договор поставки.pdf", mimeType: "application/pdf", buffer: Buffer.from("x") }]);
@@ -501,4 +502,27 @@ test("«Работы»: the tariff is picked as soon as the work is filled, chan
   await wizard.locator(".wizard-steps button").filter({ hasText: "02" }).click();
   await expect(work.locator(".work-layout__cell--price")).toContainText("1 000 ₽");
   if (process.env.CAPTURE_OWNER_QA) await work.screenshot({ path: "../../test-results/paid-v3/works-tariff.png" });
+});
+
+test("order card: a new work gets its tariff and cost as soon as it is filled", async ({ page }) => {
+  const requests: Request[] = [];
+  await fixtures(page, requests, {
+    services,
+    extra: (path) => path.endsWith("/crm/orders/card-order") ? cardDetail()
+      : path.endsWith("/crm/pricing/options") ? { options: [option("t-apostille", { is_auto: true })], auto_key: "t-apostille", resolution: "direct", message: "" }
+        : undefined,
+  });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/admin/orders?open=card-order");
+  const card = page.locator(".phase5-order-card");
+  await card.getByRole("tab", { name: /Работы/ }).click();
+  await card.getByRole("button", { name: "Добавить работу +" }).click();
+  const form = card.locator(".work-inline-editor .work-draft");
+  await pick(page, form, "Услуга", "Апостиль");
+  await form.getByLabel("Количество документов").fill("2");
+  await expect(form.locator(".work-tariff-picker")).toContainText("500");
+  await expect(form.locator(".work-layout__cell--price")).toContainText("1 000 ₽");
+  await card.getByRole("button", { name: "Сохранить работу" }).click();
+  await expect.poll(() => requests.find((r) => r.method === "POST" && r.path.endsWith("/card-order/works"))?.body).toBeTruthy();
+  expect(JSON.parse(requests.find((r) => r.method === "POST" && r.path.endsWith("/card-order/works"))!.body)).toMatchObject({ service_code: "apostille", tariff_ids: ["t-apostille"], document_count: 2 });
 });

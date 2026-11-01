@@ -2506,17 +2506,6 @@ const quoteRequestBody = (work: DraftWork, clientId: string | null) => ({
   native_speaker: work.native_speaker,
   client_id: clientId || null,
 });
-const tariffSourceLabel = (work: DraftWork) =>
-  work.manualPrice
-    ? "Итог задан вручную"
-    : work.tariff_ids.some((id) => id.startsWith("client:"))
-      ? "Тариф клиента"
-      : work.tariff_ids.length
-        ? "Стандартный тариф"
-        : Number(work.client_rate || 0) > 0
-          ? "Ставка вручную"
-          : "Подбирается CRM при сохранении";
-
 /** «Тариф» on the wizard «Работы» step: the same choice as on «Расчёт» (one state). */
 function WizardTariffField({ work, service, options, loading, onPick }: { work: DraftWork; service?: Service; options: TariffOption[] | undefined; loading: boolean; onPick: (option: TariffOption) => void }) {
   if (!work.service_code) return null;
@@ -2555,50 +2544,74 @@ function WorkTariffPicker({ work, service, clientId, patch }: { work: DraftWork;
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const selectedKey = work.tariff_ids.join(",");
-  async function load() {
+  const selected = options?.find((option) => option.key === selectedKey);
+  // Same as the wizard «Работы» step (owner, 2026-11-01): the tariff and the cost appear as soon as
+  // the work is filled. Options are re-read only when the pricing inputs change.
+  const inputs = [work.service_code, work.certification_mode, work.source_language, work.target_language, billedCharacters(work), work.page_count,
+    work.document_count, work.duration_seconds, work.hour_count, work.urgent, work.urgency_multiplier, work.native_speaker, clientId].join("|");
+  useEffect(() => {
     if (!work.service_code) return;
-    setLoading(true);
-    try {
-      const result = await api<{ options: TariffOption[]; message?: string }>("/api/admin/crm/pricing/options", {
-        method: "POST",
-        body: JSON.stringify(quoteRequestBody(work, clientId)),
-      });
-      setOptions(result.options);
-      setMessage(result.options.length ? "" : result.message || "Подходящих тарифов нет — укажите ставку вручную.");
-    } catch (e) {
-      setOptions([]);
-      setMessage(e instanceof Error ? e.message : "Не удалось загрузить тарифы");
-    } finally {
-      setLoading(false);
-    }
-  }
-  if (!options)
-    return (
-      <div className="pricing-field work-tariff-picker">
-        <span className="field__label">Тариф</span>
-        <div className="calculated-value">
-          <strong>{Number(work.client_rate || 0) > 0 ? formatRate(work.client_rate, work.billing_unit) : "—"}</strong>
-          <small>{tariffSourceLabel(work)}</small>
-        </div>
-        <Button type="button" variant="quiet" disabled={!work.service_code || loading} onClick={() => void load()}>
-          {loading ? "Загружаем…" : "Выбрать другой тариф"}
-        </Button>
-      </div>
-    );
+    let active = true;
+    const timer = window.setTimeout(async () => {
+      setLoading(true);
+      try {
+        const result = await api<{ options: TariffOption[]; auto_key: string; message?: string }>("/api/admin/crm/pricing/options", {
+          method: "POST",
+          body: JSON.stringify(quoteRequestBody(work, clientId)),
+        });
+        if (!active) return;
+        setOptions(result.options);
+        setMessage(result.options.length ? "" : result.message || "Подходящих тарифов нет — укажите ставку вручную.");
+        if (work.manualPrice) return;
+        const current = result.options.find((option) => option.key === work.tariff_ids.join(","));
+        if (current) {
+          // the same tariff for a new volume: refresh the cost
+          if (!work.quoteAmount) patch(quotePatchFromOption(work, current));
+        } else if (!work.tariff_ids.length && Number(work.client_rate || 0) === 0) {
+          // a work without a tariff (new, or its service/languages changed) gets the CRM choice
+          const auto = result.options.find((option) => option.key === result.auto_key) ?? result.options[0];
+          if (auto) patch(quotePatchFromOption(work, auto, true));
+        }
+      } catch (e) {
+        if (!active) return;
+        setOptions([]);
+        setMessage(e instanceof Error ? e.message : "Не удалось загрузить тарифы");
+      } finally {
+        if (active) setLoading(false);
+      }
+    }, 450);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+    // re-quote on the pricing inputs only; work/patch change identity on every keystroke
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputs]);
+  if (!work.service_code) return null;
   return (
     <div className="work-tariff-picker">
       <Select
         label="Тариф"
-        value={options.some((option) => option.key === selectedKey) ? selectedKey : ""}
-        hint={message || `Сейчас: ${tariffSourceLabel(work)}`}
+        value={selected ? selectedKey : ""}
+        hint={
+          loading
+            ? "Подбираем тариф…"
+            : selected
+              ? `${formatRate(selected.rate, selected.unit)} · ${selected.client_tariff ? "тариф клиента" : "стандартный тариф"}`
+              : work.manualPrice
+                ? "Итог задан вручную"
+                : Number(work.client_rate || 0) > 0
+                  ? `Ставка вручную: ${formatRate(work.client_rate, work.billing_unit)}`
+                  : message || "Заполните услугу, языки и объём"
+        }
         onChange={(e) => {
-          const option = options.find((item) => item.key === e.target.value);
+          const option = options?.find((item) => item.key === e.target.value);
           if (!option) return;
           patch({ ...quotePatchFromOption(work, option), manualPrice: false });
         }}
       >
-        <option value="">{options.length ? "Выберите тариф" : "Подходящих тарифов нет"}</option>
-        {options.map((option) => <option key={option.key} value={option.key}>{tariffOptionLabel(service, option)}</option>)}
+        <option value="">{options?.length ? "Выберите тариф" : "—"}</option>
+        {(options ?? []).map((option) => <option key={option.key} value={option.key}>{tariffOptionLabel(service, option)}</option>)}
       </Select>
     </div>
   );
@@ -4655,7 +4668,7 @@ function OrderCard({
                   work={workEditor.draft}
                   service={services.find((item) => item.code === workEditor.draft.service_code)}
                   clientId={order.client_id}
-                  patch={(patch) => setWorkEditor({ ...workEditor, draft: { ...workEditor.draft, ...patch } })}
+                  patch={(patch) => setWorkEditor((current) => (current ? { ...current, draft: { ...current.draft, ...patch } } : current))}
                 />
               }
               filesSlot={
